@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "electron"],
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["main.ts", "preload.ts", "permissionQa.ts", "nativeSurfaceWindow.ts"]
+}
