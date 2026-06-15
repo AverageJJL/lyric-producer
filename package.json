@@ -1,0 +1,142 @@
+{
+  "name": "MusicApp",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node electron/scripts/dev.mjs",
+    "setup:submodules": "node electron/scripts/setup-submodules.mjs",
+    "build": "npm run build:engine && npm run build:electron && vite build",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build:engine": "node electron/scripts/build-native.mjs",
+    "validate:macos": "node electron/scripts/validate-macos-package.mjs",
+    "validate:permissions": "node electron/scripts/validate-permission-qa.mjs",
+    "validate:release": "node electron/scripts/validate-release-readiness.mjs",
+    "validate:collab-service": "node electron/scripts/validate-collaboration-service.mjs",
+    "validate:release-services": "node electron/scripts/validate-release-services.mjs",
+    "validate:release-artifacts": "node electron/scripts/validate-release-artifacts.mjs",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs,.cjs",
+    "start": "npm run dev",
+    "test": "jest",
+    "collab:service": "node electron/scripts/collaboration-service.mjs",
+    "smoke:collab-service-persistence": "node electron/scripts/smoke-collaboration-service-persistence.mjs",
+    "smoke:collab-service-production": "node electron/scripts/smoke-collaboration-service-production.mjs",
+    "smoke:release-services": "node electron/scripts/smoke-release-services.mjs",
+    "smoke:native-master-mix": "node electron/scripts/smoke-native-master-mix.mjs",
+    "smoke:native-track-mix": "node electron/scripts/smoke-native-track-mix.mjs",
+    "smoke:native-tempo-map": "node electron/scripts/smoke-native-tempo-map.mjs",
+    "smoke:native-meter-events": "node electron/scripts/smoke-native-meter-events.mjs",
+    "smoke:native-command-matrix": "node electron/scripts/smoke-native-command-matrix.mjs",
+    "smoke:native-external-plugin-host": "node electron/scripts/smoke-native-external-plugin-host.mjs",
+    "smoke:native-routing-graph": "node electron/scripts/smoke-native-routing-graph.mjs",
+    "smoke:native-audio-offset": "node electron/scripts/smoke-native-audio-offset.mjs",
+    "smoke:native-fx": "node electron/scripts/smoke-native-fx.mjs",
+    "smoke:native-fx-recovery": "node electron/scripts/smoke-native-fx-recovery.mjs",
+    "smoke:native-instrument-param": "node electron/scripts/smoke-native-instrument-param.mjs",
+    "smoke:native-spectrogram": "node electron/scripts/smoke-native-spectrogram.mjs",
+    "smoke:native-sampler": "node electron/scripts/smoke-native-sampler.mjs",
+    "generate:drums": "node tools/generate-drum-samples.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3",
+    "fflate": "^0.8.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-react-jsx": "^7.28.6",
+    "@babel/plugin-transform-typescript": "^7.28.6",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "cmake-js": "^8.0.0",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^8.19.0",
+    "jest": "^29.6.3",
+    "jest-environment-jsdom": "^30.4.1",
+    "jsdom": "^29.1.1",
+    "node-addon-api": "^8.8.0",
+    "prettier": "2.8.8",
+    "typescript": "^5.8.3",
+    "vite": "^8.0.16"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "build": {
+    "appId": "com.musicapp.aiproducercore",
+    "productName": "AI Producer Core",
+    "electronUpdaterCompatibility": ">=2.16",
+    "detectUpdateChannel": true,
+    "generateUpdatesFilesForAllChannels": true,
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "${env.AI_PRODUCER_UPDATE_FEED_URL}",
+        "channel": "latest",
+        "publishAutoUpdate": true
+      }
+    ],
+    "files": [
+      "dist-electron/**/*",
+      "dist/renderer/**/*",
+      "electron/native/build-release/Release/native_audio_engine.node",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/instruments",
+        "to": "assets/instruments"
+      },
+      {
+        "from": "assets/drums/icons",
+        "to": "assets/drums/icons"
+      },
+      {
+        "from": "assets/sample-library",
+        "to": "assets/sample-library"
+      }
+    ],
+    "asarUnpack": [
+      "electron/native/build-release/Release/native_audio_engine.node"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.music",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/signing/entitlements.mac.plist",
+      "entitlementsInherit": "electron/signing/entitlements.mac.inherit.plist",
+      "notarize": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "AI Producer Core records microphone audio only when you start recording."
+      }
+    },
+    "win": {
+      "target": "nsis",
+      "verifyUpdateCodeSignature": true,
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": true,
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
+    }
+  }
+}

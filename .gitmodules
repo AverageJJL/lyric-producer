@@ -1,0 +1,8 @@
+[submodule "shared_cpp/third_party/juce"]
+	path = shared_cpp/third_party/juce
+	url = https://github.com/juce-framework/JUCE.git
+	branch = master
+[submodule "shared_cpp/third_party/tracktion_engine"]
+	path = shared_cpp/third_party/tracktion_engine
+	url = https://github.com/Tracktion/tracktion_engine.git
+	branch = develop
