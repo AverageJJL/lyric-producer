@@ -1,0 +1,54 @@
+.workspace-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-right: var(--right-dock-width, 0px);
+  transition: padding-right 180ms ease;
+}
+
+.right-dock {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+  max-width: 560px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--line-soft);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+}
+
+.right-dock-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.right-dock-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.right-dock-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

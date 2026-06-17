@@ -1,0 +1,63 @@
+{
+  "libraryId": "cc0-core",
+  "displayName": "CC0 Core Library",
+  "license": "CC0-1.0",
+  "description": "Curated downloadable sample families for AI Producer Core.",
+  "packs": [
+    {
+      "id": "core-drums",
+      "family": "drums",
+      "displayName": "Core Drums",
+      "license": "CC0-1.0",
+      "description": "Kick, snare, hats, toms, clap, and percussion one-shots.",
+      "sourceName": "AI Producer Core local fixture",
+      "sourceUrl": "",
+      "fileCount": 8,
+      "totalBytes": 595716
+    },
+    {
+      "id": "core-bass-guitar",
+      "family": "bass-guitar",
+      "displayName": "Core Bass/Guitar",
+      "license": "CC0-1.0",
+      "description": "Karoryfer Growlybass and Emilyguitar starter notes.",
+      "sourceName": "Karoryfer Samples",
+      "sourceUrl": "https://shop.karoryfer.com/pages/free-samples",
+      "fileCount": 14,
+      "totalBytes": 9738528
+    },
+    {
+      "id": "core-keys",
+      "family": "keys",
+      "displayName": "Core Keys",
+      "license": "CC0-1.0",
+      "description": "Reserved for curated VCSL Keys samples in the hosted manifest.",
+      "sourceName": "Versilian Studios",
+      "sourceUrl": "https://versilian-studios.com/vcsl-keys/",
+      "fileCount": 0,
+      "totalBytes": 0
+    },
+    {
+      "id": "core-orchestra",
+      "family": "orchestra",
+      "displayName": "Core Orchestra",
+      "license": "CC0-1.0",
+      "description": "Reserved for curated VSCO/VCSL orchestral samples in the hosted manifest.",
+      "sourceName": "Versilian Studios",
+      "sourceUrl": "https://versilian-studios.com/vsco-community/",
+      "fileCount": 0,
+      "totalBytes": 0
+    },
+    {
+      "id": "core-percussion-fx",
+      "family": "percussion-fx",
+      "displayName": "Core Percussion/FX",
+      "license": "CC0-1.0",
+      "description": "Reserved for curated CC0 percussion and FX in the hosted manifest.",
+      "sourceName": "Versilian Studios",
+      "sourceUrl": "https://versilian-studios.com/vsco-community/",
+      "fileCount": 0,
+      "totalBytes": 0
+    }
+  ]
+}

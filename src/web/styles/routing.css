@@ -1,0 +1,89 @@
+.track-routing-controls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(82px, 1fr));
+  gap: 6px 8px;
+  align-items: center;
+  padding-left: 12px;
+}
+
+.track-routing-field,
+.track-routing-send,
+.track-routing-pre {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  align-items: center;
+}
+
+.track-routing-field {
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.track-routing-send {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(110px, 1fr) 58px auto 48px;
+  gap: 6px;
+}
+
+.track-routing-pre {
+  grid-template-columns: auto 14px;
+}
+
+.track-routing-field span,
+.track-routing-pre span,
+.track-routing-list button,
+.track-routing-send button {
+  overflow: hidden;
+  color: #d8dbde;
+  font-size: 9px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-routing-field select,
+.track-routing-send select,
+.track-routing-send input {
+  min-width: 0;
+  width: 100%;
+  height: 20px;
+  color: #f0f2f4;
+  font-size: 9px;
+  font-weight: 800;
+  background: #3d4042;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+}
+
+.track-routing-send input {
+  padding: 0 3px;
+}
+
+.track-routing-pre input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent-green);
+}
+
+.track-routing-list {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 5px;
+}
+
+.track-routing-list button,
+.track-routing-send button {
+  height: 20px;
+  padding: 0 5px;
+  background: #3d4042;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.track-routing-send button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}

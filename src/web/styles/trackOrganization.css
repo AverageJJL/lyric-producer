@@ -1,0 +1,57 @@
+.track-row.disabled {
+  background: #47494b;
+}
+
+.track-row.disabled .track-main,
+.track-row.disabled .track-mix-controls {
+  opacity: 0.58;
+}
+
+.track-row.disabled .track-name::after {
+  content: ' OFF';
+  color: #f1c45b;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.track-organization-labels {
+  display: grid;
+  grid-template-columns: repeat(2, 42px);
+  gap: 4px;
+}
+
+.track-organization-labels input {
+  width: 42px;
+  height: 22px;
+  padding: 0 4px;
+  color: #f0f2f4;
+  font-size: 9px;
+  font-weight: 800;
+  background: #3d4042;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  border-radius: 4px;
+}
+
+.track-organization-labels input::placeholder {
+  color: #9da3a8;
+}
+
+.track-height-control {
+  display: grid;
+  grid-template-columns: auto 54px;
+  gap: 3px;
+  align-items: center;
+  color: #d8dbde;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.track-height-control select {
+  height: 22px;
+  color: #f0f2f4;
+  font-size: 9px;
+  font-weight: 800;
+  background: #3d4042;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  border-radius: 4px;
+}

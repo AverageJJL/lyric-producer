@@ -1,0 +1,331 @@
+:root {
+  --bg-app: #15171d;
+  --bg-panel: #1e2128;
+  --bg-panel-soft: #262a33;
+  --bg-panel-raised: #2f3542;
+  --bg-track: #3d4454;
+  --bg-arrange: #1a1d24;
+  --line-dark: #0f1115;
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --text-main: #eef0f4;
+  --text-muted: #a8adb8;
+  --text-dim: #727886;
+  --accent-primary: #7eaeff;
+  --accent-primary-rgb: 126, 174, 255;
+  --accent-primary-contrast: #101419;
+  --accent-green: var(--accent-primary);
+  --accent-red: #e85d52;
+  --accent-blue: var(--accent-primary);
+  --accent-amber: #f5b34a;
+  --accent-violet: #8b7bf0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  color: var(--text-main);
+  background: var(--bg-app);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    var(--bg-app);
+  background-size: 12px 12px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button {
+  color: inherit;
+  border: 0;
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(100, 165, 255, 0.95);
+  outline-offset: -2px;
+}
+
+.app-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.media-drop-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 56px 16px 16px;
+  display: grid;
+  place-items: center;
+  color: #eef6ff;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(31, 32, 34, 0.78);
+  border: 1px dashed rgba(100, 165, 255, 0.82);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.media-drop-toast {
+  position: absolute;
+  z-index: 31;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 10px 12px;
+  color: #f5f7fa;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(43, 47, 52, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.workspace:focus {
+  outline: none;
+}
+
+.workspace:focus-visible {
+  outline: 1px solid rgba(100, 165, 255, 0.45);
+  outline-offset: -1px;
+}
+
+.library-header,
+.tracks-titlebar,
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--line-dark);
+}
+
+.tracks-titlebar {
+  justify-content: space-between;
+}
+
+.library-header strong,
+.tracks-titlebar strong,
+.timeline-toolbar strong {
+  color: var(--text-main);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.timeline-toolbar-meta,
+.snap-grid-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.snap-grid-control span {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.snap-grid-control select {
+  height: 22px;
+  padding: 0 22px 0 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.snap-grid-control input {
+  width: 14px;
+  height: 14px;
+  accent-color: #9fb7ff;
+}
+
+.timeline-tool-button {
+  height: 22px;
+  padding: 0 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.timeline-tool-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+}
+
+.timeline-tool-button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.timeline-fit-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  padding: 0;
+}
+
+.timeline-fit-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.marker-lane {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 21px;
+  pointer-events: none;
+}
+
+.marker-chip {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) 18px 7px;
+  overflow: hidden;
+  height: 20px;
+  color: #141516;
+  font-size: 10px;
+  font-weight: 900;
+  background: rgba(241, 196, 91, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.24);
+  border-radius: 4px;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.marker-chip.dragging {
+  outline: 1px solid rgba(255, 255, 255, 0.62);
+  cursor: grabbing;
+}
+
+.marker-drag-button,
+.marker-resize-handle {
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.marker-drag-button {
+  overflow: hidden;
+  padding-top: 2px;
+  cursor: grab;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marker-resize-handle {
+  cursor: ew-resize;
+}
+
+.marker-resize-handle:hover,
+.marker-resize-handle:focus-visible {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.timeline-marquee-layer {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+}
+
+.timeline-marquee-layer .timeline-track-row {
+  top: 0;
+  pointer-events: auto;
+}
+
+.timeline-marquee-rect {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  background: rgba(118, 178, 255, 0.18);
+  border: 1px solid rgba(154, 201, 255, 0.78);
+}
+
+.grid-line.beat {
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.grid-line.subdivision {
+  background: rgba(255, 255, 255, 0.022);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #202123;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #55585c;
+  border: 2px solid #202123;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #696d72;
+}

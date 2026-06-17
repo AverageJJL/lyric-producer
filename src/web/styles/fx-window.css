@@ -1,0 +1,16 @@
+.fx-window-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+  padding: 12px;
+  gap: 12px;
+  background: var(--bg-app);
+}
+
+.fx-window-header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+}

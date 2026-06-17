@@ -1,0 +1,64 @@
+{
+  "libraryId": "cc0-core",
+  "displayName": "CC0 Core Library",
+  "license": "CC0-1.0",
+  "description": "Local development manifest that copies available workspace assets into grouped writable sample packs.",
+  "packs": [
+    {
+      "packId": "core-drums",
+      "family": "drums",
+      "displayName": "Core Drums",
+      "license": "CC0-1.0",
+      "description": "Kick, snare, hats, toms, clap, and percussion one-shots.",
+      "sourceName": "AI Producer Core local fixture",
+      "sourceUrl": "",
+      "files": [
+        {"packId": "core-drums", "family": "drums", "relativePath": "kick.wav", "url": "asset:drums/kick.wav", "bytes": 132346, "sha256": "7f25e10c782f4a99c57ca346743a912e9104a414a3a22d06595329b3370d4362", "tags": ["drums", "kick"], "displayName": "Kick", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "snare.wav", "url": "asset:drums/snare.wav", "bytes": 44146, "sha256": "667eca1430ac5f692544613ad72bfc82e9f4ba3be461d96c16cc437156d0943e", "tags": ["drums", "snare"], "displayName": "Snare", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "hatClosed.wav", "url": "asset:drums/hatClosed.wav", "bytes": 22094, "sha256": "c9f30ff2b4d73b03f41960e504e03c54e9a59697af666fe4d155bab9cd1ccae6", "tags": ["drums", "hihat", "closed"], "displayName": "Closed Hat", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "hatOpen.wav", "url": "asset:drums/hatOpen.wav", "bytes": 22096, "sha256": "2674962ca376c0d08ce802423eb696be86b516450fe23707ac69f3878b35f12b", "tags": ["drums", "hihat", "open"], "displayName": "Open Hat", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "tom1.wav", "url": "asset:drums/tom1.wav", "bytes": 88246, "sha256": "a324073813003398a3ed92c3e569ac80f6ff50d82253f95b2b87a3f268f6951b", "tags": ["drums", "tom"], "displayName": "Tom 1", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "tom2.wav", "url": "asset:drums/tom2.wav", "bytes": 88246, "sha256": "b649329207aec14fb7880d88a824526fc706ad1e8293b2fd9de5115be01530c0", "tags": ["drums", "tom"], "displayName": "Tom 2", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "perc.wav", "url": "asset:drums/perc.wav", "bytes": 22096, "sha256": "20d5cd385c0f8c3a24bbfe78c2e2747776841ede6185bc0fe93f97f0b455b89c", "tags": ["drums", "percussion"], "displayName": "Percussion", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-drums", "family": "drums", "relativePath": "clap.wav", "url": "asset:drums/clap.wav", "bytes": 176446, "sha256": "376429bb81cb48d1f392a11cd066c32ffb7883d445b2488704ea52e46bb08286", "tags": ["drums", "clap"], "displayName": "Clap", "sourceName": "AI Producer Core local fixture", "sourceUrl": "", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"}
+      ]
+    },
+    {
+      "packId": "core-bass-guitar",
+      "family": "bass-guitar",
+      "displayName": "Core Bass/Guitar",
+      "license": "CC0-1.0",
+      "description": "Karoryfer Growlybass and Emilyguitar starter notes.",
+      "sourceName": "Karoryfer Samples",
+      "sourceUrl": "https://shop.karoryfer.com/pages/free-samples",
+      "files": [
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/db2_f_rr1.wav", "url": "asset:instruments/bass/growlybass/db2_f_rr1.wav", "bytes": 796606, "sha256": "6a51d063354b0cdc1a6f36d97b6110a6aafb5a88bd97646999997080e0d8bb49", "tags": ["bass", "karoryfer"], "displayName": "Growlybass Db2", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/e2_f_rr1.wav", "url": "asset:instruments/bass/growlybass/e2_f_rr1.wav", "bytes": 796608, "sha256": "ab8ea422e3a4210390977d750e7e441bb5d9d3fabcbed5e6702c058ca106e058", "tags": ["bass", "karoryfer"], "displayName": "Growlybass E2", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/gb2_f_rr1.wav", "url": "asset:instruments/bass/growlybass/gb2_f_rr1.wav", "bytes": 796608, "sha256": "ae7199b00fad32a084d3195031fbd8be10713ba9de4b03a27f5c99aaee6eb260", "tags": ["bass", "karoryfer"], "displayName": "Growlybass Gb2", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/a2_f_rr1.wav", "url": "asset:instruments/bass/growlybass/a2_f_rr1.wav", "bytes": 796606, "sha256": "a82372dfddf56c39ea5879adec1bde79d2f40902fa8fcb75ad2d6f5d90db3bf3", "tags": ["bass", "karoryfer"], "displayName": "Growlybass A2", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/c3_f_rr1.wav", "url": "asset:instruments/bass/growlybass/c3_f_rr1.wav", "bytes": 796606, "sha256": "aecf86a56cca457c330e04fab89f1008be44d3d31e48912943ace153089009fb", "tags": ["bass", "karoryfer"], "displayName": "Growlybass C3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/eb3_f_rr1.wav", "url": "asset:instruments/bass/growlybass/eb3_f_rr1.wav", "bytes": 796608, "sha256": "3271914e197edf34a1c366b22be633e0aaac24cb83f653afdb246ffff48ff178", "tags": ["bass", "karoryfer"], "displayName": "Growlybass Eb3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/gb3_f_rr1.wav", "url": "asset:instruments/bass/growlybass/gb3_f_rr1.wav", "bytes": 796608, "sha256": "595b0f1c18147c72e1cf3e894afdcdd09a5a21922f09d17072eab95bbbf15a09", "tags": ["bass", "karoryfer"], "displayName": "Growlybass Gb3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "growlybass/a3_f_rr1.wav", "url": "asset:instruments/bass/growlybass/a3_f_rr1.wav", "bytes": 796608, "sha256": "990d071388e30c550391c245957c89109437c8bdc1c6fdc94e3d1cf3ce99443d", "tags": ["bass", "karoryfer"], "displayName": "Growlybass A3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/a2_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/a2_mf_rr1.wav", "bytes": 560944, "sha256": "b0031818b989d576cdc189154c90162e1b545b7ee9c56a6640ce0e7e658079c4", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar A2", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/c3_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/c3_mf_rr1.wav", "bytes": 560944, "sha256": "255adb40062435e8774a8d02f26b98f7741f3496b362eb265ca3453f5e4ad55d", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar C3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/a3_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/a3_mf_rr1.wav", "bytes": 560944, "sha256": "97da917363eef473435df5e215cedf18579fdef7d7cb0f677f9a50f085930c13", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar A3", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/c4_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/c4_mf_rr1.wav", "bytes": 560946, "sha256": "67643ecb0b523745ff80127396a5c8c6e871115102020c34ab84cce3140aab70", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar C4", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/a4_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/a4_mf_rr1.wav", "bytes": 560946, "sha256": "4df039e1d517e727149ba4ef8e1616ead6761ab485fa541f522611a9388471b8", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar A4", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"},
+        {"packId": "core-bass-guitar", "family": "bass-guitar", "relativePath": "emilyguitar/c5_mf_rr1.wav", "url": "asset:instruments/guitar/emilyguitar/c5_mf_rr1.wav", "bytes": 560946, "sha256": "5e2f79f8b12e1cde3fdaa62e7c441907fd39eb3a222c3d240ae227a241a9f5ee", "tags": ["guitar", "karoryfer"], "displayName": "Emilyguitar C5", "sourceName": "Karoryfer Samples", "sourceUrl": "https://shop.karoryfer.com/pages/free-samples", "license": "CC0-1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"}
+      ]
+    },
+    {
+      "packId": "core-keys",
+      "family": "keys",
+      "displayName": "Core Keys",
+      "license": "CC0-1.0",
+      "description": "Reserved for hosted VCSL Keys samples.",
+      "sourceName": "Versilian Studios",
+      "sourceUrl": "https://versilian-studios.com/vcsl-keys/",
+      "files": []
+    },
+    {"packId": "core-orchestra", "family": "orchestra", "displayName": "Core Orchestra", "license": "CC0-1.0", "description": "Reserved for hosted VSCO/VCSL orchestral samples.", "sourceName": "Versilian Studios", "sourceUrl": "https://versilian-studios.com/vsco-community/", "files": []},
+    {"packId": "core-percussion-fx", "family": "percussion-fx", "displayName": "Core Percussion/FX", "license": "CC0-1.0", "description": "Reserved for hosted CC0 percussion and FX samples.", "sourceName": "Versilian Studios", "sourceUrl": "https://versilian-studios.com/vsco-community/", "files": []}
+  ]
+}

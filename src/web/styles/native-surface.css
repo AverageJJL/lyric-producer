@@ -1,0 +1,303 @@
+:root {
+  --bg-app: rgba(21, 22, 24, 0.9);
+  --bg-panel: #1d1e21;
+  --bg-panel-soft: #242529;
+  --bg-panel-raised: #2b2d31;
+  --bg-track: #383a3f;
+  --bg-arrange: #17181b;
+  --line-dark: #0d0e10;
+  --line-soft: rgba(255, 255, 255, 0.075);
+  --text-main: #e7e7e4;
+  --text-muted: #aaa9a4;
+  --text-dim: #74736f;
+  --accent-primary: #7eaeff;
+  --accent-primary-rgb: 126, 174, 255;
+  --accent-primary-contrast: #101419;
+  --accent-green: var(--accent-primary);
+  --accent-red: #d35c55;
+  --accent-blue: var(--accent-primary);
+  --accent-amber: #c2a057;
+  --accent-violet: #9d93bd;
+  --mac-titlebar-height: 38px;
+}
+
+html,
+body,
+#root {
+  background: transparent;
+}
+
+body {
+  user-select: none;
+  background: rgba(18, 19, 21, 0.88);
+  -webkit-font-smoothing: antialiased;
+  -webkit-touch-callout: none;
+}
+
+.app-shell {
+  background: rgba(21, 22, 24, 0.88);
+}
+
+html[data-platform='darwin'] .app-shell {
+  box-sizing: border-box;
+  padding-top: var(--mac-titlebar-height);
+}
+
+html[data-platform='darwin'] .app-shell::before {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--mac-titlebar-height);
+  background: linear-gradient(180deg, rgba(33, 34, 37, 0.96), rgba(29, 30, 33, 0.94));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.38);
+  content: '';
+  -webkit-app-region: drag;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+button,
+input,
+select,
+textarea,
+label,
+[role='button'],
+[role='menu'],
+.project-menu-panel,
+.track-menu-panel-floating {
+  -webkit-app-region: no-drag;
+}
+
+.transport-bar {
+  position: relative;
+  min-height: 52px;
+  padding: 7px 14px;
+  background: linear-gradient(180deg, rgba(41, 42, 46, 0.9), rgba(29, 30, 33, 0.92));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow: none;
+  -webkit-app-region: drag;
+}
+
+.transport-control-cluster,
+.project-file-menu,
+.workspace-nav-group {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.transport-icon-button,
+.metronome-toggle,
+.workspace-nav-button,
+.timeline-tool-button,
+.mini-button,
+.bpm-control button,
+.click-toggle {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 5px;
+  box-shadow: none;
+  cursor: default;
+  transition:
+    background-color 90ms linear,
+    color 90ms linear,
+    border-color 90ms linear;
+}
+
+.transport-icon-button:hover:not(:disabled),
+.metronome-toggle:hover,
+.workspace-nav-button:hover,
+.timeline-tool-button:hover:not(:disabled),
+.mini-button:hover:not(:disabled),
+.bpm-control button:hover,
+.click-toggle:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.transport-icon-button:active:not(:disabled),
+.metronome-toggle:active,
+.workspace-nav-button:active,
+.timeline-tool-button:active:not(:disabled),
+.mini-button:active,
+.bpm-control button:active,
+.click-toggle:active {
+  transform: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.transport-icon-button.play-toggle.is-playing,
+.metronome-toggle.active,
+.click-toggle.active,
+.mini-button.active,
+.workspace-nav-button.active {
+  color: var(--accent-primary-contrast);
+  background: var(--accent-primary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.transport-icon-button.record-toggle.active .record-dot,
+.mini-button.record.active {
+  background: var(--accent-red);
+  box-shadow: none;
+}
+
+.transport-icon-button.cycle-toggle.active {
+  color: #171510;
+  background: var(--accent-amber);
+}
+
+.lcd-display {
+  color: #d4d8d9;
+  background: rgba(12, 16, 19, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.tempo-input,
+.meter-select,
+.project-key-button,
+.lcd-map-trigger,
+.project-menu-midi-scope select {
+  color: var(--text-main);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.pushable,
+.pushable:hover:not(:disabled) {
+  filter: none;
+  cursor: default;
+}
+
+.pushable-shadow,
+.pushable-edge {
+  display: none;
+}
+
+.pushable-front,
+.pushable:hover:not(:disabled) .pushable-front,
+.pushable:active:not(:disabled) .pushable-front {
+  min-height: 30px;
+  padding: 7px 10px;
+  color: var(--text-main);
+  font-size: 12px;
+  letter-spacing: 0;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 5px;
+  transform: none;
+  transition:
+    background-color 90ms linear,
+    border-color 90ms linear;
+}
+
+.pushable:hover:not(:disabled) .pushable-front {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pushable-blue .pushable-front,
+.pushable-blue:hover:not(:disabled) .pushable-front {
+  color: var(--text-main);
+  background: rgba(143, 155, 170, 0.16) !important;
+  border-color: rgba(143, 155, 170, 0.28) !important;
+}
+
+.pushable-green .pushable-front,
+.pushable-green:hover:not(:disabled) .pushable-front {
+  color: var(--text-main);
+  background: rgba(var(--accent-primary-rgb), 0.18) !important;
+  border-color: rgba(var(--accent-primary-rgb), 0.34) !important;
+}
+
+.track-sidebar-imports .pushable-front {
+  background: rgba(255, 255, 255, 0.055) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.track-sidebar,
+.track-sidebar-actions,
+.ruler-spacer,
+.timeline-container {
+  background: var(--bg-panel);
+}
+
+.track-row {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.track-row:hover,
+.track-row.selected {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.track-row.selected {
+  border-left-color: var(--accent-green);
+}
+
+.track-select-button,
+.menu-row,
+.menu-back,
+.project-menu-panel button[role='menuitem'] {
+  cursor: default;
+}
+
+.project-menu-panel,
+.track-menu-panel,
+.track-menu-panel-floating {
+  background: rgba(39, 40, 43, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+}
+
+.project-menu-panel button[role='menuitem']:hover:not(:disabled),
+.menu-row:hover,
+.menu-back:hover {
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.menu-chevron,
+.menu-back {
+  color: var(--text-muted);
+}
+
+.timeline-track-row,
+.timeline-track-row:nth-of-type(even) {
+  background: var(--bg-arrange);
+}
+
+.ruler-row {
+  background: rgba(255, 255, 255, 0.045);
+  border-bottom-color: rgba(0, 0, 0, 0.55);
+}
+
+.grid-line {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.grid-line.bar {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.sidebar-resize {
+  cursor: col-resize;
+}
+
+html[data-platform='darwin'] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html[data-platform='darwin'] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: transparent;
+}

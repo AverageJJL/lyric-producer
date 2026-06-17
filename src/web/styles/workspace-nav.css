@@ -1,0 +1,42 @@
+.workspace-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-panel-soft);
+  border-radius: 8px;
+}
+
+.workspace-nav-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.workspace-nav-button:hover {
+  background: var(--bg-panel-raised);
+  color: var(--text-main);
+}
+
+.workspace-nav-button.active {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+.workspace-nav-icon {
+  width: 18px;
+  height: 18px;
+}

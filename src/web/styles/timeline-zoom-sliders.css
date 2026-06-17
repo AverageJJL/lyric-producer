@@ -1,0 +1,47 @@
+/* Timeline arrangement zoom sliders (horizontal time scale + track height) */
+
+.timeline-zoom-sliders {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.timeline-zoom-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-zoom-control + .timeline-zoom-control {
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.timeline-zoom-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: #c4c8cc;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.timeline-zoom-slider {
+  width: 72px;
+  height: 4px;
+  margin: 0;
+  accent-color: #b8bcc2;
+  cursor: default;
+}
+
+.timeline-zoom-slider:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

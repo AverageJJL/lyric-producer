@@ -1,0 +1,30 @@
+.ruler-tick.bar {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.timeline-map-marker {
+  position: absolute;
+  z-index: 4;
+  top: 16px;
+  min-width: 22px;
+  height: 11px;
+  padding: 0 3px;
+  color: #101214;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 11px;
+  text-align: center;
+  background: #8ee3f5;
+  border-radius: 3px;
+  transform: translateX(3px);
+  pointer-events: none;
+}
+
+.timeline-map-marker.meter {
+  top: 3px;
+  background: #f1c45b;
+}
+
+.timeline-map-marker.ramp {
+  border-right: 4px solid #d9edf6;
+}

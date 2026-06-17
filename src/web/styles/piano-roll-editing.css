@@ -1,0 +1,114 @@
+.piano-roll-white-seams {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.piano-roll-white-seam {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: rgba(142, 146, 150, 0.48);
+}
+
+.piano-roll-key.black {
+  z-index: 3;
+  justify-content: flex-start;
+  padding: 0;
+  color: transparent;
+  overflow: visible;
+}
+
+.piano-roll-key.black::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: var(--black-key-height);
+  content: '';
+  background: linear-gradient(#2f3339, #14171b);
+  border-right: 1px solid rgba(0, 0, 0, 0.36);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+  transform: translateY(-50%);
+}
+
+.piano-roll-key.black.active::before {
+  background: var(--accent-green);
+}
+
+.piano-roll-key.white {
+  z-index: 2;
+}
+
+.piano-roll-note {
+  overflow: hidden;
+}
+
+.piano-roll-note-label {
+  position: relative;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.piano-roll-note.active {
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.28),
+    0 0 0 1px rgba(57, 217, 130, 0.55);
+}
+
+.piano-roll-note-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 12px;
+  cursor: ew-resize;
+}
+
+.piano-roll-note-resize.start {
+  left: 0;
+}
+
+.piano-roll-note-resize.end {
+  right: 0;
+}
+
+.piano-roll-marquee {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  background: rgba(89, 168, 255, 0.16);
+  border: 1px solid rgba(160, 208, 255, 0.88);
+}
+
+.piano-roll-note-velocity {
+  position: absolute;
+  right: 5px;
+  bottom: 3px;
+  left: 5px;
+  z-index: 3;
+  height: 2px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.piano-roll-note-velocity-fill {
+  display: block;
+  width: var(--note-velocity-width);
+  height: 100%;
+  background: rgba(247, 248, 250, 0.78);
+  border-radius: inherit;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.piano-roll-note.selected .piano-roll-note-velocity-fill,
+.piano-roll-note.active .piano-roll-note-velocity-fill {
+  background: #f7f8fa;
+}

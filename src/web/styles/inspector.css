@@ -1,0 +1,294 @@
+.studio-inspector {
+  display: flex;
+  flex: 0 0 420px;
+  min-width: 390px;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 14px;
+  background: #303132;
+  border-right: 1px solid var(--line-dark);
+}
+
+.library-header {
+  margin: -14px -14px 0;
+}
+
+.studio-inspector > * {
+  flex-shrink: 0;
+}
+
+.patch-preview {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 14px 12px 12px;
+  min-height: 142px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035), transparent),
+    #292a2c;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.patch-preview p,
+.patch-preview strong {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patch-preview p {
+  color: #d4d7da;
+  font-size: 12px;
+}
+
+.patch-preview strong {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.patch-glyph {
+  position: relative;
+  width: 112px;
+  height: 70px;
+  margin-bottom: 34px;
+  border: 4px solid var(--accent-green);
+  border-radius: 7px 7px 3px 3px;
+  box-shadow: 0 0 18px rgba(var(--accent-primary-rgb), 0.22);
+}
+
+.patch-glyph::before,
+.patch-glyph::after {
+  position: absolute;
+  content: '';
+  background: var(--accent-green);
+}
+
+.patch-glyph::before {
+  right: 12px;
+  bottom: 15px;
+  left: 12px;
+  height: 4px;
+}
+
+.patch-glyph::after {
+  right: 12px;
+  bottom: -44px;
+  left: 12px;
+  height: 42px;
+  border-right: 4px solid var(--accent-green);
+  border-left: 4px solid var(--accent-green);
+  background: transparent;
+}
+
+.patch-glyph span {
+  position: absolute;
+  top: 13px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-green);
+  border-radius: 50%;
+}
+
+.patch-glyph span:first-child {
+  left: 30px;
+}
+
+.patch-glyph span:last-child {
+  left: 48px;
+}
+
+.patch-glyph.voice_audio {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 18px rgba(100, 165, 255, 0.22);
+}
+
+.patch-glyph.voice_audio::before,
+.patch-glyph.voice_audio span {
+  background: var(--accent-blue);
+}
+
+.patch-glyph.voice_audio::after {
+  border-color: var(--accent-blue);
+}
+
+.patch-glyph.drum_machine {
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 18px rgba(210, 166, 64, 0.22);
+}
+
+.patch-glyph.drum_machine::before,
+.patch-glyph.drum_machine span {
+  background: var(--accent-amber);
+}
+
+.patch-glyph.drum_machine::after {
+  border-color: var(--accent-amber);
+}
+
+.patch-glyph.empty {
+  opacity: 0.46;
+}
+
+.import-audio-button {
+  height: 32px;
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(91, 140, 255, 0.1);
+  border: 1px solid rgba(91, 140, 255, 0.28);
+  border-radius: 5px;
+  cursor: default;
+}
+
+.import-audio-button:hover:not(:disabled) {
+  background: rgba(91, 140, 255, 0.18);
+}
+
+.import-audio-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.import-audio-button.secondary {
+  color: var(--accent-blue);
+  background: rgba(91, 140, 255, 0.1);
+  border: 1px solid rgba(91, 140, 255, 0.28);
+}
+
+.import-audio-error {
+  margin: -4px 0 0;
+  color: var(--accent-red);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.inspector-card {
+  min-height: auto;
+  padding: 12px;
+  background: #28292b;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.inspector-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.inspector-title strong {
+  color: #e5e6e8;
+}
+
+.inspector-title button {
+  height: 22px;
+  padding: 0 7px;
+  color: #202224;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.inspector-card dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+}
+
+.inspector-card dl div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.inspector-card dt,
+.inspector-card dd {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.inspector-card dt {
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-mix-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.master-mix-row {
+  display: grid;
+  grid-template-columns: 64px minmax(54px, auto);
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.master-mix-row span,
+.master-mix-row output {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-mix-row output {
+  color: #f0f2f4;
+  text-align: right;
+}
+
+.master-mix-row input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent-green);
+}
+
+.audio-device-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.audio-device-panel select {
+  min-width: 0;
+  height: 28px;
+  color: #e5e6e8;
+  font-size: 11px;
+  font-weight: 700;
+  background: #343638;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+}
+
+.audio-device-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.audio-device-error {
+  margin: 0;
+  color: var(--accent-red);
+  font-size: 11px;
+  font-weight: 700;
+}

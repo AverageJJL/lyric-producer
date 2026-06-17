@@ -1,0 +1,53 @@
+.copilot-drum-option-card {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(234, 163, 89, 0.28);
+  border-radius: 7px;
+  background: rgba(234, 163, 89, 0.08);
+}
+
+.copilot-drum-grid {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.copilot-drum-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.copilot-drum-row span {
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copilot-drum-row div {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.copilot-drum-row i {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.copilot-drum-row i.beat-start {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.copilot-drum-row i.active {
+  background: #eaa359;
+  box-shadow: 0 0 8px rgba(234, 163, 89, 0.34);
+}

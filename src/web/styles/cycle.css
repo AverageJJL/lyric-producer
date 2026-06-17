@@ -1,0 +1,119 @@
+.cycle-control {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-width: 54px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cycle-control span {
+  color: rgba(217, 237, 246, 0.66);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.cycle-control .cycle-toggle {
+  height: 20px;
+  padding: 0 7px;
+  color: rgba(217, 237, 246, 0.72);
+  font-size: 9px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.cycle-control .cycle-toggle.active {
+  color: #101214;
+  background: #f1c45b;
+}
+
+.looper-control {
+  display: grid;
+  min-width: 64px;
+  gap: 2px;
+  justify-items: stretch;
+}
+
+.looper-toggle,
+.looper-length {
+  height: 20px;
+  color: rgba(217, 237, 246, 0.78);
+  font-size: 9px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.looper-toggle {
+  cursor: default;
+}
+
+.looper-toggle.active {
+  color: #101214;
+  background: #8ee3f5;
+}
+
+.looper-length {
+  padding: 0 4px;
+}
+
+.looper-layer-count {
+  color: rgba(217, 237, 246, 0.66);
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.cycle-locator-layer {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  pointer-events: none;
+}
+
+.cycle-locator-region {
+  position: absolute;
+  top: 2px;
+  height: 5px;
+  background: rgba(120, 124, 128, 0.28);
+  border-top: 1px solid rgba(140, 144, 148, 0.55);
+}
+
+.cycle-locator-layer.active .cycle-locator-region {
+  background: rgba(241, 196, 91, 0.38);
+  border-top-color: rgba(241, 196, 91, 0.72);
+}
+
+.cycle-locator-handle {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: ew-resize;
+  pointer-events: auto;
+  transform: translateX(-6px);
+}
+
+.cycle-locator-handle::after {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 5px;
+  width: 2px;
+  background: #8c9094;
+  box-shadow: 0 0 0 1px rgba(20, 20, 20, 0.42);
+  content: '';
+}
+
+.cycle-locator-layer.active .cycle-locator-handle::after {
+  background: #f1c45b;
+}

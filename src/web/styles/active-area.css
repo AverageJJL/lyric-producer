@@ -1,0 +1,5 @@
+.workspace:focus-within:not(:focus-visible),
+.resizable-editor-panel:focus-within {
+  outline: 1px solid rgba(93, 156, 255, 0.34);
+  outline-offset: -1px;
+}

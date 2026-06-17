@@ -1,0 +1,85 @@
+.structure-stack-panel {
+  gap: 10px;
+}
+
+.structure-stack-controls,
+.structure-stack-actions,
+.structure-stack-row {
+  display: grid;
+  gap: 6px;
+}
+
+.structure-stack-controls {
+  grid-template-columns: 1fr;
+}
+
+.structure-stack-controls input,
+.structure-stack-controls select {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  color: #eef2f4;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.structure-stack-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.structure-stack-actions button,
+.structure-stack-row button {
+  min-height: 28px;
+  color: #eef2f4;
+  font-size: 10px;
+  font-weight: 900;
+  background: rgba(100, 165, 255, 0.2);
+  border: 1px solid rgba(100, 165, 255, 0.34);
+  border-radius: 4px;
+}
+
+.structure-stack-actions button:disabled,
+.structure-stack-row button:disabled {
+  color: rgba(238, 242, 244, 0.44);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.structure-stack-list {
+  display: grid;
+  gap: 6px;
+}
+
+.structure-stack-row {
+  grid-template-columns: minmax(0, 1fr) 64px;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+}
+
+.structure-stack-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.structure-stack-row small,
+.structure-stack-empty {
+  color: rgba(217, 237, 246, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.structure-stack-row span {
+  overflow: hidden;
+  color: #eef2f4;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,67 @@
+.meter-detail {
+  min-width: 96px;
+}
+
+.tempo-map-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: 214px;
+  gap: 5px;
+  padding: 8px;
+  background: rgba(27, 33, 39, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+}
+
+.tempo-map-menu-control {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 8px;
+  align-items: center;
+  color: rgba(217, 237, 246, 0.76);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tempo-map-ramp,
+.tempo-map-menu button {
+  height: 26px;
+  color: rgba(217, 237, 246, 0.86);
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.tempo-map-ramp {
+  padding: 0 2px;
+}
+
+.tempo-map-menu button {
+  padding: 0 8px;
+  text-align: left;
+  cursor: default;
+}
+
+.tempo-map-menu button.active {
+  color: var(--accent-primary-contrast);
+  background: var(--accent-primary);
+}
+
+.tempo-map-menu button:disabled {
+  color: rgba(217, 237, 246, 0.3);
+  cursor: default;
+}
+
+.tempo-map-count {
+  padding-top: 4px;
+  color: rgba(217, 237, 246, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}

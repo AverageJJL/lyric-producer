@@ -1,0 +1,105 @@
+/* 3D push buttons — dark nav edge + accent-blue face (inspired by Uiverse pushable pattern). */
+
+.pushable {
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
+  outline-offset: 3px;
+  transition: filter 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pushable:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.pushable:disabled {
+  cursor: default;
+  filter: grayscale(0.15);
+  opacity: 0.58;
+}
+
+.pushable-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: #2a3344;
+  filter: blur(2px);
+  transform: translateY(2px);
+  transition: transform 250ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  will-change: transform;
+}
+
+.pushable-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(
+    to right,
+    var(--bg-app) 0%,
+    #2a3448 10%,
+    #2a3448 90%,
+    #0f1115 100%
+  );
+}
+
+.pushable-blue .pushable-front {
+  background: linear-gradient(180deg, #6f9dff 0%, var(--accent-blue) 100%);
+  color: #fff;
+}
+
+.pushable-green .pushable-shadow {
+  background: #243a66;
+}
+
+.pushable-green .pushable-front {
+  background: linear-gradient(180deg, #a6c6ff 0%, var(--accent-primary) 100%);
+  color: var(--accent-primary-contrast);
+}
+
+.pushable-front {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transform: translateY(-3px);
+  transition: transform 180ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.pushable:hover:not(:disabled) {
+  filter: brightness(108%);
+}
+
+.pushable:hover:not(:disabled) .pushable-front {
+  transform: translateY(-5px);
+  transition: transform 140ms cubic-bezier(0.3, 0.7, 0.4, 1.35);
+}
+
+.pushable:hover:not(:disabled) .pushable-shadow {
+  transform: translateY(3px);
+  transition: transform 140ms cubic-bezier(0.3, 0.7, 0.4, 1.35);
+}
+
+.pushable:active:not(:disabled) .pushable-front {
+  transform: translateY(-1px);
+  transition: transform 34ms ease;
+}
+
+.pushable:active:not(:disabled) .pushable-shadow {
+  transform: translateY(1px);
+  transition: transform 34ms ease;
+}
+
+.pushable:disabled .pushable-front {
+  transform: translateY(-2px);
+}
