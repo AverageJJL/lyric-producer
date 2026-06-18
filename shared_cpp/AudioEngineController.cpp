@@ -7,6 +7,7 @@
 #include "ArrangementCommands.h"
 #include "AmpSimCommands.h"
 #include "EngineEventPublisher.h"
+#include "AskMeasurementCommands.h"
 #include "AudioInputCapture.h"
 #include "InstrumentCommands.h"
 #include "InstrumentParameterCommands.h"
@@ -15,6 +16,7 @@
 #include "JsonResponse.h"
 #include "MediaAnalysisCommands.h"
 #include "MeterSnapshot.h"
+#include "MidiPhrasePreview.h"
 #include "MixdownRenderManager.h"
 #include "MusicAppEngineBehaviour.h"
 #include "PlaybackDeviceRouting.h"
@@ -276,6 +278,14 @@ class AudioEngineController::Impl {
         return handleSetClickTrack(payloadJson);
       }
 
+      if (command == "start_count_in_click") {
+        return handleStartCountInClick(payloadJson);
+      }
+
+      if (command == "stop_count_in_click") {
+        return handleStopCountInClick(payloadJson);
+      }
+
       if (command == "setTracks" || command == "set_tracks") {
         return handleSetTracks(payloadJson);
       }
@@ -432,6 +442,16 @@ class AudioEngineController::Impl {
         return commandResultToJson(result);
       }
 
+      if (command == "measure_loudness") {
+        const auto result = handleMeasureLoudness(*edit_, projectState_, payloadJson);
+        return commandResultToJson(result);
+      }
+
+      if (command == "get_spectrum_bands") {
+        const auto result = handleGetSpectrumBands(*edit_, projectState_, payloadJson);
+        return commandResultToJson(result);
+      }
+
       if (command == "delete_clip") {
         const auto result = handleDeleteClip(projectState_, payloadJson);
         return commandResultToJson(result);
@@ -443,6 +463,9 @@ class AudioEngineController::Impl {
       }
 
       if (command == "midi_note_on") {
+        if (isMidiPhrasePreviewActive()) {
+          handleStopMidiPhrasePreview();
+        }
         if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
           return commandResultToJson(
               makeError("midi_note_on", "audio_device_unavailable", *error));
@@ -457,6 +480,9 @@ class AudioEngineController::Impl {
       }
 
       if (command == "play_sample") {
+        if (isMidiPhrasePreviewActive()) {
+          handleStopMidiPhrasePreview();
+        }
         if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
           return commandResultToJson(
               makeError("play_sample", "audio_device_unavailable", *error));
@@ -474,6 +500,9 @@ class AudioEngineController::Impl {
 
       if (command == "start_pattern_preview" || command == "update_pattern_preview"
           || command == "stop_pattern_preview") {
+        if (command == "start_pattern_preview" && isMidiPhrasePreviewActive()) {
+          handleStopMidiPhrasePreview();
+        }
         if (command != "stop_pattern_preview") {
           if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
             return commandResultToJson(
@@ -509,7 +538,26 @@ class AudioEngineController::Impl {
       }
 
       if (command == "midi_all_notes_off") {
+        if (isMidiPhrasePreviewActive()) {
+          handleStopMidiPhrasePreview();
+        }
         const auto result = handleMidiAllNotesOff(*edit_, projectState_, payloadJson);
+        return commandResultToJson(result);
+      }
+
+      if (command == "start_midi_phrase_preview" || command == "stop_midi_phrase_preview") {
+        if (command == "start_midi_phrase_preview") {
+          if (isDrumPatternPreviewActive()) {
+            handleStopPatternPreview();
+          }
+          if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
+            return commandResultToJson(
+                makeError(command, "audio_device_unavailable", *error));
+          }
+          const auto result = handleStartMidiPhrasePreview(*edit_, projectState_, payloadJson);
+          return commandResultToJson(result);
+        }
+        const auto result = handleStopMidiPhrasePreview();
         return commandResultToJson(result);
       }
 
@@ -623,6 +671,19 @@ class AudioEngineController::Impl {
   bool nativeTrackGraphReady_ = false;
   NativeTrackOutputRoutingSummary lastNativeRouting_;
   NativeTrackSidechainRoutingSummary lastNativeSidechain_;
+  struct CountInClickTrackState {
+    bool muted = false;
+    bool solo = false;
+  };
+  struct CountInClickState {
+    bool active = false;
+    bool clickEnabled = false;
+    bool clickRecordingOnly = false;
+    double restoreBeat = 0.0;
+    double recordStartBeat = 0.0;
+    std::vector<CountInClickTrackState> tracks;
+  };
+  CountInClickState countInClickState_;
 
   void createDefaultEdit() {
     edit_ = std::make_unique<te::Edit>(*engine_, te::Edit::forEditing);
@@ -782,6 +843,7 @@ class AudioEngineController::Impl {
 
     if (shouldPlay) {
       handleStopPatternPreview();
+      handleStopMidiPhrasePreview();
       clearAllPreviewClips(*edit_, projectState_);
       if (payload.contains("positionBeat")) {
         setTransportPositionBeats(*edit_, payload["positionBeat"].get<double>());
@@ -795,6 +857,7 @@ class AudioEngineController::Impl {
     } else {
       transport.stop(false, false);
       handleStopPatternPreview();
+      handleStopMidiPhrasePreview();
       if (payload.contains("positionSeconds")) {
         transport.setPosition(
             tracktion::TimePosition::fromSeconds(payload["positionSeconds"].get<double>()));
@@ -843,6 +906,101 @@ class AudioEngineController::Impl {
 
     configureClickTrack(payload["enabled"].get<bool>());
     return commandResultToJson(makeSuccess("set_click_track", statusJson()));
+  }
+
+  std::string handleStartCountInClick(const std::string& payloadJson) {
+    nlohmann::json payload = nlohmann::json::parse(payloadJson, nullptr, false);
+    if (payload.is_discarded() || !payload.contains("beats") || !payload["beats"].is_number()) {
+      return commandResultToJson(
+          makeError("start_count_in_click", "invalid_payload", "Expected payload { \"beats\": number }."));
+    }
+
+    if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
+      return commandResultToJson(makeError("start_count_in_click", "audio_device_unavailable", *error));
+    }
+
+    if (countInClickState_.active) {
+      restoreCountInClickState(std::nullopt);
+    }
+
+    auto& transport = edit_->getTransport();
+    const double beats = std::max(0.0, payload["beats"].get<double>());
+    const double recordStartBeat = std::max(
+        0.0,
+        jsonFiniteNumberOr(payload, "recordStartBeat", readTransportBeat(*edit_)));
+    const double leadInBeat = std::max(0.0, recordStartBeat - beats);
+    countInClickState_.active = true;
+    countInClickState_.restoreBeat = readTransportBeat(*edit_);
+    countInClickState_.recordStartBeat = recordStartBeat;
+    countInClickState_.clickEnabled = edit_->clickTrackEnabled.get();
+    countInClickState_.clickRecordingOnly = edit_->clickTrackRecordingOnly.get();
+    countInClickState_.tracks.clear();
+    const auto tracks = te::getAudioTracks(*edit_);
+    for (auto* track : tracks) {
+      if (track == nullptr) {
+        continue;
+      }
+      countInClickState_.tracks.push_back({
+          track->isMuted(false),
+          track->isSolo(false),
+      });
+      track->setMute(true);
+      track->setSolo(false);
+    }
+
+    edit_->clickTrackEnabled = true;
+    edit_->clickTrackRecordingOnly = false;
+    edit_->clickTrackEmphasiseBars = true;
+    edit_->setClickTrackVolume(0.6f);
+    handleStopPatternPreview();
+    clearAllPreviewClips(*edit_, projectState_);
+    setTransportPositionBeats(*edit_, leadInBeat);
+    playbackRouting_.rebuildPlaybackGraph(*engine_, *edit_);
+    transport.play(false);
+
+    nlohmann::json data = nlohmann::json::parse(statusJson());
+    data["countInClickActive"] = true;
+    data["countInBeats"] = beats;
+    data["recordStartBeat"] = recordStartBeat;
+    data["nativeLeadInBeat"] = leadInBeat;
+    return commandResultToJson(makeSuccess("start_count_in_click", data.dump()));
+  }
+
+  std::string handleStopCountInClick(const std::string& payloadJson) {
+    std::optional<double> restoreBeat;
+    nlohmann::json payload = payloadJson.empty() ? nlohmann::json::object()
+                                                 : nlohmann::json::parse(payloadJson, nullptr, false);
+    if (!payload.is_discarded() && payload.contains("restoreBeat") && payload["restoreBeat"].is_number()) {
+      restoreBeat = std::max(0.0, payload["restoreBeat"].get<double>());
+    }
+    restoreCountInClickState(restoreBeat);
+    nlohmann::json data = nlohmann::json::parse(statusJson());
+    data["countInClickActive"] = false;
+    return commandResultToJson(makeSuccess("stop_count_in_click", data.dump()));
+  }
+
+  void restoreCountInClickState(std::optional<double> requestedRestoreBeat) {
+    if (!edit_) {
+      return;
+    }
+
+    auto& transport = edit_->getTransport();
+    transport.stop(false, false);
+    if (countInClickState_.active) {
+      const double restoreBeat = requestedRestoreBeat.value_or(countInClickState_.recordStartBeat);
+      setTransportPositionBeats(*edit_, restoreBeat);
+      edit_->clickTrackEnabled = countInClickState_.clickEnabled;
+      edit_->clickTrackRecordingOnly = countInClickState_.clickRecordingOnly;
+      const auto tracks = te::getAudioTracks(*edit_);
+      for (int index = 0; index < tracks.size(); ++index) {
+        if (index >= static_cast<int>(countInClickState_.tracks.size()) || tracks[index] == nullptr) {
+          continue;
+        }
+        tracks[index]->setMute(countInClickState_.tracks[static_cast<std::size_t>(index)].muted);
+        tracks[index]->setSolo(countInClickState_.tracks[static_cast<std::size_t>(index)].solo);
+      }
+      countInClickState_ = {};
+    }
   }
 
   std::string handleSetTracks(const std::string& payloadJson) {

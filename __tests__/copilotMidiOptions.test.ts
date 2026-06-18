@@ -67,6 +67,36 @@ describe('Copilot MIDI options', () => {
     expect(importCopilotMidiOption(bassOption)).toMatchObject({ok: true, startBeat: 4});
   });
 
+  it('imports exact-length generated chord options without an empty tail bar', () => {
+    resetStore();
+
+    const chordOption: CopilotMidiOption = {
+      id: 'piano-chords',
+      label: 'Grand Piano Chords',
+      role: 'chords',
+      description: 'Four-bar chords.',
+      startBeat: 0,
+      lengthBeats: 16,
+      target: {
+        instrumentId: KEYS_PIANO.id,
+        presetId: KEYS_PIANO.defaultPresetId,
+        label: KEYS_PIANO.label,
+      },
+      createTrack: {
+        name: KEYS_PIANO.label,
+        instrumentId: KEYS_PIANO.id,
+        presetId: KEYS_PIANO.defaultPresetId,
+      },
+      notes: [
+        {note: 48, velocity: 80, startBeat: 0, lengthBeats: 4},
+        {note: 55, velocity: 80, startBeat: 12, lengthBeats: 4},
+      ],
+    };
+
+    expect(importCopilotMidiOption(chordOption)).toMatchObject({ok: true});
+    expect(useDAWStore.getState().blocks[0]?.lengthBeats).toBe(16);
+  });
+
   it('rejects drag drops on non-software-instrument tracks', () => {
     const audio = createTrackFromTemplate('voice_audio', 0, {id: 'track-audio'});
     resetStore([audio]);

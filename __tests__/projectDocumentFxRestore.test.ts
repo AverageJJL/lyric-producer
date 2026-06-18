@@ -1,13 +1,26 @@
 import {applyArrangementOperations} from '../src/arrangement/operations';
 import {
-  createProjectDocument,
-  openProjectDocument,
-} from '../src/arrangement/projectDocument';
+  compileApcSourceToSnapshot,
+  decomposeSnapshotToApcSource,
+} from '../src/arrangement/apc';
+import {restoreProjectSnapshot} from '../src/arrangement/projectRestore';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
+
+const TS = '2026-06-02T12:00:00.000Z';
+
+// Restore through the .apc round-trip WITHOUT skipping native refresh so the
+// FX/amp-sim native command bridge fires, matching the original document open.
+function restoreSnapshotViaApc(snapshot: ReturnType<typeof captureProjectSnapshot>): void {
+  const compiled = compileApcSourceToSnapshot(decomposeSnapshotToApcSource(snapshot, TS));
+  if (!compiled.ok) {
+    throw new Error(compiled.errors.map(e => e.message).join('; '));
+  }
+  restoreProjectSnapshot(compiled.snapshot);
+}
 
 jest.mock('../src/native/refreshPlayback', () => ({
   refreshPlaybackAndInstruments: jest.fn(),
@@ -106,7 +119,7 @@ describe('project document FX restore', () => {
     );
     window.audioEngine = {sendCommand};
 
-    openProjectDocument(createProjectDocument(snapshot, '2026-06-02T12:00:00.000Z'));
+    restoreSnapshotViaApc(snapshot);
 
     expect(sendCommand).toHaveBeenCalledWith(
       'set_amp_sim',
@@ -152,7 +165,7 @@ describe('project document FX restore', () => {
     );
     window.audioEngine = {sendCommand};
 
-    openProjectDocument(createProjectDocument(snapshot, '2026-06-02T12:00:00.000Z'));
+    restoreSnapshotViaApc(snapshot);
 
     const fxPayload = JSON.parse(
       sendCommand.mock.calls.find(([command]) => command === 'set_track_fx')?.[1] ?? '{}',

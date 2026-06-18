@@ -17,7 +17,7 @@ export type AppProjectCommand =
 export type AppProjectCommandSender = (command: AppProjectCommand) => void;
 
 export function isProjectDocumentPath(filePath: string): boolean {
-  return /\.(apcproject|json)$/i.test(filePath.trim());
+  return /\.apc$/i.test(filePath.trim());
 }
 
 export function isDawProjectPath(filePath: string): boolean {

@@ -31,10 +31,19 @@ export const PROJECT_KEY_ROOTS = [
 
 export const PROJECT_SCALE_MODES = ['major', 'minor'] as const;
 
+/**
+ * Display label for the project key. Returns '' when no key is set — the project
+ * default is `scale: null`, and the UI should show "no key" rather than fabricating
+ * a "C Maj" that's indistinguishable from a deliberately-chosen C major. We also treat
+ * a malformed scale (missing/empty root) as unset, so a bad agent-supplied value can't
+ * masquerade as C major either.
+ */
 export function projectScaleLabel(scale: ScaleMetadata | null): string {
-  const root = scale?.root || 'C';
-  const mode = scale?.mode === 'minor' ? 'Min' : 'Maj';
-  return `${root} ${mode}`;
+  if (!scale || typeof scale.root !== 'string' || scale.root.length === 0) {
+    return '';
+  }
+  const mode = scale.mode === 'minor' ? 'Min' : 'Maj';
+  return `${scale.root} ${mode}`;
 }
 
 export type SectionMarker = {

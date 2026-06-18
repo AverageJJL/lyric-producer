@@ -5,8 +5,9 @@ jest.mock('../src/native/NativeAudioEngine', () => ({
 import React from 'react';
 import {fireEvent, render, screen} from '@testing-library/react';
 
-import {createProjectDocument, openProjectDocument} from '../src/arrangement/projectDocument';
+import {compileApcSourceToSnapshot, decomposeSnapshotToApcSource} from '../src/arrangement/apc';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
+import {restoreProjectSnapshot} from '../src/arrangement/projectRestore';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
@@ -146,15 +147,20 @@ describe('track routing store and sidebar', () => {
       .toBeUndefined();
   });
 
-  it('persists routing metadata through project documents', () => {
+  it('persists routing metadata through the .apc source round-trip', () => {
     useDAWStore.getState().setTrackRoutingRole('track-b', 'aux_return');
     useDAWStore.getState().setTrackOutput('track-a', 'track-b');
     useDAWStore.getState().setTrackSend('track-a', 'track-b', -9);
     useDAWStore.getState().setTrackSidechainSource('track-a', 'track-b');
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
+    const compiled = compileApcSourceToSnapshot(
+      decomposeSnapshotToApcSource(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z'),
+    );
+    if (!compiled.ok) {
+      throw new Error(compiled.errors.map(error => error.message).join('; '));
+    }
 
     resetStore();
-    openProjectDocument(document, {skipNativeRefresh: true});
+    restoreProjectSnapshot(compiled.snapshot, {skipNativeRefresh: true});
 
     expect(useDAWStore.getState().tracks.find(item => item.id === 'track-a')).toMatchObject({
       routingOutputTrackId: 'track-b',

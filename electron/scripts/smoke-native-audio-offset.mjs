@@ -47,11 +47,13 @@ function writeOffsetProbeWav(filePath) {
 const tempRoot = mkdtempSync(path.join(tmpdir(), 'musicapp-native-audio-offset-'));
 const smokeMainPath = path.join(tempRoot, 'main.cjs');
 const wavPath = path.join(tempRoot, 'imports', 'offset-probe.wav');
+const unsupportedPath = path.join(tempRoot, 'imports', 'unsupported.mp3');
 const mixPath = path.join(tempRoot, 'mix', 'offset-render.wav');
 const reverseMixPath = path.join(tempRoot, 'mix', 'reverse-render.wav');
 
 mkdirSync(path.dirname(wavPath), {recursive: true});
 writeOffsetProbeWav(wavPath);
+writeFileSync(unsupportedPath, Buffer.alloc(128));
 
 const smokeMain = `
 const assert = require('node:assert/strict');
@@ -60,6 +62,7 @@ const addon = require(${JSON.stringify(addonPath)});
 const assetRoot = ${JSON.stringify(path.join(repoRoot, 'assets'))};
 const writableRoot = ${JSON.stringify(tempRoot)};
 const wavPath = ${JSON.stringify(wavPath)};
+const unsupportedPath = ${JSON.stringify(unsupportedPath)};
 const mixPath = ${JSON.stringify(mixPath)};
 const stemMixPath = ${JSON.stringify(path.join(tempRoot, 'mix', 'offset-stem.wav'))};
 const clipMixPath = ${JSON.stringify(path.join(tempRoot, 'mix', 'offset-clip.wav'))};
@@ -151,6 +154,17 @@ try {
     tempoMap: [],
     meterMap: [],
   }).ok, true);
+
+  const unsupportedUpsert = send('upsert_audio_clip', {
+    clipId: 'unsupported-probe',
+    trackId: 'track-audio',
+    startBeat: 0,
+    lengthBeats: 1,
+    audioFilePath: 'imports/unsupported.mp3',
+    absoluteAudioFilePath: unsupportedPath,
+  });
+  assert.equal(unsupportedUpsert.ok, false);
+  assert.equal(unsupportedUpsert.error.code, 'unsupported_file');
 
   const upsert = send('upsert_audio_clip', {
     clipId: 'offset-probe',

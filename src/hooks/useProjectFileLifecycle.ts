@@ -1,12 +1,13 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 import {
-  createNewProjectFile,
-  openProjectFile,
-  type ProjectFileActionResult,
-  restoreProjectFileContent,
-  saveCurrentProjectFile,
-} from '../arrangement/projectFileActions';
+  createNewApcProject,
+  currentSourceFiles,
+  openApcProject,
+  type ApcProjectActionResult,
+  restoreApcProjectFromFiles,
+  saveCurrentApcProject,
+} from '../arrangement/apc';
 import {
   clearAutosaveDraft,
   loadRecentProjects,
@@ -15,29 +16,25 @@ import {
   writeAutosaveDraft,
 } from '../arrangement/projectLifecycleStorage';
 import {
-  createProjectDocument,
-  serializeProjectDocument,
-} from '../arrangement/projectDocument';
-import {
   captureProjectSnapshot,
-  projectSnapshotSourcesChanged,
   snapshotFingerprint,
 } from '../arrangement/projectSnapshot';
 import {getMediaImportBridge} from '../native/mediaImportApi';
 import {getProjectFileBridge} from '../native/projectFileApi';
-import {useDAWStore} from '../store/useDAWStore';
 import {
   confirmDirtyProjectDiscard,
   useDirtyProjectUnloadPrompt,
 } from './useDirtyProjectUnloadPrompt';
 import {useAppProjectCommands} from './useAppProjectCommands';
 import {useDawProjectFileLifecycle} from './useDawProjectFileLifecycle';
+import {useProjectPersistenceWatch} from './useProjectPersistenceWatch';
 import {useProjectExportLifecycle} from './useProjectExportLifecycle';
 
 export type {ProjectFileLifecycle} from './projectFileLifecycleTypes';
 
 function displayNameFromPath(path: string | null): string {
-  return path?.split(/[\\/]/).pop() || 'Untitled';
+  const name = path?.split(/[\\/]/).pop();
+  return name ? name.replace(/\.apc$/i, '') : 'Untitled';
 }
 
 export function useProjectFileLifecycle() {
@@ -59,35 +56,17 @@ export function useProjectFileLifecycle() {
   useDirtyProjectUnloadPrompt(isDirty);
 
   const writeCurrentAutosave = useCallback(() => {
-    const snapshot = captureProjectSnapshot();
     writeAutosaveDraft({
       path: currentPath,
-      content: serializeProjectDocument(createProjectDocument(snapshot)),
-      savedFingerprint: savedFingerprintRef.current ?? snapshotFingerprint(snapshot),
+      files: currentSourceFiles(),
+      savedFingerprint:
+        savedFingerprintRef.current ?? snapshotFingerprint(captureProjectSnapshot()),
       savedAt: new Date().toISOString(),
     });
     setHasAutosave(true);
   }, [currentPath]);
 
-  useEffect(() => {
-    const updateDirtyState = () => {
-      const saved = savedFingerprintRef.current;
-      const dirty =
-        saved !== null &&
-        snapshotFingerprint(captureProjectSnapshot()) !== saved;
-      setIsDirty(dirty);
-      if (dirty) {
-        writeCurrentAutosave();
-      }
-    };
-
-    updateDirtyState();
-    return useDAWStore.subscribe((nextState, previousState) => {
-      if (projectSnapshotSourcesChanged(previousState, nextState)) {
-        updateDirtyState();
-      }
-    });
-  }, [writeCurrentAutosave]);
+  useProjectPersistenceWatch({savedFingerprintRef, setIsDirty, writeCurrentAutosave});
 
   const applySavedState = useCallback((path: string | undefined, fingerprint: string) => {
     savedFingerprintRef.current = fingerprint;
@@ -103,7 +82,7 @@ export function useProjectFileLifecycle() {
 
   const runFileAction = useCallback(
     async (
-      action: () => Promise<ProjectFileActionResult>,
+      action: () => Promise<ApcProjectActionResult>,
       successMessage: string,
       options?: {confirmDiscard?: boolean},
     ) => {
@@ -145,7 +124,7 @@ export function useProjectFileLifecycle() {
       return;
     }
 
-    const result = createNewProjectFile();
+    const result = await createNewApcProject(getProjectFileBridge());
     if (result.ok) {
       applySavedState(undefined, result.fingerprint);
       setStatusMessage('New project');
@@ -155,7 +134,7 @@ export function useProjectFileLifecycle() {
   const openProject = useCallback(
     () =>
       runFileAction(
-        () => openProjectFile(getProjectFileBridge(), undefined, getMediaImportBridge()),
+        () => openApcProject(getProjectFileBridge(), undefined, getMediaImportBridge()),
         'Project opened',
         {confirmDiscard: true},
       ),
@@ -165,7 +144,7 @@ export function useProjectFileLifecycle() {
   const openRecentProject = useCallback(
     (path: string) =>
       runFileAction(
-        () => openProjectFile(getProjectFileBridge(), path, getMediaImportBridge()),
+        () => openApcProject(getProjectFileBridge(), path, getMediaImportBridge()),
         'Project opened',
         {confirmDiscard: true},
       ),
@@ -175,7 +154,7 @@ export function useProjectFileLifecycle() {
   const saveProject = useCallback(
     () =>
       runFileAction(
-        () => saveCurrentProjectFile(getProjectFileBridge(), currentPath),
+        () => saveCurrentApcProject(getProjectFileBridge(), currentPath),
         'Project saved',
       ),
     [currentPath, runFileAction],
@@ -184,7 +163,7 @@ export function useProjectFileLifecycle() {
   const saveProjectAs = useCallback(
     () =>
       runFileAction(
-        () => saveCurrentProjectFile(
+        () => saveCurrentApcProject(
           getProjectFileBridge(),
           undefined,
           {consolidateMedia: true, mediaBridge: getMediaImportBridge()},
@@ -236,7 +215,7 @@ export function useProjectFileLifecycle() {
       return;
     }
 
-    const result = restoreProjectFileContent(draft.content);
+    const result = restoreApcProjectFromFiles(draft.files);
     if (!result.ok) {
       setErrorMessage(result.error);
       setStatusMessage(result.error);

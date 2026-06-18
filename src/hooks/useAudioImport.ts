@@ -7,7 +7,13 @@ import {
 } from '../music/audioImport';
 import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
 import {getMediaImportBridge, type AudioImportRequest} from '../native/mediaImportApi';
-import {useDAWStore} from '../store/useDAWStore';
+import {useDAWStore, type DAWBlock} from '../store/useDAWStore';
+
+export type AudioImportPlacement = {
+  startBeat?: number;
+  preferredTrackId?: string | null;
+  stackIndex?: number;
+};
 
 function parseAnalysis(response: string | null): AudioAnalysis | null {
   const data = parseCommandData(response);
@@ -44,13 +50,54 @@ function firstVoiceTrackId(): string | null {
   return useDAWStore.getState().tracks.find(track => track.type === 'voice_audio')?.id ?? null;
 }
 
+function createVoiceTrack(): string | null {
+  const before = new Set(useDAWStore.getState().tracks.map(track => track.id));
+  useDAWStore.getState().addVoiceAudioTrack();
+  return useDAWStore.getState().tracks.find(track =>
+    track.type === 'voice_audio' && !before.has(track.id),
+  )?.id ?? firstVoiceTrackId();
+}
+
+function preferredVoiceTrackId(trackId: string | null | undefined): string | null {
+  if (!trackId) {
+    return null;
+  }
+  return useDAWStore.getState().tracks.find(track =>
+    track.id === trackId && track.type === 'voice_audio',
+  )?.id ?? null;
+}
+
+function resolveVoiceTrackForImport(placement?: AudioImportPlacement): string | null {
+  const existing = preferredVoiceTrackId(placement?.preferredTrackId);
+  const stackIndex = placement?.stackIndex ?? 0;
+  if (existing && stackIndex <= 0) {
+    return existing;
+  }
+  if (placement) {
+    return createVoiceTrack();
+  }
+
+  const first = firstVoiceTrackId();
+  if (first) {
+    return first;
+  }
+  return createVoiceTrack();
+}
+
+function safeImportStartBeat(placement?: AudioImportPlacement): number {
+  const startBeat = placement?.startBeat;
+  if (typeof startBeat === 'number' && Number.isFinite(startBeat)) {
+    return Math.max(0, startBeat);
+  }
+  return useDAWStore.getState().playheadBeat;
+}
+
 function ensureVoiceTrack(): string | null {
   const existing = firstVoiceTrackId();
   if (existing) {
     return existing;
   }
-  useDAWStore.getState().addVoiceAudioTrack();
-  return firstVoiceTrackId();
+  return createVoiceTrack();
 }
 
 export function useAudioImport() {
@@ -58,11 +105,14 @@ export function useAudioImport() {
   const [isRelinking, setIsRelinking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const importAudioFile = useCallback(async (request?: AudioImportRequest) => {
+  const importAudioFile = useCallback(async (
+    request?: AudioImportRequest,
+    placement?: AudioImportPlacement,
+  ): Promise<DAWBlock | null> => {
     const bridge = getMediaImportBridge();
     if (!bridge) {
       setErrorMessage('Media import API is unavailable.');
-      return;
+      return null;
     }
 
     setIsImporting(true);
@@ -73,19 +123,19 @@ export function useAudioImport() {
         if (!imported.canceled) {
           setErrorMessage(imported.error);
         }
-        return;
+        return null;
       }
 
       const analysis = analyzeAudioFile(imported.absolutePath);
       if (!analysis) {
         setErrorMessage('Imported audio could not be analyzed.');
-        return;
+        return null;
       }
 
-      const trackId = ensureVoiceTrack();
+      const trackId = placement ? resolveVoiceTrackForImport(placement) : ensureVoiceTrack();
       if (!trackId) {
         setErrorMessage('Could not create an audio track.');
-        return;
+        return null;
       }
 
       const state = useDAWStore.getState();
@@ -93,7 +143,7 @@ export function useAudioImport() {
       const block = createImportedAudioBlock({
         trackId,
         trackIndex,
-        startBeat: state.playheadBeat,
+        startBeat: safeImportStartBeat(placement),
         name: imported.name,
         relativePath: imported.relativePath,
         absolutePath: imported.absolutePath,
@@ -102,6 +152,7 @@ export function useAudioImport() {
       });
       useDAWStore.getState().addBlock(block);
       useDAWStore.getState().selectBlock(block.id);
+      return block;
     } finally {
       setIsImporting(false);
     }

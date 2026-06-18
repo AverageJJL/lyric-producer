@@ -10,10 +10,11 @@ jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus:
 
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
+import {resetCopilotChatHistoryForTests} from '../src/assistant/copilotChatHistory';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
-const ask = jest.fn();
+const agentAsk = jest.fn();
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -43,9 +44,10 @@ function resetStore(): void {
 
 beforeEach(() => {
   resetStore();
+  resetCopilotChatHistoryForTests();
   sendCommand.mockImplementation(() => JSON.stringify({ok: true, data: {}}));
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.copilot = {ask};
+  window.copilot = {agentAsk};
   HTMLElement.prototype.scrollIntoView = jest.fn();
   HTMLElement.prototype.getBoundingClientRect = () =>
     ({x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40, toJSON: () => ({})});
@@ -53,16 +55,20 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetCopilotChatHistoryForTests();
   sendCommand.mockReset();
-  ask.mockReset();
+  agentAsk.mockReset();
   delete window.audioEngine;
   delete window.copilot;
 });
 
 test('renders drum pattern options, previews natively, and imports a step sequencer clip', async () => {
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'I made a drum beat.',
+    patch: null,
     model: 'test-model',
+    turns: 1,
     answer: {
       text: 'I made a drum beat.',
       actions: [],
@@ -89,9 +95,9 @@ test('renders drum pattern options, previews natively, and imports a step sequen
 
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Make a drum beat'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Make a drum beat'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Backbeat')).toBeInTheDocument();

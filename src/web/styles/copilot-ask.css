@@ -1,0 +1,209 @@
+/*
+ * Styling for the read-only "Ask" mode: the Build/Ask segmented toggle and the
+ * measurement report cards. Mirrors the Logic-dark Copilot card conventions
+ * (copilot.css) and uses the shared theme variables (base.css).
+ */
+
+/* Build/Ask mode picker — a Cursor-style labelled trigger with a drop menu. */
+.copilot-mode-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.copilot-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 7px 0 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.copilot-mode-trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.085);
+}
+
+.copilot-mode-trigger:disabled {
+  opacity: 0.56;
+  cursor: default;
+}
+
+.copilot-mode-trigger[aria-expanded='true'] {
+  background: rgba(var(--accent-primary-rgb), 0.16);
+  border-color: rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.copilot-mode-caret {
+  width: 13px;
+  height: 13px;
+  color: var(--text-muted);
+}
+
+.copilot-mode-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  min-width: 176px;
+  padding: 5px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: #15181d;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+
+.copilot-mode-menu button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.copilot-mode-menu button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+}
+
+.copilot-mode-menu button.active {
+  color: var(--text-main);
+}
+
+.copilot-mode-check {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-primary);
+}
+
+.ask-report-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ask-report-card {
+  display: grid;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-left: 2px solid rgba(var(--accent-primary-rgb), 0.55);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ask-report-header {
+  display: grid;
+  gap: 3px;
+}
+
+.ask-report-header strong {
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.ask-report-header span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.ask-report-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ask-report-metric {
+  display: grid;
+  gap: 1px;
+  min-width: 56px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(8, 10, 14, 0.5);
+}
+
+.ask-report-metric-value {
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ask-report-metric-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ask-report-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.ask-report-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.ask-report-bar-label {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-report-bar-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ask-report-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  background: var(--accent-primary);
+}
+
+.ask-report-bar-value {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ask-report-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1.4;
+}

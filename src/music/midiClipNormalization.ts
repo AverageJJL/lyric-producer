@@ -34,7 +34,10 @@ export type NormalizeMidiContext = {
   bpm?: number;
   timeSignature?: TimeSignature;
   minClipBeats?: number;
+  barBeats?: number;
   requestedLengthBeats?: number;
+  respectRequestedLength?: boolean;
+  tailPaddingBeats?: number;
 };
 
 export type NormalizedMidiClip = {
@@ -169,18 +172,28 @@ export function clipLengthFromNoteExtent(
 /** Round clip length up to full bars with a minimum of one bar when notes exist. */
 export function deriveMidiClipLength(
   notes: DAWNote[],
-  options?: {minBeats?: number; requestedLengthBeats?: number},
+  options?: {
+    minBeats?: number;
+    barBeats?: number;
+    requestedLengthBeats?: number;
+    respectRequestedLength?: boolean;
+    tailPaddingBeats?: number;
+  },
 ): number {
   const minBeats = options?.minBeats ?? BEATS_PER_BAR;
+  const barBeats = options?.barBeats ?? BEATS_PER_BAR;
   const extent = noteExtentBeats(notes);
   const fromNotes =
     extent > 0
       ? Math.ceil(
-          clipLengthFromNoteExtent(extent, {minBeats: BEATS_PER_BAR}) / BEATS_PER_BAR,
-        ) * BEATS_PER_BAR
+          clipLengthFromNoteExtent(extent, {
+            minBeats,
+            tailPaddingBeats: options?.tailPaddingBeats,
+          }) / barBeats,
+        ) * barBeats
       : minBeats;
   const requested = options?.requestedLengthBeats;
-  if (isFiniteNumber(requested) && requested > 0) {
+  if (options?.respectRequestedLength !== false && isFiniteNumber(requested) && requested > 0) {
     return Math.max(minBeats, Math.max(requested, fromNotes));
   }
   return Math.max(minBeats, fromNotes);
@@ -229,7 +242,10 @@ export function normalizeMidiClip(
   const notes = normalizeMidiNotes(rawNotes, context);
   const lengthBeats = deriveMidiClipLength(notes, {
     minBeats: context.minClipBeats ?? BEATS_PER_BAR,
+    barBeats: context.barBeats,
     requestedLengthBeats: context.requestedLengthBeats,
+    respectRequestedLength: context.respectRequestedLength,
+    tailPaddingBeats: context.tailPaddingBeats,
   });
   const trimmed = trimNotesToClipLength(notes, lengthBeats);
   return {notes: trimmed, lengthBeats};

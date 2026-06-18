@@ -1,8 +1,10 @@
 import React from 'react';
 
+import type {AskReport} from '../../assistant/askReports';
 import type {CopilotDrumPatternOption} from '../../assistant/copilotDrumPatternOptions';
 import type {CopilotMidiOption} from '../../assistant/copilotMidiOptions';
 import type {CopilotChatMessage} from '../../native/copilotApi';
+import {AskReportCard} from './AskReportCard';
 import {CopilotDrumPatternOptionCard} from './CopilotDrumPatternOptionCard';
 import {CopilotMarkdown} from './CopilotMarkdown';
 import {CopilotMidiOptionCard} from './CopilotMidiOptionCard';
@@ -12,6 +14,7 @@ export type PanelMessage = CopilotChatMessage & {
   error?: boolean;
   midiOptions?: CopilotMidiOption[];
   drumPatternOptions?: CopilotDrumPatternOption[];
+  askReports?: AskReport[];
 };
 
 type MidiController = {
@@ -51,6 +54,13 @@ export function CopilotMessageArticle({
       {assistant ? (
         <>
           <CopilotMarkdown content={message.content} />
+          {message.askReports?.length ? (
+            <div className="ask-report-list">
+              {message.askReports.map(report => (
+                <AskReportCard key={`${message.id}-${report.id}`} report={report} />
+              ))}
+            </div>
+          ) : null}
           {message.drumPatternOptions?.length ? (
             <div className="copilot-midi-options">
               {message.drumPatternOptions.map(option => (

@@ -2,19 +2,12 @@ import {dialog, ipcMain, type BrowserWindow} from 'electron';
 import type {OpenDialogOptions, SaveDialogOptions} from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {writeFileAtomic} from './atomicWrite';
 import {
   copyMediaFileIntoImportsAsync,
   reserveRenderedAudioImportPath,
   resolveWritableAssetPath,
 } from './mediaAssetFiles';
 
-type ProjectFileSaveRequest = {
-  path?: string;
-  content: string;
-};
-
-type ProjectFileOpenRequest = {path?: string};
 type ProjectFileMixdownRequest = {title?: string; defaultPath?: string};
 type ProjectFileMidiWriteRequest = {path?: string; defaultPath?: string; base64?: string};
 type MediaImportRequest = {path?: string};
@@ -30,23 +23,12 @@ type FileIpcConfig = {
   assetRoots: () => {readRoot: string; writableRoot: string};
 };
 
-const projectFileFilter = {
-  name: 'AI Producer Core Project',
-  extensions: ['apcproject', 'json'],
-};
 const audioFileFilter = {
   name: 'Audio Files',
   extensions: ['wav', 'aif', 'aiff', 'flac', 'ogg', 'mp3', 'm4a'],
 };
 const mixdownFileFilter = {name: 'WAV Audio', extensions: ['wav']};
 const midiFileFilter = {name: 'MIDI File', extensions: ['mid', 'midi']};
-
-function ensureProjectExtension(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  return ext === '.apcproject' || ext === '.json'
-    ? filePath
-    : `${filePath}.apcproject`;
-}
 
 function ensureWavExtension(filePath: string): string {
   return path.extname(filePath).toLowerCase() === '.wav' ? filePath : `${filePath}.wav`;
@@ -92,59 +74,8 @@ async function copyAudioIntoProject(
 }
 
 export function registerFileIpc(config: FileIpcConfig): void {
-  ipcMain.handle('project-file:save', async (_event, request: ProjectFileSaveRequest) => {
-    try {
-      if (!request || typeof request.content !== 'string') {
-        return {ok: false, error: 'Project save request is invalid.'};
-      }
-
-      let targetPath = request.path;
-      if (!targetPath) {
-        const result = await showSaveDialog(config.getMainWindow(), {
-          title: 'Save Project',
-          defaultPath: 'Untitled.apcproject',
-          filters: [projectFileFilter],
-        });
-        if (result.canceled || !result.filePath) {
-          return {ok: false, canceled: true, error: 'Project save canceled.'};
-        }
-        targetPath = result.filePath;
-      }
-
-      const resolvedPath = ensureProjectExtension(targetPath);
-      await writeFileAtomic(resolvedPath, request.content, 'utf8');
-      return {ok: true, path: resolvedPath};
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not save project.';
-      return {ok: false, error: message};
-    }
-  });
-
-  ipcMain.handle('project-file:open', async (_event, request?: ProjectFileOpenRequest) => {
-    try {
-      if (request?.path) {
-        const content = await fs.promises.readFile(request.path, 'utf8');
-        return {ok: true, path: request.path, content};
-      }
-
-      const result = await showOpenDialog(config.getMainWindow(), {
-        title: 'Open Project',
-        properties: ['openFile'],
-        filters: [projectFileFilter],
-      });
-      if (result.canceled || result.filePaths.length === 0) {
-        return {ok: false, canceled: true, error: 'Project open canceled.'};
-      }
-
-      const filePath = result.filePaths[0];
-      const content = await fs.promises.readFile(filePath, 'utf8');
-      return {ok: true, path: filePath, content};
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not open project.';
-      return {ok: false, error: message};
-    }
-  });
-
+  // Project open/save now lives in apcProjectIpc.ts (folder-based `.apc` format).
+  // This module retains only media + mixdown + MIDI file handlers.
   ipcMain.handle('media-file:import-audio', async (_event, request?: MediaImportRequest) => {
     try {
       return await copyAudioIntoProject(

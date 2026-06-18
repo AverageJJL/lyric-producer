@@ -50,6 +50,7 @@ add_compile_definitions(
   JUCE_PLUGINHOST_AU=${MUSICAPP_PLUGINHOST_AU_VALUE}
   JUCE_USE_CURL=0
   JUCE_WEB_BROWSER=0
+  JUCE_USE_MP3AUDIOFORMAT=1
 )
 
 set(MUSICAPP_SUBMODULE_SETUP_COMMAND "npm run setup:submodules")
@@ -93,6 +94,7 @@ add_library(MusicAppEngine STATIC
   InstrumentCommands.cpp
   InstrumentParameterCommands.cpp
   DrumPatternPreview.cpp
+  MidiPhrasePreview.cpp
   DrumSampleDuration.cpp
   SamplePreviewHelpers.cpp
   SampleOneShotPlayer.cpp
@@ -106,6 +108,8 @@ add_library(MusicAppEngine STATIC
   PlaybackGraphRouting.cpp
   RoutingGraphCommands.cpp
   WaveformPeaks.cpp
+  AskMeasurementCommands.cpp
+  AskMeasurementDsp.cpp
   MediaAnalysisCommands.cpp
   MeterSnapshot.cpp
   MixdownRenderManager.cpp
@@ -159,6 +163,7 @@ target_compile_definitions(MusicAppEngine PRIVATE
   MUSICAPP_HAVE_TRACKTION=1
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
+  JUCE_USE_MP3AUDIOFORMAT=1
   JUCE_MODAL_LOOPS_PERMITTED=0
   JUCE_STRICT_REFCOUNTEDPOINTER=1
   MUSICAPP_ENABLE_EXTERNAL_PLUGIN_HOSTING=${MUSICAPP_EXTERNAL_PLUGIN_HOSTING_VALUE}

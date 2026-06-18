@@ -1,7 +1,16 @@
 import React from 'react';
 import {act, cleanup, render, screen, waitFor} from '@testing-library/react';
 
-import {createProjectDocument, serializeProjectDocument} from '../src/arrangement/projectDocument';
+// <App /> mounts the Copilot panel, which imports react-markdown (ESM) — stub the
+// markdown/highlighter deps jest can't transform, as the other App-render tests do.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
+import {decomposeSnapshotToApcSource, serializeApcSource} from '../src/arrangement/apc';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
 import type {AppLifecycleProjectCommand} from '../src/native/appLifecycleApi';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
@@ -10,8 +19,9 @@ import {openProjectMenu} from './helpers/projectMenu';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
-const openProject = jest.fn();
-const saveProject = jest.fn();
+const openProjectFolder = jest.fn();
+const saveProjectFolder = jest.fn();
+const setProjectAssetRoot = jest.fn();
 const rendererReady = jest.fn();
 const setProjectDirty = jest.fn();
 let projectCommandHandler: ((command: AppLifecycleProjectCommand) => void) | null = null;
@@ -55,9 +65,11 @@ beforeEach(() => {
       : {ok: true, data: {}}),
   );
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  setProjectAssetRoot.mockResolvedValue({ok: true, writableRoot: '/tmp/menu.apc/assets'});
   window.projectFiles = {
-    saveProject,
-    openProject,
+    saveProjectFolder,
+    openProjectFolder,
+    setProjectAssetRoot,
     exportMixdown: jest.fn(),
     writeMidiFile: jest.fn(),
   };
@@ -89,19 +101,19 @@ test('handles Electron open-file project commands through the project lifecycle'
   act(() => {
     useDAWStore.getState().addTrackFromTemplate('drum_machine');
   });
-  const content = serializeProjectDocument(createProjectDocument(captureProjectSnapshot()));
+  const files = serializeApcSource(decomposeSnapshotToApcSource(captureProjectSnapshot()));
   resetStore();
-  openProject.mockResolvedValue({ok: true, path: '/tmp/menu.apcproject', content});
+  openProjectFolder.mockResolvedValue({ok: true, path: '/tmp/menu.apc', files});
 
   render(<App />);
 
   expect(rendererReady).toHaveBeenCalledTimes(1);
   await act(async () => {
-    projectCommandHandler?.({command: 'openProjectPath', path: '/tmp/menu.apcproject'});
+    projectCommandHandler?.({command: 'openProjectPath', path: '/tmp/menu.apc'});
     await Promise.resolve();
   });
 
-  expect(openProject).toHaveBeenCalledWith({path: '/tmp/menu.apcproject'});
+  expect(openProjectFolder).toHaveBeenCalledWith({path: '/tmp/menu.apc'});
   expect(useDAWStore.getState().tracks[0]?.type).toBe('drum_machine');
   openProjectMenu();
   await waitFor(() => {

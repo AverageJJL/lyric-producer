@@ -24,6 +24,5 @@ export function sendNativeAudioCommand(
     return null;
   }
 
-  const response = audioEngine.sendCommand(command, JSON.stringify(payload));
-  return response;
+  return audioEngine.sendCommand(command, JSON.stringify(payload));
 }

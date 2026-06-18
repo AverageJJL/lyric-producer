@@ -8,11 +8,15 @@ import type {
   SectionMarker,
   TimeSignature,
 } from '../store/projectMetadata';
+import {beatsPerBarForTimeSignature} from '../store/projectMetadata';
 import {normalizeMidiClip, type RawMidiNoteInput} from '../music/midiClipNormalization';
 import {refreshPlaybackAndInstruments, upsertBlockForEngine} from '../native/refreshPlayback';
 import {captureProjectSnapshot, type ProjectSnapshot} from './projectSnapshot';
 import type {SnapGrid} from '../ui/snapGrid';
-import {shouldSkipLockedArrangementOperation} from './operationLocks';
+import {
+  createArrangementLockLookup,
+  shouldSkipLockedArrangementOperation,
+} from './operationLocks';
 import type {LooperLengthBars, ProjectPerformanceMode} from '../transport/performanceMode';
 import {
   applySamplerSliceOperation,
@@ -37,6 +41,7 @@ export type ArrangementOperation =
   | {op: 'setClipLocked'; clipId: string; isLocked: boolean}
   | {op: 'setBpm'; bpm: number}
   | {op: 'setMasterMix'; volumeDb: number; pan: number}
+  | {op: 'setTrackMix'; trackId: string; volumeDb?: number; pan?: number; gainDb?: number}
   | {op: 'setSnapGrid'; snapGrid: SnapGrid}
   | {op: 'setRelativeSnap'; enabled: boolean}
   | {op: 'setPerformanceMode'; mode: ProjectPerformanceMode; looperLengthBars?: LooperLengthBars}
@@ -62,6 +67,7 @@ export type MidiClipIntent = {
   startBeat: number;
   lengthBeats: number;
   notes: DAWNote[];
+  fitToNotes?: boolean;
 };
 
 export type DrumClipIntent = {
@@ -87,9 +93,18 @@ export function applyArrangementOperations(
   options?: ApplyArrangementOptions,
 ): ProjectSnapshot {
   const store = useDAWStore.getState();
+  let lockLookup = createArrangementLockLookup(store);
+
+  function currentLockLookup() {
+    const state = useDAWStore.getState();
+    if (lockLookup.tracks !== state.tracks || lockLookup.blocks !== state.blocks) {
+      lockLookup = createArrangementLockLookup(state);
+    }
+    return lockLookup;
+  }
 
   operations.forEach(operation => {
-    if (shouldSkipLockedArrangementOperation(operation, useDAWStore.getState())) {
+    if (shouldSkipLockedArrangementOperation(operation, currentLockLookup())) {
       return;
     }
 
@@ -131,6 +146,19 @@ export function applyArrangementOperations(
         store.setMasterVolumeDb(operation.volumeDb);
         store.setMasterPan(operation.pan);
         break;
+      case 'setTrackMix':
+        // Partial mix edit: each field is optional so the Copilot can change just
+        // one knob (e.g. "turn the bass down 3 dB") without restating the others.
+        if (operation.volumeDb !== undefined) {
+          store.setTrackVolumeDb(operation.trackId, operation.volumeDb);
+        }
+        if (operation.pan !== undefined) {
+          store.setTrackPan(operation.trackId, operation.pan);
+        }
+        if (operation.gainDb !== undefined) {
+          store.setTrackGainDb(operation.trackId, operation.gainDb);
+        }
+        break;
       case 'setSnapGrid':
         store.setSnapGrid(operation.snapGrid);
         break;
@@ -166,10 +194,15 @@ export function applyArrangementOperations(
         break;
       case 'upsertMidiClip': {
         const project = useDAWStore.getState();
+        const barBeats = beatsPerBarForTimeSignature(project.timeSignature);
         const normalized = normalizeMidiClip(operation.clip.notes as RawMidiNoteInput[], {
           bpm: project.bpm,
           timeSignature: project.timeSignature,
+          barBeats,
+          minClipBeats: operation.clip.fitToNotes ? barBeats : undefined,
           requestedLengthBeats: operation.clip.lengthBeats,
+          respectRequestedLength: operation.clip.fitToNotes ? false : undefined,
+          tailPaddingBeats: operation.clip.fitToNotes ? 0 : undefined,
         });
         const block: DAWBlock = {
           id: operation.clip.id,

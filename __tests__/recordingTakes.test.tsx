@@ -1,7 +1,11 @@
 import React from 'react';
 import {fireEvent, render, screen} from '@testing-library/react';
 
-import {createProjectDocument, openProjectDocument} from '../src/arrangement/projectDocument';
+import {
+  compileApcSourceToSnapshot,
+  decomposeSnapshotToApcSource,
+} from '../src/arrangement/apc';
+import {restoreProjectSnapshot} from '../src/arrangement/projectRestore';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
 import {recordingTakeGroups} from '../src/transport/recordingTakes';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
@@ -302,15 +306,20 @@ describe('recording takes', () => {
     expect(onSelectBlock).toHaveBeenCalledWith('take-b');
   });
 
-  it('persists take grouping through project documents', () => {
+  it('persists take grouping through the .apc source round-trip', () => {
     finishAudioTake(4, 'take-a');
     finishAudioTake(4, 'take-b');
     const before = recordingTakeGroups(useDAWStore.getState().blocks)[0];
     expect(before?.takes).toHaveLength(2);
 
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
+    const compiled = compileApcSourceToSnapshot(
+      decomposeSnapshotToApcSource(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z'),
+    );
+    if (!compiled.ok) {
+      throw new Error(compiled.errors.map(error => error.message).join('; '));
+    }
     resetStore();
-    openProjectDocument(document, {skipNativeRefresh: true});
+    restoreProjectSnapshot(compiled.snapshot, {skipNativeRefresh: true});
 
     const after = recordingTakeGroups(useDAWStore.getState().blocks)[0];
     expect(after?.groupId).toBe(before?.groupId);

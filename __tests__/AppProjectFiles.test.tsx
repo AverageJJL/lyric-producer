@@ -1,16 +1,26 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+// <App /> mounts the Copilot panel, which imports react-markdown (ESM) — stub the
+// markdown/highlighter deps jest can't transform, as the other App-render tests do.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {openProjectMenu} from './helpers/projectMenu';
 import {App} from '../src/web/App';
-import {createProjectDocument, serializeProjectDocument} from '../src/arrangement/projectDocument';
+import {decomposeSnapshotToApcSource, serializeApcSource} from '../src/arrangement/apc';
 import {captureProjectSnapshot, snapshotFingerprint} from '../src/arrangement/projectSnapshot';
 
 const sendCommand = jest.fn();
-const saveProject = jest.fn();
-const openProject = jest.fn();
+const saveProjectFolder = jest.fn();
+const openProjectFolder = jest.fn();
+const setProjectAssetRoot = jest.fn();
 const exportMixdown = jest.fn();
 const writeMidiFile = jest.fn();
 const resolveAudioMedia = jest.fn();
@@ -18,6 +28,10 @@ const resolveAudioMedia = jest.fn();
 const asyncRenderPayloads = () => sendCommand.mock.calls
   .filter(([command]) => command === 'render_mixdown_async')
   .map(([, payload]) => JSON.parse(payload));
+
+// The working `.apc` source tree for the current store state — what the bridge would
+// hand back from open/recover, mirroring how a real Song.apc/ folder is serialized.
+const apcFiles = () => serializeApcSource(decomposeSnapshotToApcSource(captureProjectSnapshot()));
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -68,21 +82,23 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
-  saveProject.mockResolvedValue({ok: true, path: '/tmp/song.apcproject'});
-  openProject.mockResolvedValue({ok: false, canceled: true, error: 'Canceled'});
+  saveProjectFolder.mockResolvedValue({ok: true, path: '/tmp/song.apc'});
+  openProjectFolder.mockResolvedValue({ok: false, canceled: true, error: 'Canceled'});
+  setProjectAssetRoot.mockResolvedValue({ok: true, writableRoot: '/tmp/song.apc/assets'});
   exportMixdown.mockResolvedValue({ok: true, path: '/tmp/mix.wav'});
   writeMidiFile.mockResolvedValue({ok: true, path: '/tmp/arrangement.mid'});
   resolveAudioMedia.mockResolvedValue({ok: true, resolved: []});
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.projectFiles = {saveProject, openProject, exportMixdown, writeMidiFile};
+  window.projectFiles = {saveProjectFolder, openProjectFolder, setProjectAssetRoot, exportMixdown, writeMidiFile};
   window.mediaImport = {importAudio: jest.fn(), resolveAudioMedia};
 });
 
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
-  saveProject.mockReset();
-  openProject.mockReset();
+  saveProjectFolder.mockReset();
+  openProjectFolder.mockReset();
+  setProjectAssetRoot.mockReset();
   exportMixdown.mockReset();
   writeMidiFile.mockReset();
   resolveAudioMedia.mockReset();
@@ -92,7 +108,7 @@ afterEach(() => {
   delete window.mediaImport;
 });
 
-test('renders project file controls and saves through the bridge', async () => {
+test('renders project file controls and saves the .apc source tree through the bridge', async () => {
   render(<App />);
   openProjectMenu();
 
@@ -109,11 +125,18 @@ test('renders project file controls and saves through the bridge', async () => {
     fireEvent.click(screen.getByRole('menuitem', {name: 'Save'}));
   });
 
-  expect(saveProject).toHaveBeenCalledWith({
-    content: expect.stringContaining('"format":"ai-producer-core.project"'),
-  });
+  expect(saveProjectFolder).toHaveBeenCalledWith(
+    expect.objectContaining({
+      files: expect.arrayContaining([
+        expect.objectContaining({
+          relativePath: 'manifest.json',
+          content: expect.stringContaining('"format":"ai-producer-core.apc"'),
+        }),
+      ]),
+    }),
+  );
   openProjectMenu();
-  expect(screen.getByTitle('Project saved')).toHaveTextContent('song.apcproject');
+  expect(screen.getByTitle('Project saved')).toHaveTextContent('song');
 });
 
 test('exports a native full-mix WAV through the bridge', async () => {
@@ -176,7 +199,7 @@ test('asks before discarding dirty project changes', async () => {
     fireEvent.click(screen.getByRole('menuitem', {name: 'Open'}));
   });
 
-  expect(openProject).not.toHaveBeenCalled();
+  expect(openProjectFolder).not.toHaveBeenCalled();
 });
 
 test('autosaves dirty drafts and recovers them', async () => {
@@ -186,33 +209,34 @@ test('autosaves dirty drafts and recovers them', async () => {
     useDAWStore.getState().addTrackFromTemplate('virtual_instrument');
   });
 
+  // Autosave now persists the .apc source tree (the manifest carries the apc format).
   expect(window.localStorage.getItem('aiProducerCore.autosaveDraft')).toContain(
-    'ai-producer-core.project',
+    'ai-producer-core.apc',
   );
   openProjectMenu();
   expect(await screen.findByRole('menuitem', {name: 'Recover'})).toBeInTheDocument();
 });
 
-test('opens a recent project path through the bridge', async () => {
+test('opens a recent project folder through the bridge', async () => {
   act(() => {
     useDAWStore.getState().addTrackFromTemplate('drum_machine');
   });
-  const content = serializeProjectDocument(createProjectDocument(captureProjectSnapshot()));
+  const files = apcFiles();
   resetStore();
   window.localStorage.setItem(
     'aiProducerCore.recentProjects',
-    JSON.stringify(['/tmp/recent.apcproject']),
+    JSON.stringify(['/tmp/recent.apc']),
   );
-  openProject.mockResolvedValue({ok: true, path: '/tmp/recent.apcproject', content});
+  openProjectFolder.mockResolvedValue({ok: true, path: '/tmp/recent.apc', files});
 
   render(<App />);
   openProjectMenu();
 
   await act(async () => {
-    fireEvent.click(screen.getByRole('menuitem', {name: 'recent.apcproject'}));
+    fireEvent.click(screen.getByRole('menuitem', {name: 'recent.apc'}));
   });
 
-  expect(openProject).toHaveBeenCalledWith({path: '/tmp/recent.apcproject'});
+  expect(openProjectFolder).toHaveBeenCalledWith({path: '/tmp/recent.apc'});
   expect(useDAWStore.getState().tracks[0]?.type).toBe('drum_machine');
 });
 
@@ -240,13 +264,13 @@ test('marks missing audio media when opening a project', async () => {
       audioFilePath: 'imports/missing.wav',
     }],
   });
-  const content = serializeProjectDocument(createProjectDocument(captureProjectSnapshot()));
+  const files = apcFiles();
   resetStore();
   window.localStorage.setItem(
     'aiProducerCore.recentProjects',
-    JSON.stringify(['/tmp/missing.apcproject']),
+    JSON.stringify(['/tmp/missing.apc']),
   );
-  openProject.mockResolvedValue({ok: true, path: '/tmp/missing.apcproject', content});
+  openProjectFolder.mockResolvedValue({ok: true, path: '/tmp/missing.apc', files});
   resolveAudioMedia.mockResolvedValue({
     ok: true,
     resolved: [{
@@ -260,7 +284,7 @@ test('marks missing audio media when opening a project', async () => {
   openProjectMenu();
 
   await act(async () => {
-    fireEvent.click(screen.getByRole('menuitem', {name: 'missing.apcproject'}));
+    fireEvent.click(screen.getByRole('menuitem', {name: 'missing.apc'}));
   });
 
   expect(resolveAudioMedia).toHaveBeenCalledWith({
@@ -271,12 +295,12 @@ test('marks missing audio media when opening a project', async () => {
   expect(screen.getByTitle('Project opened (1 missing media)')).toBeInTheDocument();
 });
 
-test('recovers an autosave document into dirty project state', async () => {
+test('recovers an autosave draft into dirty project state', async () => {
   act(() => {
     useDAWStore.getState().addTrackFromTemplate('voice_audio');
   });
   const snapshot = captureProjectSnapshot();
-  const content = serializeProjectDocument(createProjectDocument(snapshot));
+  const files = serializeApcSource(decomposeSnapshotToApcSource(snapshot));
   const savedFingerprint = snapshotFingerprint({
     ...snapshot,
     tracks: [],
@@ -286,8 +310,8 @@ test('recovers an autosave document into dirty project state', async () => {
   window.localStorage.setItem(
     'aiProducerCore.autosaveDraft',
     JSON.stringify({
-      path: '/tmp/draft.apcproject',
-      content,
+      path: '/tmp/draft.apc',
+      files,
       savedFingerprint,
       savedAt: '2026-06-02T12:00:00.000Z',
     }),
@@ -302,5 +326,5 @@ test('recovers an autosave document into dirty project state', async () => {
 
   expect(useDAWStore.getState().tracks[0]?.type).toBe('voice_audio');
   openProjectMenu();
-  expect(screen.getByText('draft.apcproject *')).toBeInTheDocument();
+  expect(screen.getByText('draft *')).toBeInTheDocument();
 });

@@ -1,19 +1,37 @@
-export type ProjectFileSaveRequest = {
-  path?: string;
-  content: string;
+import type {ApcSourceFile} from '../arrangement/apc';
+
+/**
+ * Save the working `.apc` source tree to a project folder. `folderPath` is omitted
+ * for "Save As" (the main process shows a directory picker) and supplied for "Save".
+ */
+export type ApcProjectSaveRequest = {
+  folderPath?: string;
+  files: ApcSourceFile[];
 };
 
-export type ProjectFileSaveResponse =
+export type ApcProjectSaveResponse =
   | {ok: true; path: string}
   | {ok: false; error: string; canceled?: boolean};
 
-export type ProjectFileOpenResponse =
-  | {ok: true; path: string; content: string}
-  | {ok: false; error: string; canceled?: boolean};
-
-export type ProjectFileOpenRequest = {
+export type ApcProjectOpenRequest = {
   path?: string;
 };
+
+export type ApcProjectOpenResponse =
+  | {ok: true; path: string; files: ApcSourceFile[]}
+  | {ok: false; error: string; canceled?: boolean};
+
+/**
+ * Point the native engine's writable asset root at the open project's
+ * `Song.apc/assets` (or back to the unsaved-draft root when `folderPath` is null).
+ */
+export type ApcAssetRootRequest = {
+  folderPath: string | null;
+};
+
+export type ApcAssetRootResponse =
+  | {ok: true; writableRoot: string}
+  | {ok: false; error: string};
 
 export type ProjectFileExportResponse =
   | {ok: true; path: string}
@@ -85,8 +103,9 @@ export type ProjectFileStemExportResponse =
   | {ok: false; error: string; canceled?: boolean};
 
 export type ProjectFileBridge = {
-  saveProject: (request: ProjectFileSaveRequest) => Promise<ProjectFileSaveResponse>;
-  openProject: (request?: ProjectFileOpenRequest) => Promise<ProjectFileOpenResponse>;
+  saveProjectFolder: (request: ApcProjectSaveRequest) => Promise<ApcProjectSaveResponse>;
+  openProjectFolder: (request?: ApcProjectOpenRequest) => Promise<ApcProjectOpenResponse>;
+  setProjectAssetRoot: (request: ApcAssetRootRequest) => Promise<ApcAssetRootResponse>;
   exportMixdown: (request?: ProjectFileMixdownRequest) => Promise<ProjectFileExportResponse>;
   exportDawProject?: (request: DawProjectExportRequest) => Promise<ProjectFileExportResponse>;
   importDawProject?: (request?: DawProjectImportRequest) => Promise<DawProjectImportResponse>;

@@ -1,8 +1,8 @@
 import {useCallback, useRef, useState, type DragEvent} from 'react';
 
-import type {AudioImportRequest} from '../native/mediaImportApi';
+import {getMediaImportBridge, type AudioImportRequest} from '../native/mediaImportApi';
 
-type ImportMediaFile = (request?: AudioImportRequest) => Promise<void>;
+type ImportMediaFile = (request?: AudioImportRequest) => Promise<unknown>;
 type MediaKind = 'audio' | 'midi';
 type DroppedFile = File & {path?: string};
 
@@ -26,7 +26,16 @@ export function mediaKindForPath(filePath: string): MediaKind | null {
   return null;
 }
 
-function fileSystemPath(file: File): string | null {
+export function fileSystemPath(file: File): string | null {
+  let resolvedPath: string | null | undefined;
+  try {
+    resolvedPath = getMediaImportBridge()?.pathForFile?.(file);
+  } catch {
+    resolvedPath = null;
+  }
+  if (typeof resolvedPath === 'string' && resolvedPath.length > 0) {
+    return resolvedPath;
+  }
   const filePath = (file as DroppedFile).path;
   return typeof filePath === 'string' && filePath.length > 0 ? filePath : null;
 }
@@ -94,7 +103,14 @@ export function useMediaDropImport(
     }
   }, [importAudioFile, importMidiFile]);
 
+  const clearMediaDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setIsDraggingMedia(false);
+    setDropImportError(null);
+  }, []);
+
   return {
+    clearMediaDragState,
     dropImportError,
     isDraggingMedia,
     dropImportProps: {

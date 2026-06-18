@@ -130,6 +130,7 @@ export type MidiImportResponse =
   | {ok: false; error: string; canceled?: boolean};
 
 export type MediaImportBridge = {
+  pathForFile?: (file: File) => string | null;
   importAudio: (request?: AudioImportRequest) => Promise<AudioImportResponse>;
   importMidi?: (request?: AudioImportRequest) => Promise<MidiImportResponse>;
   relinkAudio?: (request?: AudioImportRequest) => Promise<AudioImportResponse>;

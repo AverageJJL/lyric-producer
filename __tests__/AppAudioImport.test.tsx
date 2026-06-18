@@ -1,6 +1,15 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+// <App /> mounts the Copilot panel, which imports ESM markdown/highlighter deps
+// that Jest does not transform in this repo's current test setup.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {emptyProjectSnapshot} from '../src/arrangement/projectSnapshot';

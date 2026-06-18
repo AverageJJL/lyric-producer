@@ -90,4 +90,20 @@ describe('midiClipNormalization', () => {
     expect(notes[0]?.startBeat).toBe(0);
     expect(notes[1]?.startBeat).toBe(1);
   });
+
+  it('can fit generated clips to note extents without an empty tail bar', () => {
+    const {lengthBeats} = normalizeMidiClip(
+      [
+        {note: 60, velocity: 100, startBeat: 0, lengthBeats: 4},
+        {note: 67, velocity: 100, startBeat: 12, lengthBeats: 4},
+      ],
+      {
+        requestedLengthBeats: 16,
+        respectRequestedLength: false,
+        tailPaddingBeats: 0,
+      },
+    );
+
+    expect(lengthBeats).toBe(16);
+  });
 });

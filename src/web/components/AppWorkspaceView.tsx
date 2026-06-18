@@ -225,6 +225,8 @@ export function AppWorkspaceView({
             onSelectBlock={handlers.onSelectBlock}
             onUpdateBlock={handlers.onUpdateBlock}
             onDeleteBlock={handlers.onDeleteBlock}
+            importAudioFile={audioImport.importAudioFile}
+            onTimelineMediaDropHandled={mediaDrop.clearMediaDragState}
           />
         </section>
         {workspacePanels.isMixerOpen ? (

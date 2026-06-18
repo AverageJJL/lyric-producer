@@ -103,6 +103,26 @@ export function recordArrangementHistory(
   future = [];
 }
 
+/**
+ * Run a mutation without recording an undo checkpoint.
+ *
+ * Why: Copilot staging applies a proposed edit into the live store so the user
+ * can hear it under normal transport, then either accepts (one clean checkpoint)
+ * or reverts (snapshot restore). During that preview dance we must not pollute
+ * the user's undo stack with the intermediate stage/swap/revert steps. Reusing
+ * the same `suppressRecording` flag the undo/redo engine already relies on keeps
+ * suppression consistent and nesting-safe (we save and restore the prior value).
+ */
+export function runWithoutHistory<T>(fn: () => T): T {
+  const previous = suppressRecording;
+  suppressRecording = true;
+  try {
+    return fn();
+  } finally {
+    suppressRecording = previous;
+  }
+}
+
 export function canUndoArrangement(): boolean {
   return past.length > 0;
 }

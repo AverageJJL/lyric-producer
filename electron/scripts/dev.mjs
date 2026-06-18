@@ -1,6 +1,10 @@
 import {spawn} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
+import {existsSync, readFileSync} from 'node:fs';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'vite';
+
+const envPath = fileURLToPath(new URL('../../.env', import.meta.url));
+const localEnvPath = fileURLToPath(new URL('../../.env.local', import.meta.url));
 
 function runBuildStep(command, args) {
   return new Promise((resolve, reject) => {
@@ -18,6 +22,57 @@ function runBuildStep(command, args) {
       reject(new Error(`${command} ${args.join(' ')} exited with ${code ?? signal}`));
     });
   });
+}
+
+function unquoteEnvValue(value) {
+  const trimmed = value.trim();
+  const quote = trimmed[0];
+  if ((quote === '"' || quote === "'") && trimmed.endsWith(quote)) {
+    const unquoted = trimmed.slice(1, -1);
+    return quote === '"'
+      ? unquoted.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t')
+      : unquoted;
+  }
+  return trimmed.replace(/\s+#.*$/, '').trim();
+}
+
+export function parseEnvFile(contents) {
+  const parsed = {};
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (match) {
+      parsed[match[1]] = unquoteEnvValue(match[2]);
+    }
+  }
+  return parsed;
+}
+
+export function loadLocalElectronEnv(envPath = localEnvPath) {
+  if (!existsSync(envPath)) {
+    return {};
+  }
+  return parseEnvFile(readFileSync(envPath, 'utf8'));
+}
+
+export function loadElectronEnv(envPaths = [envPath, localEnvPath]) {
+  return envPaths.reduce(
+    (env, currentPath) => ({...env, ...loadLocalElectronEnv(currentPath)}),
+    {},
+  );
+}
+
+export function electronDevEnv(url, baseEnv = process.env, localEnv = loadElectronEnv()) {
+  // Load local env files into Electron main only. Vite does not receive this
+  // map, so local API keys are not injected into the renderer bundle. The
+  // plain .env file gives users a familiar setup path, while .env.local can
+  // still override it for machine-specific secrets.
+  const electronEnv = {...localEnv, ...baseEnv, ELECTRON_RENDERER_URL: url};
+  delete electronEnv.ELECTRON_RUN_AS_NODE;
+  return electronEnv;
 }
 
 export function vitePort() {
@@ -77,8 +132,7 @@ export async function main() {
 
     // Cursor/CI sometimes sets ELECTRON_RUN_AS_NODE=1, which makes require('electron')
     // return the binary path instead of main-process APIs (ipcMain undefined).
-    const electronEnv = {...process.env, ELECTRON_RENDERER_URL: url};
-    delete electronEnv.ELECTRON_RUN_AS_NODE;
+    const electronEnv = electronDevEnv(url);
 
     electronProcess = spawn('npx', ['electron', '.'], {
       stdio: 'inherit',

@@ -17,6 +17,7 @@ import {
   exactKeys,
   numberField,
   oneOf,
+  optionalNumber,
   optionalString,
   record,
   stringField,
@@ -108,6 +109,29 @@ function operation(
       return volumeDb !== null && pan !== null && pan <= 1
         ? {op, volumeDb, pan}
         : add(errors, `${path}.pan`, 'Expected pan between -1 and 1.');
+    }
+    case 'setTrackMix': {
+      // Partial per-track mix edit: trackId required, each knob optional so the
+      // Copilot can change just one (e.g. only volume). Mirrors setMasterMix but
+      // for a single track, with pan bounded to [-1, 1].
+      exactKeys(value, path, ['op', 'trackId', 'volumeDb', 'pan', 'gainDb'], errors);
+      const trackId = stringField(value, 'trackId', path, errors);
+      const volumeDb = optionalNumber(value, 'volumeDb', path, errors);
+      const pan = optionalNumber(value, 'pan', path, errors, {min: -1, max: 1});
+      const gainDb = optionalNumber(value, 'gainDb', path, errors);
+      if (!trackId || volumeDb === null || pan === null || gainDb === null) {
+        return null;
+      }
+      if (volumeDb === undefined && pan === undefined && gainDb === undefined) {
+        return add(errors, path, 'Expected at least one of volumeDb, pan, gainDb.');
+      }
+      return {
+        op,
+        trackId,
+        ...(volumeDb !== undefined ? {volumeDb} : {}),
+        ...(pan !== undefined ? {pan} : {}),
+        ...(gainDb !== undefined ? {gainDb} : {}),
+      };
     }
     case 'setSnapGrid': {
       exactKeys(value, path, ['op', 'snapGrid'], errors);

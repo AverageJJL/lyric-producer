@@ -71,7 +71,8 @@ function shouldRemoveNativeAudioClip(block: DAWBlock): boolean {
 }
 
 export function upsertBlockToEngine(block: DAWBlock): void {
-  if (!trackIsPlayable(useDAWStore.getState().tracks, block.trackId)) {
+  const tracks = useDAWStore.getState().tracks;
+  if (!trackIsPlayable(tracks, block.trackId)) {
     sendNativeAudioCommand('delete_clip', {clipId: block.id});
     return;
   }
@@ -119,7 +120,8 @@ export function upsertBlockToEngine(block: DAWBlock): void {
     }
   }
 
-  if (shouldSyncFileAudioClip(block)) {
+  const shouldSyncFileAudio = shouldSyncFileAudioClip(block);
+  if (shouldSyncFileAudio) {
     payload.audioFilePath = block.audioFilePath;
     if (block.absoluteAudioFilePath) {
       payload.absoluteAudioFilePath = block.absoluteAudioFilePath;

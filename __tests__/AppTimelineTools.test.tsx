@@ -8,6 +8,7 @@ import {PIXELS_PER_BEAT, ROW_HEIGHT} from '../src/ui/timelineLayout';
 import {TimelineGrid} from '../src/web/components/TimelineGrid';
 
 const noop = () => undefined;
+const noopImportAudio = async () => null;
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -81,12 +82,16 @@ function renderTimelineGrid(options: {
       verticalScrollRef={verticalScrollRef}
       onVerticalScroll={noop}
       rowHeight={ROW_HEIGHT}
+      expandedTakeGroups={[]}
+      onToggleTakeFolder={noop}
       onRowHeightChange={noop}
       onMoveBlock={noop}
       onResizeBlock={noop}
       onSelectBlock={noop}
       onUpdateBlock={noop}
       onDeleteBlock={noop}
+      importAudioFile={noopImportAudio}
+      onTimelineMediaDropHandled={noop}
     />,
   );
 }

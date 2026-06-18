@@ -8,6 +8,7 @@ import {
   captureProjectSnapshot,
   type ProjectSnapshot,
 } from './projectSnapshot';
+import {restoreCopilotChatProjectState} from '../assistant/copilotChatHistory';
 import type {ApplyArrangementOptions} from './operations';
 import {normalizeSnapGrid} from '../ui/snapGrid';
 import {normalizeCycleRange} from '../transport/cycleRange';
@@ -28,6 +29,11 @@ import {
 import {normalizeTrackOrganizationLabel} from '../music/trackOrganization';
 import {storedTrackRoutingRole} from '../music/trackRouting';
 import {normalizeTimeSignature} from '../store/projectMetadata';
+
+export type RestoreProjectSnapshotOptions = ApplyArrangementOptions & {
+  /** Copilot staging reuses project snapshots as transient previews; those must not rewind live chat. */
+  restoreCopilotChats?: boolean;
+};
 
 function blockFromSnapshot(block: DAWBlock): DAWBlock {
   return {
@@ -55,8 +61,11 @@ function patternFromSnapshot(pattern: DrumPattern): DrumPattern {
  */
 export function restoreProjectSnapshot(
   snapshot: ProjectSnapshot,
-  options?: ApplyArrangementOptions,
+  options?: RestoreProjectSnapshotOptions,
 ): ProjectSnapshot {
+  if (options?.restoreCopilotChats !== false) {
+    restoreCopilotChatProjectState(snapshot.copilotChats);
+  }
   const bpm = normalizeTempoBpm(snapshot.bpm);
   const secondsPerBeat = bpm > 0 ? 60 / bpm : 0.5;
   const cycleRange = normalizeCycleRange(snapshot.cycleStartBeat, snapshot.cycleEndBeat);

@@ -1,14 +1,21 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+// <App /> mounts the Copilot panel (react-markdown is ESM) — stub the markdown/
+// highlighter deps jest can't transform, matching the other App-render tests.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {openProjectMenu} from './helpers/projectMenu';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
-const saveProject = jest.fn();
-const openProject = jest.fn();
 const exportMixdown = jest.fn();
 const importDawProject = jest.fn();
 const exportDawProject = jest.fn();
@@ -81,8 +88,9 @@ beforeEach(() => {
     exportDawProject,
     exportMixdown,
     importDawProject,
-    openProject,
-    saveProject,
+    saveProjectFolder: jest.fn(),
+    openProjectFolder: jest.fn(),
+    setProjectAssetRoot: jest.fn(),
   };
   window.mediaImport = {
     importAudio: jest.fn(),

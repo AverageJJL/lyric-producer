@@ -7,6 +7,8 @@ export const AI_PROVIDER_ENV = {
   baseUrl: 'AI_PRODUCER_API_BASE_URL',
 } as const;
 
+export const DEFAULT_AI_MODEL = 'google/gemini-3.1-pro-preview-customtools';
+
 export type AiRuntimeEnvironment = 'development' | 'test' | 'production';
 
 export type AiProviderConfig = {
@@ -83,7 +85,7 @@ export function resolveAiProviderConfig(
   const errors: ArrangementValidationError[] = [];
   const env = input.env;
   const apiKeyEnvVar = clean(input.apiKeyEnvVar) ?? AI_PROVIDER_ENV.apiKey;
-  const model = clean(input.model) ?? clean(env[AI_PROVIDER_ENV.model]);
+  const model = clean(input.model) ?? clean(env[AI_PROVIDER_ENV.model]) ?? DEFAULT_AI_MODEL;
   const apiKey = clean(env[apiKeyEnvVar]);
   const environment = runtimeEnvironment(
     input.environment ?? env[AI_PROVIDER_ENV.environment],
@@ -91,9 +93,6 @@ export function resolveAiProviderConfig(
   );
   const baseUrl = validateBaseUrl(input.baseUrl ?? env[AI_PROVIDER_ENV.baseUrl], errors);
 
-  if (!model) {
-    error(errors, 'model', `Expected model id from ${AI_PROVIDER_ENV.model} or override.`);
-  }
   if (!apiKey) {
     error(errors, 'apiKey', `Expected API key in ${apiKeyEnvVar}.`);
   }

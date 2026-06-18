@@ -5,10 +5,10 @@ describe('single-instance desktop lifecycle', () => {
     expect(projectCommandFromArgv([
       'AI Producer Core.exe',
       '--some-flag',
-      'C:\\sessions\\song.apcproject',
+      'C:\\sessions\\song.apc',
     ])).toEqual({
       command: 'openProjectPath',
-      path: 'C:\\sessions\\song.apcproject',
+      path: 'C:\\sessions\\song.apc',
     });
 
     expect(projectCommandFromArgv(['app.exe', 'C:\\sessions\\song.dawproject'])).toEqual({

@@ -1,6 +1,15 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
+// <App /> mounts the Copilot panel (react-markdown is ESM) — stub the markdown/
+// highlighter deps jest can't transform, matching the other App-render tests.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -8,8 +17,6 @@ import {openBrowserDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
-const saveProject = jest.fn();
-const openProject = jest.fn();
 const importAudio = jest.fn();
 const duplicateAudio = jest.fn();
 const resolveAudioMedia = jest.fn();
@@ -112,8 +119,6 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
-  saveProject.mockResolvedValue({ok: true, path: '/tmp/song.apcproject'});
-  openProject.mockResolvedValue({ok: false, canceled: true, error: 'Canceled'});
   duplicateAudio.mockResolvedValue({
     ok: true,
     originalPath: '/external/shared.wav',
@@ -123,7 +128,7 @@ beforeEach(() => {
   });
   resolveAudioMedia.mockResolvedValue({ok: true, resolved: []});
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.projectFiles = {saveProject, openProject};
+  window.projectFiles = {saveProjectFolder: jest.fn(), openProjectFolder: jest.fn(), setProjectAssetRoot: jest.fn()};
   window.mediaImport = {importAudio, duplicateAudio, resolveAudioMedia};
   window.localStorage.clear();
 });
@@ -131,8 +136,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
-  saveProject.mockReset();
-  openProject.mockReset();
   importAudio.mockReset();
   duplicateAudio.mockReset();
   resolveAudioMedia.mockReset();

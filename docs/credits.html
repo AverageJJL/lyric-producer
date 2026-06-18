@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Credits - AI Producer Core</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090b0f;
+        --panel: #12161d;
+        --text: #f3f6fa;
+        --muted: #9ca8b8;
+        --line: #2b333f;
+        --accent: #d3efff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(760px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 72px 0 48px;
+      }
+
+      article {
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: 44px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 28px, 760px);
+          padding-top: 28px;
+        }
+
+        article {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>Credits</h1>
+        <p>
+          AI Producer Core uses song metadata services to help users seed a
+          desktop music production session from an existing song idea.
+        </p>
+        <p>
+          Tempo and key metadata powered by
+          <a href="https://getsongbpm.com" rel="noopener">GetSongBPM</a>.
+        </p>
+        <p><a href="./">Back to AI Producer Core</a></p>
+      </article>
+    </main>
+  </body>
+</html>

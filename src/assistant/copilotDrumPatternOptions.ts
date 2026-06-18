@@ -40,6 +40,7 @@ export type CopilotDrumPatternApplyResult =
   | {ok: false; error: string};
 
 type ImportPlacement = {trackId?: string; startBeat?: number};
+type SanitizedDrumLanes = {lanes: CopilotDrumPatternLanes; hitCount: number};
 
 const MAX_OPTIONS = 3;
 const MAX_EDITS = 4;
@@ -66,35 +67,58 @@ function emptyLanes(): CopilotDrumPatternLanes {
   return lanes;
 }
 
-export function sanitizeCopilotDrumLanes(value: unknown): CopilotDrumPatternLanes {
+function stepsFromMask(mask: number): number[] {
+  const steps: number[] = [];
+  for (let step = 0; step < STEPS_PER_BAR; step += 1) {
+    if ((mask & (1 << step)) !== 0) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+
+function sanitizeCopilotDrumLaneData(value: unknown): SanitizedDrumLanes {
   const lanes = emptyLanes();
+  let hitCount = 0;
   if (!record(value)) {
-    return lanes;
+    return {lanes, hitCount};
   }
   DRUM_SAMPLE_KEYS.forEach(key => {
     const raw = value[key];
     if (!Array.isArray(raw)) {
       return;
     }
-    lanes[key] = Array.from(new Set(raw
-      .filter(step => typeof step === 'number' && Number.isFinite(step))
-      .map(step => Math.round(step))
-      .filter(step => step >= 0 && step < STEPS_PER_BAR)))
-      .sort((a, b) => a - b);
+    // The drum grid is fixed at 16 steps, so a bitmask gives sorted unique steps without Set/map allocations.
+    let mask = 0;
+    for (const candidate of raw) {
+      if (typeof candidate !== 'number' || !Number.isFinite(candidate)) {
+        continue;
+      }
+      const step = Math.round(candidate);
+      if (step < 0 || step >= STEPS_PER_BAR) {
+        continue;
+      }
+      const bit = 1 << step;
+      if ((mask & bit) === 0) {
+        mask |= bit;
+        hitCount += 1;
+      }
+    }
+    lanes[key] = stepsFromMask(mask);
   });
-  return lanes;
+  return {lanes, hitCount};
 }
 
-function hasAnyStep(lanes: CopilotDrumPatternLanes): boolean {
-  return DRUM_SAMPLE_KEYS.some(key => lanes[key].length > 0);
+export function sanitizeCopilotDrumLanes(value: unknown): CopilotDrumPatternLanes {
+  return sanitizeCopilotDrumLaneData(value).lanes;
 }
 
 function parseOption(value: unknown, index: number): CopilotDrumPatternOption | null {
   if (!record(value)) {
     return null;
   }
-  const lanes = sanitizeCopilotDrumLanes(value.lanes);
-  if (!hasAnyStep(lanes)) {
+  const {lanes, hitCount} = sanitizeCopilotDrumLaneData(value.lanes);
+  if (hitCount === 0) {
     return null;
   }
   return {
@@ -122,8 +146,8 @@ function parseEdit(value: unknown): CopilotDrumPatternEdit | null {
   if (!record(value) || value.op !== 'replaceDrumPattern' || typeof value.blockId !== 'string') {
     return null;
   }
-  const lanes = sanitizeCopilotDrumLanes(value.lanes);
-  return hasAnyStep(lanes)
+  const {lanes, hitCount} = sanitizeCopilotDrumLaneData(value.lanes);
+  return hitCount > 0
     ? {op: 'replaceDrumPattern', blockId: value.blockId, name: cleanString(value.name, '', 80) || undefined, lanes}
     : null;
 }
@@ -230,15 +254,6 @@ export function copilotDrumPatternEditsToOperations(
     });
   }
   return {ok: true, operations, message: `${operations.length} drum pattern edit${operations.length === 1 ? '' : 's'} applied.`};
-}
-
-export function applyCopilotDrumPatternEdits(edits: CopilotDrumPatternEdit[]): CopilotDrumPatternApplyResult {
-  const converted = copilotDrumPatternEditsToOperations(edits);
-  if (!converted.ok) {
-    return converted;
-  }
-  applyArrangementOperations(converted.operations);
-  return converted;
 }
 
 export function describeCopilotDrumPatternEdit(edit: CopilotDrumPatternEdit): string {

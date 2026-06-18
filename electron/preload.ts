@@ -1,4 +1,4 @@
-import {contextBridge, ipcRenderer} from 'electron';
+import {contextBridge, ipcRenderer, webUtils} from 'electron';
 
 type AudioEngineEventName =
   | 'onTransportUpdate'
@@ -41,12 +41,19 @@ contextBridge.exposeInMainWorld('audioEngine', {
 });
 
 contextBridge.exposeInMainWorld('projectFiles', {
-  saveProject(request: {path?: string; content: string}) {
-    return ipcRenderer.invoke('project-file:save', request);
+  saveProjectFolder(request: {
+    folderPath?: string;
+    files: Array<{relativePath: string; content: string}>;
+  }) {
+    return ipcRenderer.invoke('apc-project:save-folder', request);
   },
 
-  openProject(request?: {path?: string}) {
-    return ipcRenderer.invoke('project-file:open', request);
+  openProjectFolder(request?: {path?: string}) {
+    return ipcRenderer.invoke('apc-project:open-folder', request);
+  },
+
+  setProjectAssetRoot(request: {folderPath: string | null}) {
+    return ipcRenderer.invoke('apc-project:set-active-root', request);
   },
 
   exportMixdown(request?: {title?: string; defaultPath?: string}) {
@@ -112,6 +119,33 @@ contextBridge.exposeInMainWorld('appUpdates', {
   },
 });
 
+contextBridge.exposeInMainWorld('copilot', {
+  agentAsk(request: {
+    message: string;
+    history?: Array<{role: 'user' | 'assistant'; content: string}>;
+    conversationSummary?: string;
+    context?: Record<string, unknown>;
+    mode?: 'build' | 'ask';
+    tree?: {
+      fingerprint: string;
+      files: Record<string, string>;
+      index: Array<{path: string; bytes: number; contentHash: string}>;
+    };
+  }) {
+    return ipcRenderer.invoke('copilot:agent-ask', request);
+  },
+
+  compact(request: {
+    history: Array<{role: 'user' | 'assistant'; content: string}>;
+    conversationSummary?: string;
+    currentUserMessage?: string;
+    uiState?: Record<string, unknown>;
+    context?: Record<string, unknown>;
+  }) {
+    return ipcRenderer.invoke('copilot:compact', request);
+  },
+});
+
 contextBridge.exposeInMainWorld('fxWindow', {
   open(trackId: string): void {
     ipcRenderer.send('fx-window:open', trackId);
@@ -154,6 +188,11 @@ contextBridge.exposeInMainWorld('fxWindow', {
 });
 
 contextBridge.exposeInMainWorld('mediaImport', {
+  pathForFile(file: File): string | null {
+    const filePath = webUtils.getPathForFile(file);
+    return filePath.length > 0 ? filePath : null;
+  },
+
   importAudio(request?: {path?: string}) {
     return ipcRenderer.invoke('media-file:import-audio', request);
   },

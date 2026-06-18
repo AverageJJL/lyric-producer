@@ -1,103 +1,65 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 
-import {
-  sanitizeCopilotAnswer,
-  type CopilotAnswer,
-  type CopilotUiAction,
-} from '../../assistant/copilotActions';
+import {type CopilotUiAction} from '../../assistant/copilotActions';
 import {
   buildCopilotContextPayload,
-  copilotRevealTargetIds,
-  copilotVisibleTargetIds,
   type CopilotContextPayload,
 } from '../../assistant/copilotContext';
+import {CopilotMessageArticle} from './CopilotMessageArticle';
+import {CopilotHeaderBar} from './CopilotHeaderBar';
+import {CopilotStagedProposalCard} from './CopilotStagedProposalCard';
+import {runCopilotAgent, type RunCopilotAgentResult} from '../../assistant/runCopilotAgent';
+import {revertStagedEdit} from '../../assistant/copilotStaging';
+import {isCopilotStagePending, useCopilotStagingStore} from '../../assistant/copilotStagingStore';
 import {
-  buildCopilotEditableArrangementSummary,
-  type CopilotEditableArrangementSummary,
-} from '../../assistant/copilotArrangementContext';
-import {
-  applyCopilotMidiBlockEdits,
-  type CopilotMidiBlockEdit,
-} from '../../assistant/copilotMidiBlockEdits';
-import {
-  applyCopilotDrumPatternEdits,
-  type CopilotDrumPatternEdit,
-} from '../../assistant/copilotDrumPatternOptions';
+  useCopilotChatHistoryStore,
+  type CopilotChatSession,
+} from '../../assistant/copilotChatHistory';
 import {CopilotInputForm} from './CopilotInputForm';
-import {CopilotMessageArticle, type PanelMessage} from './CopilotMessageArticle';
-import {CopilotPendingDrumPatternEditCard} from './CopilotPendingDrumPatternEditCard';
-import {CopilotPendingMidiEditCard} from './CopilotPendingMidiEditCard';
 import {useCopilotProjectContext} from './useCopilotProjectContext';
 import {useCopilotDrumPatternController} from './useCopilotDrumPatternController';
+import {useCopilotEditableArrangement} from './useCopilotEditableArrangement';
 import {useCopilotMidiOptionController} from './useCopilotMidiOptionController';
-import {
-  getCopilotBridge,
-  type CopilotUiState,
-} from '../../native/copilotApi';
-import {activeTracks, blocksForActiveTracks} from '../../music/trackOrganization';
-import {useDAWStore} from '../../store/useDAWStore';
+import {useCopilotMemoryState} from './useCopilotMemoryState';
+import {getCopilotBridge, type CopilotMode, type CopilotUiState} from '../../native/copilotApi';
 
 type CopilotPanelProps = {
   uiState: CopilotUiState;
   onActions: (actions: CopilotUiAction[], context: CopilotContextPayload) => void;
 };
 
-type PendingMidiEdit = {
-  id: string;
-  edits: CopilotMidiBlockEdit[];
-  error?: string;
-};
-
-type PendingDrumPatternEdit = {
-  id: string;
-  edits: CopilotDrumPatternEdit[];
-  error?: string;
-};
+type AgentSuccess = Extract<RunCopilotAgentResult, {ok: true}>;
 
 function messageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function activeSessionFrom(sessions: CopilotChatSession[], activeSessionId: string): CopilotChatSession | undefined {
+  return sessions.find(session => session.id === activeSessionId) ?? sessions[0];
+}
+
 export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
-  const [messages, setMessages] = useState<PanelMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [isPending, setIsPending] = useState(false);
-  const [pendingMidiEdit, setPendingMidiEdit] = useState<PendingMidiEdit | null>(null);
-  const [pendingDrumPatternEdit, setPendingDrumPatternEdit] = useState<PendingDrumPatternEdit | null>(null);
+  const [mode, setMode] = useState<CopilotMode>('build');
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const activeRequestRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bridge = getCopilotBridge();
-  const tracks = useDAWStore(state => state.tracks);
-  const blocks = useDAWStore(state => state.blocks);
-  const patterns = useDAWStore(state => state.patterns);
-  const selectedTrackId = useDAWStore(state => state.selectedTrackId);
-  const selectedBlockId = useDAWStore(state => state.selectedBlockId);
-  const selectedBlockIds = useDAWStore(state => state.selectedBlockIds);
-  const playheadBeat = useDAWStore(state => state.playheadBeat);
   const projectContext = useCopilotProjectContext();
-  const chatHistory = useMemo(
-    () => messages
-      .filter(message => !message.error)
-      .map(({role, content}) => ({role, content}))
-      .slice(-6),
-    [messages],
-  );
-  const editableArrangement = useMemo<CopilotEditableArrangementSummary>(() => {
-    const visibleTracks = activeTracks(tracks);
-    return buildCopilotEditableArrangementSummary({
-      tracks: visibleTracks,
-      blocks: blocksForActiveTracks(blocks, tracks),
-      patterns,
-      selectedTrackId,
-      selectedBlockId,
-      selectedBlockIds,
-      playheadBeat,
-    });
-  }, [blocks, patterns, playheadBeat, selectedBlockId, selectedBlockIds, selectedTrackId, tracks]);
+  const editableArrangement = useCopilotEditableArrangement();
+  const sessions = useCopilotChatHistoryStore(state => state.sessions);
+  const activeSessionId = useCopilotChatHistoryStore(state => state.activeSessionId);
+  const pendingSessionId = useCopilotChatHistoryStore(state => state.pendingSessionId);
+  const appendMessage = useCopilotChatHistoryStore(state => state.appendMessage);
+  const newChat = useCopilotChatHistoryStore(state => state.newChat);
+  const selectSession = useCopilotChatHistoryStore(state => state.selectSession);
+  const setRequestPending = useCopilotChatHistoryStore(state => state.setRequestPending);
+  const activeSession = activeSessionFrom(sessions, activeSessionId);
+  const messages = activeSession?.messages ?? [];
+  const isPending = pendingSessionId !== null;
 
-  const focusInput = useCallback(() => {
-    textareaRef.current?.focus({preventScroll: true});
-  }, []);
+  const focusInput = useCallback(() => { textareaRef.current?.focus({preventScroll: true}); }, []);
 
   const scheduleFocusInput = useCallback(() => {
     if (window.requestAnimationFrame) {
@@ -108,152 +70,169 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
     return () => window.clearTimeout(timer);
   }, [focusInput]);
 
-  useEffect(() => {
-    return scheduleFocusInput();
-  }, [scheduleFocusInput]);
+  useEffect(() => scheduleFocusInput(), [scheduleFocusInput]);
   const midiOptions = useCopilotMidiOptionController(scheduleFocusInput);
   const drumPatterns = useCopilotDrumPatternController(scheduleFocusInput);
+  const prepareMemoryRequest = useCopilotMemoryState();
 
-  const appendAssistant = (
-    answer: CopilotAnswer,
-    model: string,
+  const closeMenus = useCallback(() => {
+    setIsModeMenuOpen(false);
+    setIsHistoryOpen(false);
+  }, []);
+
+  // Open one popover at a time so the mode menu and history list never overlap.
+  const toggleModeMenu = useCallback(() => {
+    setIsHistoryOpen(false);
+    setIsModeMenuOpen(open => !open);
+  }, []);
+
+  const toggleHistory = useCallback(() => {
+    setIsModeMenuOpen(false);
+    setIsHistoryOpen(open => !open);
+  }, []);
+
+  const selectMode = useCallback((next: CopilotMode) => {
+    setMode(next);
+    setIsModeMenuOpen(false);
+  }, []);
+
+  const startNewChat = useCallback(() => {
+    newChat();
+    setDraft('');
+    closeMenus();
+    scheduleFocusInput();
+  }, [closeMenus, newChat, scheduleFocusInput]);
+
+  const selectHistorySession = useCallback((sessionId: string) => {
+    selectSession(sessionId);
+    setDraft('');
+    closeMenus();
+    scheduleFocusInput();
+  }, [closeMenus, scheduleFocusInput, selectSession]);
+
+  // Render the unified agent result: text bubble (+ any creative option cards),
+  // dispatch UI-guidance actions (cursor highlighting), and set the single staged
+  // proposal. Gated on the stale-request guard so a slow/superseded response never
+  // appends a message, dispatches actions, or clobbers a fresher staged proposal.
+  const appendAgentResult = (
+    result: AgentSuccess,
     context: CopilotContextPayload,
     requestId: number,
+    sessionId: string,
   ) => {
     if (activeRequestRef.current !== requestId) {
       return;
     }
-    setMessages(current => [
-      ...current,
-      {
-        id: messageId('assistant'),
-        role: 'assistant',
-        content: answer.text,
-        model,
-        midiOptions: answer.midiOptions,
-        drumPatternOptions: answer.drumPatternOptions,
-      },
-    ]);
-    setPendingMidiEdit(answer.midiBlockEdits.length > 0
-      ? {id: messageId('midi-edit'), edits: answer.midiBlockEdits}
-      : null);
-    setPendingDrumPatternEdit(answer.drumPatternEdits.length > 0
-      ? {id: messageId('drum-edit'), edits: answer.drumPatternEdits}
-      : null);
-    onActions(answer.actions, context);
+    const note = result.proposal
+      ? `${result.text}\n\nProposed an edit below — click “Stage & listen” to apply it in the workspace, then Accept or Reject.`
+      : result.proposalError
+        ? `${result.text}\n\n${result.proposalError}`
+        : result.text;
+    appendMessage(sessionId, {
+      id: messageId('assistant'),
+      role: 'assistant',
+      content: note,
+      model: result.model,
+      midiOptions: result.midiOptions,
+      drumPatternOptions: result.drumPatternOptions,
+      askReports: result.reports.length > 0 ? result.reports : undefined,
+    });
+    onActions(result.actions, context);
+    if (result.proposal) {
+      // Never orphan a still-undecided preview: revert any live-but-unaccepted stage
+      // back to its base before the new proposal replaces the card.
+      if (isCopilotStagePending()) {
+        revertStagedEdit();
+      }
+      useCopilotStagingStore.getState().setStagedProposal(result.proposal);
+    }
   };
 
-
-  const appendError = (error: string, requestId: number) => {
+  const appendError = (error: string, requestId: number, sessionId: string) => {
     if (activeRequestRef.current !== requestId) {
       return;
     }
-    setMessages(current => [
-      ...current,
-      {id: messageId('error'), role: 'assistant', content: error, error: true},
-    ]);
+    appendMessage(sessionId, {id: messageId('error'), role: 'assistant', content: error, error: true});
   };
 
-  const sendMessage = async () => {
-    const message = draft.trim();
-    if (!message || isPending) {
-      return;
-    }
+  const sendMessage = async (overrideMessage?: string) => {
+    if (!activeSession) return;
+    const sessionId = activeSession.id;
+    const message = (overrideMessage ?? draft).trim();
+    if (!message || isPending) return;
     setDraft('');
-    setIsPending(true);
-    setPendingMidiEdit(null);
-    setPendingDrumPatternEdit(null);
+    setRequestPending(sessionId);
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
-    setMessages(current => [...current, {id: messageId('user'), role: 'user', content: message}]);
+    appendMessage(sessionId, {id: messageId('user'), role: 'user', content: message});
+    focusInput();
     scheduleFocusInput();
     const context = buildCopilotContextPayload(uiState, editableArrangement, projectContext);
 
     if (!bridge) {
-      appendError('Copilot is not available in this renderer.', requestId);
-      setIsPending(false);
+      appendError('Copilot is not available in this renderer.', requestId, sessionId);
+      setRequestPending(null);
       return;
     }
 
     try {
-      const response = await bridge.ask({
+      const memory = await prepareMemoryRequest({
         message,
-        history: chatHistory,
+        session: activeSession,
+        bridge,
         uiState,
         context,
+        isCurrent: () => activeRequestRef.current === requestId,
       });
-      if (activeRequestRef.current === requestId) {
-        setIsPending(false);
-      }
-      if (response.ok) {
-        appendAssistant(
-          sanitizeCopilotAnswer(response.answer, {
-            visibleTargetIds: copilotVisibleTargetIds(context),
-            revealTargetIds: copilotRevealTargetIds(context),
-          }),
-          response.model,
-          context,
-          requestId,
-        );
+      if (!memory) {
+        if (activeRequestRef.current === requestId) {
+          setRequestPending(null);
+        }
         return;
       }
-      appendError(response.error, requestId);
+      const agentResult = await runCopilotAgent({
+        message,
+        history: memory.history,
+        conversationSummary: memory.conversationSummary,
+        context,
+        mode,
+      });
+      if (activeRequestRef.current !== requestId) {
+        return;
+      }
+      setRequestPending(null);
+      if (!agentResult.ok) {
+        appendError(agentResult.error, requestId, sessionId);
+        return;
+      }
+      appendAgentResult(agentResult, context, requestId, sessionId);
     } catch {
       if (activeRequestRef.current === requestId) {
-        setIsPending(false);
+        setRequestPending(null);
       }
-      appendError('Copilot request failed before a response was returned.', requestId);
+      appendError('Copilot request failed before a response was returned.', requestId, sessionId);
     }
-  };
-
-  const applyPendingMidiEdit = () => {
-    if (!pendingMidiEdit) {
-      return;
-    }
-    const result = applyCopilotMidiBlockEdits(pendingMidiEdit.edits);
-    if (!result.ok) {
-      setPendingMidiEdit({...pendingMidiEdit, error: result.error});
-      scheduleFocusInput();
-      return;
-    }
-    setPendingMidiEdit(null);
-    setMessages(current => [
-      ...current,
-      {id: messageId('assistant'), role: 'assistant', content: result.message},
-    ]);
-    scheduleFocusInput();
-  };
-
-  const cancelPendingMidiEdit = () => {
-    setPendingMidiEdit(null);
-    scheduleFocusInput();
-  };
-
-  const applyPendingDrumPatternEdit = () => {
-    if (!pendingDrumPatternEdit) {
-      return;
-    }
-    const result = applyCopilotDrumPatternEdits(pendingDrumPatternEdit.edits);
-    if (!result.ok) {
-      setPendingDrumPatternEdit({...pendingDrumPatternEdit, error: result.error});
-      scheduleFocusInput();
-      return;
-    }
-    setPendingDrumPatternEdit(null);
-    setMessages(current => [
-      ...current,
-      {id: messageId('assistant'), role: 'assistant', content: result.message},
-    ]);
-    scheduleFocusInput();
-  };
-
-  const cancelPendingDrumPatternEdit = () => {
-    setPendingDrumPatternEdit(null);
-    scheduleFocusInput();
   };
 
   return (
-    <section className="copilot-panel" aria-label="Copilot chat">
+    <section
+      className="copilot-panel"
+      aria-label="Copilot chat"
+      data-copilot-mode={mode}>
+      <CopilotHeaderBar
+        mode={mode}
+        isModeMenuOpen={isModeMenuOpen}
+        isHistoryOpen={isHistoryOpen}
+        isPending={isPending}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectMode={selectMode}
+        onToggleModeMenu={toggleModeMenu}
+        onCloseMenus={closeMenus}
+        onNewChat={startNewChat}
+        onToggleHistory={toggleHistory}
+        onSelectSession={selectHistorySession}
+      />
       <div className="copilot-thread" aria-live="polite">
         {messages.map(message => (
           <CopilotMessageArticle
@@ -269,20 +248,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
             <p className="copilot-message-plain">Thinking...</p>
           </article>
         ) : null}
-        {pendingMidiEdit ? (
-          <CopilotPendingMidiEditCard
-            pendingMidiEdit={pendingMidiEdit}
-            onApply={applyPendingMidiEdit}
-            onCancel={cancelPendingMidiEdit}
-          />
-        ) : null}
-        {pendingDrumPatternEdit ? (
-          <CopilotPendingDrumPatternEditCard
-            pendingDrumPatternEdit={pendingDrumPatternEdit}
-            onApply={applyPendingDrumPatternEdit}
-            onCancel={cancelPendingDrumPatternEdit}
-          />
-        ) : null}
+        <CopilotStagedProposalCard />
       </div>
       <CopilotInputForm
         draft={draft}

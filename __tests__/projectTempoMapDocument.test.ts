@@ -1,10 +1,12 @@
 import {
-  createProjectDocument,
-  openProjectDocument,
-  parseProjectDocument,
-  serializeProjectDocument,
-} from '../src/arrangement/projectDocument';
+  compileApcSourceToSnapshot,
+  decomposeSnapshotToApcSource,
+  parseApcSourceFiles,
+  serializeApcSource,
+} from '../src/arrangement/apc';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
+import {normalizeSnapshot} from '../src/arrangement/snapshotNormalize';
+import {restoreProjectSnapshot} from '../src/arrangement/projectRestore';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -65,6 +67,8 @@ function resetStore(): void {
   });
 }
 
+const TS = '2026-06-03T12:00:00.000Z';
+
 describe('project document tempo and meter maps', () => {
   beforeEach(() => {
     resetStore();
@@ -75,15 +79,20 @@ describe('project document tempo and meter maps', () => {
     useDAWStore.getState().setTempoMapEvent(8, 132, 'linear');
     useDAWStore.getState().setMeterMapEvent(12, {numerator: 7, denominator: 8});
 
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
-    const parsed = parseProjectDocument(serializeProjectDocument(document));
+    const files = serializeApcSource(decomposeSnapshotToApcSource(captureProjectSnapshot(), TS));
+    const parsed = parseApcSourceFiles(files);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) {
       return;
     }
+    const compiled = compileApcSourceToSnapshot(parsed.source);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) {
+      return;
+    }
 
     resetStore();
-    const restored = openProjectDocument(parsed.document, {skipNativeRefresh: true});
+    const restored = restoreProjectSnapshot(compiled.snapshot, {skipNativeRefresh: true});
 
     expect(restored.tempoMap).toEqual([
       {id: 'tempo-8_000', beat: 8, bpm: 132, ramp: 'linear'},
@@ -93,24 +102,16 @@ describe('project document tempo and meter maps', () => {
     ]);
   });
 
-  it('normalizes legacy documents that do not carry map metadata', () => {
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
+  it('normalizes legacy snapshots that do not carry map metadata', () => {
     const legacy = {
-      ...document,
-      snapshot: {
-        ...document.snapshot,
-        tempoMap: undefined,
-        meterMap: undefined,
-      },
+      ...captureProjectSnapshot(),
+      tempoMap: undefined,
+      meterMap: undefined,
     };
 
-    const parsed = parseProjectDocument(JSON.stringify(legacy));
+    const normalized = normalizeSnapshot(legacy);
 
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) {
-      return;
-    }
-    expect(parsed.document.snapshot.tempoMap).toEqual([]);
-    expect(parsed.document.snapshot.meterMap).toEqual([]);
+    expect(normalized.tempoMap).toEqual([]);
+    expect(normalized.meterMap).toEqual([]);
   });
 });

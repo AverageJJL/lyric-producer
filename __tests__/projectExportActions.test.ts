@@ -15,8 +15,9 @@ const writeMidiFile = jest.fn();
 
 function bridge(): ProjectFileBridge {
   return {
-    saveProject: jest.fn(),
-    openProject: jest.fn(),
+    saveProjectFolder: jest.fn(),
+    openProjectFolder: jest.fn(),
+    setProjectAssetRoot: jest.fn(),
     exportMixdown,
     exportStems,
     writeMidiFile,

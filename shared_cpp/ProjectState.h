@@ -150,6 +150,7 @@ class ProjectState {
   std::string assetRoot_;
   std::string writableAssetRoot_;
   std::vector<UiTrackRecord> uiTracks_;
+  std::unordered_map<std::string, int> trackIndexById_;
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>> drumKitByTrack_;
   std::unordered_map<std::string, std::string> instrumentByTrack_;
   std::unordered_map<std::string, std::string> presetByTrack_;

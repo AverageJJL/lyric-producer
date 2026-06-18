@@ -121,7 +121,9 @@ CommandResult handleAnalyzeAudioFile(te::Edit& edit, const std::string& payloadJ
       static_cast<double>(reader->lengthInSamples) / static_cast<double>(reader->sampleRate);
   const double lengthBeats =
       std::max(1.0, secondsToBeatsFromStart(edit.tempoSequence, durationSeconds));
-  const auto peakAnalysis = computeWaveformPeakAnalysis(file, 128);
+  const auto peakAnalysis = computeWaveformPeakAnalysis(
+      file,
+      peakCountForDuration(durationSeconds));
 
   nlohmann::json peakArray = nlohmann::json::array();
   for (float peak : peakAnalysis.waveformPeaks) {

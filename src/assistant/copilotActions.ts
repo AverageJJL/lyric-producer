@@ -117,11 +117,15 @@ export function sanitizeCopilotAnswer(value: unknown, options: SanitizeOptions =
   const text = typeof value.text === 'string' && value.text.trim().length > 0
     ? value.text.trim()
     : 'I found a possible answer, but it did not include readable text.';
-  const actions = Array.isArray(value.actions)
-    ? value.actions
-      .map(action => validAction(action, visibleTargetIds, revealTargetIds))
-      .filter((action): action is CopilotUiAction => action !== null)
-    : [];
+  const actions: CopilotUiAction[] = [];
+  if (Array.isArray(value.actions)) {
+    for (const rawAction of value.actions) {
+      const action = validAction(rawAction, visibleTargetIds, revealTargetIds);
+      if (action) {
+        actions.push(action);
+      }
+    }
+  }
   return {
     text,
     actions,

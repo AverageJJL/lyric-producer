@@ -34,6 +34,8 @@ describe('macOS package configuration', () => {
       pack: expect.any(String),
       dist: expect.any(String),
     });
+    expect(scripts.pack).toBe('npm run build && electron-builder --dir');
+    expect(scripts.dist).toBe('npm run build && electron-builder');
     expect(build).toMatchObject({
       appId: 'com.musicapp.aiproducercore',
       productName: 'AI Producer Core',

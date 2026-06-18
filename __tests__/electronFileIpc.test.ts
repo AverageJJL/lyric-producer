@@ -46,17 +46,8 @@ describe('file IPC', () => {
     fs.rmSync(root, {recursive: true, force: true});
   });
 
-  it('saves and opens project documents through the registered handlers', async () => {
-    const content = JSON.stringify({document: {tracks: []}});
-    const target = path.join(root, 'session');
-
-    const saved = await handler('project-file:save')(null, {path: target, content});
-
-    expect(saved).toEqual({ok: true, path: `${target}.apcproject`});
-    expect(fs.readFileSync(`${target}.apcproject`, 'utf8')).toBe(content);
-    await expect(handler('project-file:open')(null, {path: `${target}.apcproject`}))
-      .resolves.toEqual({ok: true, path: `${target}.apcproject`, content});
-  });
+  // Removed: project-file:save / project-file:open handlers no longer live in
+  // registerFileIpc (moved to apcProjectIpc.ts as folder-based .apc handlers).
 
   it('copies imported and duplicated audio into unique project import paths', async () => {
     const sourcePath = path.join(root, 'loop.wav');

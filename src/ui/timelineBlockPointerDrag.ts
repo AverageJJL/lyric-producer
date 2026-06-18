@@ -1,5 +1,6 @@
 import {clampAudioResizeFromLeft, clampAudioResizeFromRight, clampMoveStartBeat, clampResizeFromLeft, clampResizeFromRight} from '../music/timelineCollision';
 import type {DAWBlock} from '../store/useDAWStore';
+import {shouldSuppressImportedBlockPointerDrag} from './timelineImportDragSuppression';
 import {PIXELS_PER_BEAT, RESIZE_HANDLE_WIDTH, ROW_HEIGHT, clamp} from './timelineLayout';
 import {DEFAULT_SNAP_GRID, snapBeatToGrid, snapLengthToGrid, type SnapGrid} from './snapGrid';
 import {blockResizeVisualWidthPx, isMoveLeftEdgeBlock, usesAudioTrimResize} from './timelineBlockDragCore';
@@ -22,11 +23,22 @@ export type PointerSession = {
 };
 
 export type PointerLikeEvent = {
-  nativeEvent?: {button?: number; pointerId: number; pageX: number; pageY: number};
+  nativeEvent?: {
+    button?: number;
+    buttons?: number;
+    pageX: number;
+    pageY: number;
+    pointerId: number;
+    pointerType?: string;
+    type?: string;
+  };
   button?: number;
+  buttons?: number;
   pointerId: number;
   pageX: number;
   pageY: number;
+  pointerType?: string;
+  type?: string;
   ctrlKey?: boolean;
   metaKey?: boolean;
   shiftKey?: boolean;
@@ -235,6 +247,10 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
       return;
     }
 
+    if (shouldSuppressImportedBlockPointerDrag(config.block.id)) {
+      return;
+    }
+
     config.sessionRef.current = {
       mode,
       pointerId: pointer.pointerId,
@@ -265,6 +281,12 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
     applyDragVisuals(config, session.mode, dx, dy);
   };
 
+  const cleanupSession = () => {
+    config.sessionRef.current = null;
+    config.isDraggingRef.current = false;
+    config.onDraggingChange(false);
+  };
+
   const finish = (event: PointerLikeEvent) => {
     const session = config.sessionRef.current;
     const pointer = pointerData(event);
@@ -272,18 +294,25 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
       return;
     }
 
-    const dx = pointer.pageX - session.originPageX;
-    const dy = pointer.pageY - session.originPageY;
-    commitDrag(config, session.mode, dx, dy);
-    config.sessionRef.current = null;
-    config.isDraggingRef.current = false;
-    config.onDraggingChange(false);
+    const commitDx = pointer.pageX - session.originPageX;
+    const commitDy = pointer.pageY - session.originPageY;
+    commitDrag(config, session.mode, commitDx, commitDy);
+    cleanupSession();
+  };
+
+  const cancel = (event: PointerLikeEvent) => {
+    const session = config.sessionRef.current;
+    const pointer = pointerData(event);
+    if (!session || pointer.pointerId !== session.pointerId) {
+      return;
+    }
+    cleanupSession();
   };
 
   return {
     onPointerMove,
     onPointerUp: finish,
-    onPointerCancel: finish,
+    onPointerCancel: cancel,
     onMovePointerDown: (event: PointerEvent) => beginSession('move', event),
     onResizeLeftPointerDown: (event: PointerEvent) =>
       beginSession(isMoveLeftEdgeBlock(config.block) ? 'move' : 'resize-left', event),
@@ -291,6 +320,17 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
   };
 }
 
-function pointerData(event: PointerLikeEvent): {button?: number; pointerId: number; pageX: number; pageY: number} {
+function pointerData(event: PointerLikeEvent): {
+  button?: number;
+  buttons?: number;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  pageX: number;
+  pageY: number;
+  pointerId: number;
+  pointerType?: string;
+  shiftKey?: boolean;
+  type?: string;
+} {
   return event.nativeEvent ?? event;
 }

@@ -117,6 +117,14 @@ const actionPolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
 };
 
 const directSetStatePolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
+  'src/assistant/copilotMidiOptions.ts': {
+    policy: 'no-history',
+    reason: 'option-import selection state (clip creation runs through applyArrangementOperations)',
+  },
+  'src/assistant/copilotDrumPatternOptions.ts': {
+    policy: 'no-history',
+    reason: 'option-import selection state (clip creation runs through applyArrangementOperations)',
+  },
   'src/arrangement/arrangementOperationMutations.ts': {
     policy: 'history',
     reason: 'scripted restore/upsert mutations',

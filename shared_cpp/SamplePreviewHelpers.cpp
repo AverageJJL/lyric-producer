@@ -56,7 +56,12 @@ bool isTrackAudibleForLiveInput(const ProjectState& projectState, const std::str
 void clearPreviewClipsOnTrack(te::AudioTrack& track) {
   juce::Array<te::Clip*> toRemove;
   for (auto* clip : track.getClips()) {
-    if (clip != nullptr && clip->getName().startsWith("__preview__")) {
+    // The plain Copilot label shipped briefly before phrase preview joined the shared
+    // preview namespace. Keep removing it so stale preview clips cannot layer playback.
+    if (
+        clip != nullptr &&
+        (clip->getName().startsWith("__preview__") ||
+         clip->getName() == "Copilot Preview")) {
       toRemove.add(clip);
     }
   }

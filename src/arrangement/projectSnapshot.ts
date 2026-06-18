@@ -14,7 +14,13 @@ import {DEFAULT_TIME_SIGNATURE} from '../store/projectMetadata';
 import type {DAWBlock, DAWTrack} from '../store/useDAWStore';
 import type {DAWStore} from '../store/useDAWStore';
 import {useDAWStore} from '../store/useDAWStore';
+import {
+  captureCopilotChatProjectState,
+  emptyCopilotChatProjectState,
+  type CopilotChatProjectState,
+} from '../assistant/copilotChatHistory';
 import {canonicalJsonStringify} from './canonicalJson';
+import {mediaReferencesFromBlocks} from './mediaReferences';
 import {DEFAULT_SNAP_GRID, type SnapGrid} from '../ui/snapGrid';
 import {DEFAULT_CYCLE_END_BEAT, DEFAULT_CYCLE_START_BEAT} from '../transport/cycleRange';
 import {
@@ -78,6 +84,8 @@ export type ProjectSnapshot = {
   fxSummaries: TrackFxSummary[];
   /** Native guitar/bass DI amp-sim pedalboard and cabinet state. */
   ampSimStates: TrackAmpSimState[];
+  /** Project-saved Copilot transcripts. Runtime request state stays out. */
+  copilotChats: CopilotChatProjectState;
 };
 
 export type ProjectMediaReference = {
@@ -175,19 +183,6 @@ function cloneAmpSimState(state: TrackAmpSimState): TrackAmpSimState {
   };
 }
 
-function mediaReferencesFromBlocks(blocks: DAWBlock[]): ProjectMediaReference[] {
-  return blocks
-    .filter(block => block.type === 'audio' && (block.audioFilePath || block.absoluteAudioFilePath))
-    .map(block => ({
-      clipId: block.id,
-      trackId: block.trackId,
-      kind: 'audio' as const,
-      name: block.mediaSourceName ?? block.name,
-      relativePath: block.audioFilePath,
-      absolutePath: block.absoluteAudioFilePath,
-    }));
-}
-
 function clonePattern(pattern: DrumPattern): DrumPattern {
   const normalized = normalizeDrumPattern(pattern);
   return {
@@ -240,6 +235,7 @@ export function captureProjectSnapshot(): ProjectSnapshot {
     fxStates,
     fxSummaries: fxStates.map(summarizeTrackFx),
     ampSimStates,
+    copilotChats: captureCopilotChatProjectState(),
   };
 }
 
@@ -279,5 +275,6 @@ export function emptyProjectSnapshot(): ProjectSnapshot {
     fxStates: [],
     fxSummaries: [],
     ampSimStates: [],
+    copilotChats: emptyCopilotChatProjectState(),
   };
 }

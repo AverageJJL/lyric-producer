@@ -60,6 +60,8 @@ export function TransportProjectKeyControl({
     });
   };
 
+  const label = projectScaleLabel(scale);
+
   return (
     <div ref={controlRef} className="lcd-details project-key-detail">
       <button
@@ -69,7 +71,7 @@ export function TransportProjectKeyControl({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen(open => !open)}>
-        {projectScaleLabel(scale)}
+        {label || <span className="project-key-empty" aria-hidden="true">—</span>}
       </button>
       {isOpen ? (
         <div className="project-key-menu" role="menu" aria-label="Project key menu">

@@ -1,5 +1,6 @@
 import {
   AI_PROVIDER_ENV,
+  DEFAULT_AI_MODEL,
   resolveAiProviderConfig,
 } from '../src/orchestration/aiProviderConfig';
 
@@ -52,7 +53,22 @@ describe('AI provider config', () => {
     expect(JSON.stringify(result)).not.toContain('custom-secret');
   });
 
-  it('rejects missing secrets, missing model, invalid environment, and non-HTTPS base URLs', () => {
+  it('uses the default model when no model override or env value is provided', () => {
+    const result = resolveAiProviderConfig({
+      env: {
+        [AI_PROVIDER_ENV.apiKey]: 'sk-secret-value',
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      config: {
+        model: DEFAULT_AI_MODEL,
+      },
+    });
+  });
+
+  it('rejects missing secrets, invalid environment, and non-HTTPS base URLs', () => {
     const result = resolveAiProviderConfig({
       env: {
         [AI_PROVIDER_ENV.environment]: 'staging',
@@ -64,7 +80,6 @@ describe('AI provider config', () => {
     expect(result.ok ? [] : result.errors).toEqual(expect.arrayContaining([
       {path: 'environment', message: 'Expected development, test, or production.'},
       {path: 'baseUrl', message: 'Expected an HTTPS URL.'},
-      {path: 'model', message: `Expected model id from ${AI_PROVIDER_ENV.model} or override.`},
       {path: 'apiKey', message: `Expected API key in ${AI_PROVIDER_ENV.apiKey}.`},
     ]));
   });

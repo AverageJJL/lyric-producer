@@ -19,6 +19,7 @@ import {
 } from '../../ui/timelineBlockPointerDrag';
 import type {TimelineTrackLaneLayout} from '../../ui/timelineTrackLanes';
 import {ClipContent, type ClipPreviewState} from './ClipContent';
+import {clearImportedBlockPointerDragSuppression} from '../../ui/timelineImportDragSuppression';
 
 type TimelineBlockProps = {
   block: DAWBlock;
@@ -248,6 +249,12 @@ export function TimelineBlock({
     (handler as (event: React.PointerEvent<HTMLElement>) => void)(event);
   };
 
+  const clearImportDragSuppressionWhenIdle = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.buttons === 0) {
+      clearImportedBlockPointerDragSuppression(block.id);
+    }
+  };
+
   const startQuickSwipe = (event: React.PointerEvent<HTMLElement>) => {
     if (isTakeSourceLane && !quickSwipeMode) {
       event.stopPropagation();
@@ -454,6 +461,7 @@ export function TimelineBlock({
         onPointerMove={pointerHandlers.onPointerMove}
         onPointerUp={pointerHandlers.onPointerUp}
         onPointerCancel={pointerHandlers.onPointerCancel}
+        onPointerEnter={clearImportDragSuppressionWhenIdle}
         style={{top, left, width: displayWidthPx, height: blockHeight}}>
         <div
           className="timeline-block-clip-surface"
@@ -516,6 +524,7 @@ export function TimelineBlock({
       onPointerMove={pointerHandlers.onPointerMove}
       onPointerUp={pointerHandlers.onPointerUp}
       onPointerCancel={pointerHandlers.onPointerCancel}
+      onPointerEnter={clearImportDragSuppressionWhenIdle}
       style={{top, left, width, height: blockHeight, backgroundColor: block.color}}>
       {!readOnly ? (
         <span

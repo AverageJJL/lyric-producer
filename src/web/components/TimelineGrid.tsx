@@ -29,6 +29,8 @@ import {
   recordingCompFolderRange,
 } from '../../transport/recordingComp';
 import {useTimelineOriginScroll} from '../../hooks/useTimelineOriginScroll';
+import type {useAudioImport} from '../../hooks/useAudioImport';
+import {useTimelineAudioDropImport} from '../../hooks/useTimelineAudioDropImport';
 import {useTimelineSurfaceHeight} from '../../hooks/useTimelineSurfaceHeight';
 import {computeVisibleTimelineBeats, timelineWidthPx} from '../../ui/timelineExtent';
 import {nextTimelineScrollLeft} from '../../ui/timelineFollowScroll';
@@ -69,6 +71,8 @@ type TimelineGridProps = {
   onSelectBlock: (blockId: string | null, options?: {additive?: boolean}) => void;
   onUpdateBlock: (blockId: string, updates: Partial<Pick<DAWBlock, 'name'>>) => void;
   onDeleteBlock: (blockId: string) => void;
+  importAudioFile: ReturnType<typeof useAudioImport>['importAudioFile'];
+  onTimelineMediaDropHandled: () => void;
 };
 
 export function TimelineGrid({
@@ -87,6 +91,8 @@ export function TimelineGrid({
   onSelectBlock,
   onUpdateBlock,
   onDeleteBlock,
+  importAudioFile,
+  onTimelineMediaDropHandled,
 }: TimelineGridProps) {
   const [isDraggingBlock, setIsDraggingBlock] = useState(false);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT);
@@ -224,6 +230,9 @@ export function TimelineGrid({
   };
 
   const trackIdAtClientY = useCallback((clientY: number): string | null => {
+    if (!Number.isFinite(clientY)) {
+      return null;
+    }
     const rect = timelineSurfaceRef.current?.getBoundingClientRect();
     if (!rect) {
       return null;
@@ -236,6 +245,9 @@ export function TimelineGrid({
   }, [trackLaneLayout]);
 
   const beatAtClientX = useCallback((clientX: number): number | null => {
+    if (!Number.isFinite(clientX)) {
+      return null;
+    }
     const rect = timelineSurfaceRef.current?.getBoundingClientRect();
     if (!rect) {
       return null;
@@ -243,6 +255,17 @@ export function TimelineGrid({
     const rawBeat = Math.max(0, Math.min((clientX - rect.left) / pixelsPerBeat, visibleTimelineBeats));
     return snapBeatToGrid(rawBeat, snapGrid, beatsPerBar);
   }, [beatsPerBar, pixelsPerBeat, snapGrid, visibleTimelineBeats]);
+
+  const {
+    handleTimelineAudioDragOver,
+    handleTimelineAudioDrop,
+  } = useTimelineAudioDropImport({
+    tracks,
+    importAudioFile,
+    trackIdAtClientY,
+    beatAtClientX,
+    onDropHandled: onTimelineMediaDropHandled,
+  });
 
   const handleCopilotDrumPatternDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes(COPILOT_DRUM_PATTERN_DRAG_TYPE)) {
@@ -303,6 +326,18 @@ export function TimelineGrid({
       event.dataTransfer.dropEffect = 'copy';
     }
   }, []);
+
+  const handleTimelineDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    handleTimelineAudioDragOver(event);
+    handleCopilotMidiDragOver(event);
+  }, [handleCopilotMidiDragOver, handleTimelineAudioDragOver]);
+
+  const handleTimelineDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (handleTimelineAudioDrop(event)) {
+      return;
+    }
+    handleCopilotMidiDrop(event);
+  }, [handleCopilotMidiDrop, handleTimelineAudioDrop]);
 
   const getTimelineClientX = useCallback(
     () => timelineSurfaceRef.current?.getBoundingClientRect().left ?? 0,
@@ -496,8 +531,8 @@ export function TimelineGrid({
           <div
             className="timeline-surface"
             ref={timelineSurfaceRef}
-            onDragOver={handleCopilotMidiDragOver}
-            onDrop={handleCopilotMidiDrop}
+            onDragOver={handleTimelineDragOver}
+            onDrop={handleTimelineDrop}
             onPointerDownCapture={handleTimelineSurfacePointerDownCapture}
             style={{width: timelineWidth, height: surfaceHeight}}>
             <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />

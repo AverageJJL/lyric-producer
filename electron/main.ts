@@ -7,9 +7,12 @@ import {
   projectCommandForPath,
   type AppProjectCommand,
 } from './appMenu';
+import {registerCopilotIpc} from './copilotIpc';
 import {startCrashReporting} from './crashReporting';
 import {registerDawProjectIpc} from './dawProjectIpc';
 import {registerFileIpc} from './fileIpc';
+import {registerApcProjectIpc} from './apcProjectIpc';
+import {appWideAssetRoots, projectMediaRoots} from './assetRoots';
 import {registerMediaRevealIpc} from './mediaRevealIpc';
 import {registerMidiImportIpc} from './midiImportIpc';
 import {registerOfflineMediaRecoveryIpc} from './offlineMediaRecoveryIpc';
@@ -101,17 +104,35 @@ function resolveNativeAddon(): NativeAudioAddon {
   return audioAddon;
 }
 
-function assetRoots() {
-  const readRoot = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(app.getAppPath(), 'assets');
-  const writableRoot = path.join(app.getPath('userData'), 'assets');
+// The folder of the currently open `.apc` project (null while unsaved). Recorded
+// when the renderer switches projects so native asset re-homing can build on it.
+let activeProjectFolder: string | null = null;
 
-  fs.mkdirSync(path.join(writableRoot, 'recordings'), {recursive: true});
-  fs.mkdirSync(path.join(writableRoot, 'spectrograms'), {recursive: true});
-  fs.mkdirSync(path.join(writableRoot, 'imports'), {recursive: true});
-  fs.mkdirSync(path.join(writableRoot, 'sample-library'), {recursive: true});
-  return {readRoot, writableRoot};
+function recordActiveProjectFolder(folderPath: string | null): void {
+  activeProjectFolder = folderPath;
+}
+
+function rootsEnv() {
+  return {
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+    userDataPath: app.getPath('userData'),
+    activeProjectFolder,
+  };
+}
+
+// Per-project media root: recordings/imports/spectrograms follow the open project into
+// `Song.apc/assets` (draft root while unsaved). Re-homed automatically because the open
+// project flips `activeProjectFolder` and re-issues `set_asset_root` to the engine.
+function assetRoots() {
+  return projectMediaRoots(rootsEnv());
+}
+
+// App-wide root for shared, non-project assets. Sample-library state must stay
+// under userData and never move per-project.
+function appWideRoots() {
+  return appWideAssetRoots(rootsEnv());
 }
 
 function sendRendererEvent(eventName: string, payloadJson: string) {
@@ -225,10 +246,21 @@ ipcMain.on('app-lifecycle:renderer-ready', () => {
 });
 
 registerProjectCloseGuardIpc();
+registerCopilotIpc({
+  sendNativeCommand: (command, payloadJson) =>
+    resolveNativeAddon().sendCommand(command, payloadJson),
+});
 
 registerFileIpc({
   getMainWindow: () => mainWindow,
   assetRoots,
+});
+registerApcProjectIpc({
+  getMainWindow: () => mainWindow,
+  assetRoots,
+  recordActiveProjectFolder,
+  sendNativeCommand: (command, payloadJson) =>
+    resolveNativeAddon().sendCommand(command, payloadJson),
 });
 registerDawProjectIpc({
   getMainWindow: () => mainWindow,
@@ -240,8 +272,10 @@ registerOfflineMediaRecoveryIpc({
   getMainWindow: () => mainWindow,
   assetRoots,
 });
-registerSampleLibraryIpc({assetRoots});
-registerSampleProviderIpc({assetRoots});
+// Sample library + sample provider state is shared, not project content. Keep it
+// on the app-wide root so it never moves per-project.
+registerSampleLibraryIpc({assetRoots: appWideRoots});
+registerSampleProviderIpc({assetRoots: appWideRoots});
 registerStemExportIpc({getMainWindow: () => mainWindow});
 registerFxWindowIpc(() => mainWindow);
 

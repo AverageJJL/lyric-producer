@@ -1,16 +1,29 @@
 import React from 'react';
-import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {act, cleanup, createEvent, fireEvent, render, screen, waitFor} from '@testing-library/react';
+
+// <App /> mounts the Copilot panel, which imports ESM markdown/highlighter deps
+// that Jest does not transform in this repo's current test setup.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
 
 import {emptyProjectSnapshot} from '../src/arrangement/projectSnapshot';
 import {midiBytesToBase64, midiFileBytesFromSnapshot} from '../src/music/midiFileExport';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
-import {useDAWStore} from '../src/store/useDAWStore';
+import {useDAWStore, type DAWTrack} from '../src/store/useDAWStore';
+import {PIXELS_PER_BEAT, RULER_HEIGHT, ROW_HEIGHT} from '../src/ui/timelineLayout';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
 const importAudio = jest.fn();
 const importMidi = jest.fn();
 const relinkAudio = jest.fn();
+const pathForFile = jest.fn();
+
+type DroppedTestFile = File & {mockPath?: string};
 
 function midiFixtureBase64(): string {
   const snapshot = emptyProjectSnapshot();
@@ -39,9 +52,21 @@ function midiFixtureBase64(): string {
 }
 
 function droppedFile(name: string, path: string): File {
-  const file = new File(['fixture'], name);
-  Object.defineProperty(file, 'path', {value: path});
+  const file = new File(['fixture'], name) as DroppedTestFile;
+  Object.defineProperty(file, 'mockPath', {value: path});
   return file;
+}
+
+function audioImportResponse(sourcePath = '/Users/me/drop-loop.wav') {
+  const fileName = sourcePath.split(/[\\/]/).pop() ?? 'drop-loop.wav';
+  const stem = fileName.replace(/\.[^.]+$/, '') || 'drop-loop';
+  return {
+    ok: true,
+    originalPath: sourcePath,
+    absolutePath: `/tmp/imports/${fileName}`,
+    relativePath: `imports/${fileName}`,
+    name: stem,
+  };
 }
 
 async function dropMedia(file: File): Promise<void> {
@@ -51,6 +76,69 @@ async function dropMedia(file: File): Promise<void> {
     });
     await Promise.resolve();
   });
+}
+
+function timelineSurface(): HTMLElement {
+  const surface = document.querySelector('.timeline-surface') as HTMLElement | null;
+  if (!surface) {
+    throw new Error('Timeline surface was not rendered.');
+  }
+  Object.defineProperty(surface, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      x: 100,
+      y: 80,
+      left: 100,
+      top: 80,
+      right: 1200,
+      bottom: 760,
+      width: 1100,
+      height: 680,
+      toJSON: () => ({}),
+    }),
+  });
+  return surface;
+}
+
+async function dropTimelineMedia(
+  files: File[],
+  options: {rawBeat: number; laneIndex?: number} = {rawBeat: 12.4},
+): Promise<void> {
+  const surface = timelineSurface();
+  const laneIndex = options.laneIndex ?? 0;
+  await act(async () => {
+    const event = createEvent.drop(surface, {
+      dataTransfer: {
+        files,
+        types: ['Files'],
+      },
+    });
+    Object.defineProperty(event, 'clientX', {
+      configurable: true,
+      value: 100 + options.rawBeat * PIXELS_PER_BEAT,
+    });
+    Object.defineProperty(event, 'clientY', {
+      configurable: true,
+      value: 80 + RULER_HEIGHT + laneIndex * ROW_HEIGHT + 20,
+    });
+    fireEvent(surface, event);
+    await Promise.resolve();
+  });
+}
+
+function trackFixture(id: string, type: DAWTrack['type']): DAWTrack {
+  return {
+    id,
+    name: type === 'voice_audio' ? 'Audio' : 'Instrument',
+    isMuted: false,
+    isSolo: false,
+    type,
+    instrumentId: type === 'voice_audio' ? 'voice_audio' : 'synth_lead',
+    presetId: type === 'voice_audio' ? 'voice_audio' : 'pop_lead',
+    isRecordArmed: false,
+    isInputMonitoringEnabled: false,
+    isLocked: false,
+  };
 }
 
 function resetStore(): void {
@@ -76,7 +164,11 @@ function resetStore(): void {
     playWallClockAnchor: null,
     playStartSeconds: 0,
     syncSource: 'ui',
+    snapGrid: 'beat',
+    isRelativeSnapEnabled: false,
     timeSignature: {...DEFAULT_TIME_SIGNATURE},
+    tempoMap: [],
+    meterMap: [],
     scale: null,
     chord: null,
     sections: [],
@@ -98,13 +190,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
-  importAudio.mockResolvedValue({
-    ok: true,
-    originalPath: '/Users/me/drop-loop.wav',
-    absolutePath: '/tmp/imports/drop-loop.wav',
-    relativePath: 'imports/drop-loop.wav',
-    name: 'drop-loop',
-  });
+  importAudio.mockImplementation(async (request?: {path?: string}) =>
+    audioImportResponse(request?.path),
+  );
   importMidi.mockResolvedValue({
     ok: true,
     originalPath: '/Users/me/drop-lead.mid',
@@ -112,8 +200,9 @@ beforeEach(() => {
     name: 'drop-lead',
   });
   relinkAudio.mockResolvedValue({ok: false, canceled: true, error: 'unused'});
+  pathForFile.mockImplementation((file: File) => (file as DroppedTestFile).mockPath ?? null);
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.mediaImport = {importAudio, importMidi, relinkAudio};
+  window.mediaImport = {pathForFile, importAudio, importMidi, relinkAudio};
 });
 
 afterEach(() => {
@@ -122,14 +211,16 @@ afterEach(() => {
   importAudio.mockReset();
   importMidi.mockReset();
   relinkAudio.mockReset();
+  pathForFile.mockReset();
   delete window.mediaImport;
 });
 
-test('imports a dropped audio file through the Electron path request', async () => {
+test('imports a dropped audio file through the Electron file-path resolver', async () => {
   render(<App />);
 
   await dropMedia(droppedFile('drop-loop.wav', '/Users/me/drop-loop.wav'));
 
+  expect(pathForFile).toHaveBeenCalledTimes(1);
   expect(importAudio).toHaveBeenCalledWith({path: '/Users/me/drop-loop.wav'});
   expect(importMidi).not.toHaveBeenCalled();
   expect(sendCommand).toHaveBeenCalledWith(
@@ -141,6 +232,148 @@ test('imports a dropped audio file through the Electron path request', async () 
     startBeat: 8,
     lengthBeats: 3,
     audioFilePath: 'imports/drop-loop.wav',
+  });
+});
+
+test('drops an audio file directly onto a voice audio timeline lane', async () => {
+  const voiceTrack = trackFixture('track-voice', 'voice_audio');
+  useDAWStore.setState({tracks: [voiceTrack]});
+  render(<App />);
+
+  await dropTimelineMedia([droppedFile('drop-loop.wav', '/Users/me/drop-loop.wav')], {
+    rawBeat: 12.4,
+  });
+
+  await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(1));
+  expect(importAudio).toHaveBeenCalledWith({path: '/Users/me/drop-loop.wav'});
+  const state = useDAWStore.getState();
+  expect(state.tracks).toHaveLength(1);
+  expect(state.blocks).toHaveLength(1);
+  expect(state.blocks[0]).toMatchObject({
+    trackId: 'track-voice',
+    name: 'drop-loop',
+    startBeat: 12,
+    audioFilePath: 'imports/drop-loop.wav',
+  });
+});
+
+test('drops audio on an instrument lane by creating a voice audio lane', async () => {
+  const instrumentTrack = trackFixture('track-instrument', 'software_instrument');
+  useDAWStore.setState({tracks: [instrumentTrack]});
+  render(<App />);
+
+  await dropTimelineMedia([droppedFile('drop-loop.wav', '/Users/me/drop-loop.wav')], {
+    rawBeat: 6.6,
+  });
+
+  await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(1));
+  const state = useDAWStore.getState();
+  expect(state.tracks[0]).toMatchObject({id: 'track-instrument', type: 'software_instrument'});
+  expect(state.tracks[1]).toMatchObject({type: 'voice_audio'});
+  expect(state.blocks[0]).toMatchObject({
+    trackId: state.tracks[1]?.id,
+    startBeat: 7,
+    audioFilePath: 'imports/drop-loop.wav',
+  });
+});
+
+test('drops audio on an empty timeline by creating a voice audio lane', async () => {
+  render(<App />);
+
+  await dropTimelineMedia([droppedFile('empty-drop.wav', '/Users/me/empty-drop.wav')], {
+    rawBeat: 2.2,
+  });
+
+  await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(1));
+  const state = useDAWStore.getState();
+  expect(state.tracks[0]).toMatchObject({type: 'voice_audio'});
+  expect(state.blocks[0]).toMatchObject({
+    trackId: state.tracks[0]?.id,
+    startBeat: 2,
+    audioFilePath: 'imports/empty-drop.wav',
+  });
+  expect(document.querySelector('.timeline-block .waveform-preview')).toBeTruthy();
+  expect(document.querySelector('.timeline-block .waveform-fill')).toBeTruthy();
+});
+
+test('plays an imported timeline audio clip without staying in native-start loading state', async () => {
+  render(<App />);
+
+  await dropTimelineMedia([droppedFile('drop-loop.wav', '/Users/me/drop-loop.wav')], {
+    rawBeat: 0,
+  });
+  await waitFor(() => expect(useDAWStore.getState().blocks).toHaveLength(1));
+  sendCommand.mockClear();
+
+  fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+
+  const commandNames = sendCommand.mock.calls.map(([command]) => command);
+  const setTracksIndex = commandNames.indexOf('setTracks');
+  const upsertAudioIndex = commandNames.indexOf('upsert_audio_clip');
+  const playIndex = commandNames.indexOf('transport_play');
+  expect(setTracksIndex).toBeGreaterThanOrEqual(0);
+  expect(upsertAudioIndex).toBeGreaterThan(setTracksIndex);
+  expect(upsertAudioIndex).toBeGreaterThanOrEqual(0);
+  expect(playIndex).toBeGreaterThan(upsertAudioIndex);
+  expect(JSON.parse(sendCommand.mock.calls[upsertAudioIndex]?.[1] ?? '{}')).toMatchObject({
+    audioFilePath: 'imports/drop-loop.wav',
+    absoluteAudioFilePath: '/tmp/imports/drop-loop.wav',
+  });
+  expect(useDAWStore.getState()).toMatchObject({
+    isPlaying: true,
+    playAwaitingEngine: false,
+  });
+  expect(screen.getByRole('button', {name: 'Stop'})).toBeInTheDocument();
+});
+
+test('stacks multiple timeline-dropped audio files onto voice audio tracks', async () => {
+  const voiceTrack = trackFixture('track-voice', 'voice_audio');
+  useDAWStore.setState({tracks: [voiceTrack]});
+  render(<App />);
+
+  await dropTimelineMedia([
+    droppedFile('loop-a.wav', '/Users/me/loop-a.wav'),
+    droppedFile('loop-b.wav', '/Users/me/loop-b.wav'),
+    droppedFile('loop-c.wav', '/Users/me/loop-c.wav'),
+  ], {rawBeat: 4.3});
+
+  await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(3));
+  const state = useDAWStore.getState();
+  const audioTracks = state.tracks.filter(track => track.type === 'voice_audio');
+  expect(audioTracks).toHaveLength(3);
+  expect(state.blocks).toHaveLength(3);
+  expect(state.blocks.map(block => block.startBeat)).toEqual([4, 4, 4]);
+  expect(state.blocks.map(block => block.trackId)).toEqual(audioTracks.map(track => track.id));
+  expect(state.blocks.map(block => block.audioFilePath)).toEqual([
+    'imports/loop-a.wav',
+    'imports/loop-b.wav',
+    'imports/loop-c.wav',
+  ]);
+});
+
+test('lets mixed timeline media drops fall back to the app-shell importer', async () => {
+  const voiceTrack = trackFixture('track-voice', 'voice_audio');
+  useDAWStore.setState({tracks: [voiceTrack]});
+  render(<App />);
+
+  await dropTimelineMedia([
+    droppedFile('drop-loop.wav', '/Users/me/drop-loop.wav'),
+    droppedFile('drop-lead.mid', '/Users/me/drop-lead.mid'),
+  ], {rawBeat: 12.4});
+
+  await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(importMidi).toHaveBeenCalledTimes(1));
+  expect(importAudio).toHaveBeenCalledWith({path: '/Users/me/drop-loop.wav'});
+  expect(importMidi).toHaveBeenCalledWith({path: '/Users/me/drop-lead.mid'});
+  const state = useDAWStore.getState();
+  expect(state.blocks.find(block => block.type === 'audio')).toMatchObject({
+    trackId: 'track-voice',
+    startBeat: 8,
+    audioFilePath: 'imports/drop-loop.wav',
+  });
+  expect(state.blocks.find(block => block.type === 'midi')).toMatchObject({
+    startBeat: 8,
+    notes: [{note: 67, velocity: 100, startBeat: 0, lengthBeats: 2}],
   });
 });
 

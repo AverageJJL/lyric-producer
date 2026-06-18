@@ -6,9 +6,57 @@ type LockState = {
   blocks: DAWBlock[];
 };
 
+type ArrangementLockLookup = LockState & {
+  blockById: Map<string, DAWBlock>;
+  lockedClipTrackIds: Set<string>;
+  lockedPatternIds: Set<string>;
+  trackLockedById: Map<string, boolean>;
+};
+
+function lockLookup(state: LockState): ArrangementLockLookup | null {
+  return 'trackLockedById' in state ? state as ArrangementLockLookup : null;
+}
+
+export function createArrangementLockLookup(state: LockState): ArrangementLockLookup {
+  const trackLockedById = new Map<string, boolean>();
+  state.tracks.forEach(track => {
+    const locked = track.isLocked || track.isFrozen === true;
+    trackLockedById.set(track.id, trackLockedById.get(track.id) === true || locked);
+  });
+
+  const blockById = new Map<string, DAWBlock>();
+  const lockedClipTrackIds = new Set<string>();
+  const lockedPatternIds = new Set<string>();
+  state.blocks.forEach(block => {
+    if (!blockById.has(block.id)) {
+      blockById.set(block.id, block);
+    }
+    const locked = block.isLocked === true || trackLockedById.get(block.trackId) === true;
+    if (locked) {
+      lockedClipTrackIds.add(block.trackId);
+      if (block.patternId) {
+        lockedPatternIds.add(block.patternId);
+      }
+    }
+  });
+
+  return {
+    tracks: state.tracks,
+    blocks: state.blocks,
+    blockById,
+    lockedClipTrackIds,
+    lockedPatternIds,
+    trackLockedById,
+  };
+}
+
 function trackIsLocked(trackId: string | undefined, state: LockState): boolean {
   if (!trackId) {
     return false;
+  }
+  const lookup = lockLookup(state);
+  if (lookup) {
+    return lookup.trackLockedById.get(trackId) === true;
   }
   return state.tracks.some(track =>
     track.id === trackId && (track.isLocked || track.isFrozen === true),
@@ -16,6 +64,10 @@ function trackIsLocked(trackId: string | undefined, state: LockState): boolean {
 }
 
 function blockForClip(clipId: string, state: LockState): DAWBlock | undefined {
+  const lookup = lockLookup(state);
+  if (lookup) {
+    return lookup.blockById.get(clipId);
+  }
   return state.blocks.find(block => block.id === clipId);
 }
 
@@ -27,6 +79,10 @@ function blockOrTrackIsLocked(block: DAWBlock | undefined, state: LockState): bo
 }
 
 function patternTouchesLockedClip(patternId: string, state: LockState): boolean {
+  const lookup = lockLookup(state);
+  if (lookup) {
+    return lookup.lockedPatternIds.has(patternId);
+  }
   return state.blocks.some(block =>
     block.patternId === patternId && blockOrTrackIsLocked(block, state),
   );
@@ -43,12 +99,16 @@ export function shouldSkipLockedArrangementOperation(
 ): boolean {
   switch (operation.op) {
     case 'deleteTrack':
+      if (lockLookup(state)?.lockedClipTrackIds.has(operation.trackId)) {
+        return true;
+      }
       return trackIsLocked(operation.trackId, state) ||
         state.blocks.some(block =>
           block.trackId === operation.trackId && blockOrTrackIsLocked(block, state),
         );
     case 'setTrackInstrument':
     case 'setTrackPreset':
+    case 'setTrackMix':
       return trackIsLocked(operation.trackId, state);
     case 'deleteClip':
       return blockOrTrackIsLocked(blockForClip(operation.clipId, state), state);

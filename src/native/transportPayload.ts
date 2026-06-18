@@ -19,7 +19,10 @@ export function buildNativeTransportPayload(
   };
 }
 
-export function applyTransportStatusFromResponse(response: string | null): void {
+export function applyTransportStatusFromResponse(
+  response: string | null,
+  acknowledgedPlayRequest = false,
+): void {
   if (!response) {
     return;
   }
@@ -35,11 +38,14 @@ export function applyTransportStatusFromResponse(response: string | null): void 
         clickTrackEnabled?: boolean;
       };
     };
-    if (!parsed.ok || !parsed.data) {
+    if (!parsed.ok) {
       return;
     }
 
-    useDAWStore.getState().applyEngineTransportState(parsed.data);
+    useDAWStore.getState().applyEngineTransportState({
+      ...(parsed.data ?? {}),
+      isPlaying: acknowledgedPlayRequest ? true : parsed.data?.isPlaying,
+    });
   } catch {
     // ignore malformed engine JSON
   }

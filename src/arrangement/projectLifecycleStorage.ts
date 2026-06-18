@@ -1,10 +1,19 @@
+import type {ApcSourceFile} from './apc';
+
 const RECENT_PROJECTS_KEY = 'aiProducerCore.recentProjects';
 const AUTOSAVE_DRAFT_KEY = 'aiProducerCore.autosaveDraft';
 const MAX_RECENT_PROJECTS = 8;
 
+/**
+ * Autosave holds the `.apc` SOURCE TREE (an array of small JSON files), not a
+ * single document blob. Media bytes are never in the tree — they live under the
+ * project/draft asset folder and are referenced by relative path — so the JSON
+ * tree stays small enough for app storage. `path` is the project folder (null for
+ * an unsaved draft).
+ */
 export type AutosaveDraft = {
   path: string | null;
-  content: string;
+  files: ApcSourceFile[];
   savedFingerprint: string;
   savedAt: string;
 };
@@ -62,7 +71,14 @@ export function readAutosaveDraft(storage = browserStorage()): AutosaveDraft | n
     if (
       parsed &&
       typeof parsed === 'object' &&
-      typeof parsed.content === 'string' &&
+      Array.isArray(parsed.files) &&
+      parsed.files.every(
+        (file: unknown) =>
+          file &&
+          typeof file === 'object' &&
+          typeof (file as ApcSourceFile).relativePath === 'string' &&
+          typeof (file as ApcSourceFile).content === 'string',
+      ) &&
       typeof parsed.savedFingerprint === 'string' &&
       typeof parsed.savedAt === 'string' &&
       (typeof parsed.path === 'string' || parsed.path === null)

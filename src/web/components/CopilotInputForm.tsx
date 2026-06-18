@@ -17,6 +17,8 @@ export function CopilotInputForm({
   onDraftChange,
   onSend,
 }: CopilotInputFormProps) {
+  const canSend = draft.trim().length > 0 && !isPending;
+
   return (
     <form
       className="copilot-input-row"
@@ -24,15 +26,13 @@ export function CopilotInputForm({
         event.preventDefault();
         onSend();
       }}>
-      <label className="sr-only" htmlFor="copilot-message">
-        Message Copilot
-      </label>
       <textarea
         id="copilot-message"
         ref={textareaRef}
-        value={draft}
-        rows={2}
+        aria-label="Message Copilot"
         placeholder="Message Copilot"
+        rows={2}
+        value={draft}
         onChange={event => onDraftChange(event.currentTarget.value)}
         onKeyDown={event => {
           if (event.key === 'Enter' && !event.shiftKey) {
@@ -45,7 +45,7 @@ export function CopilotInputForm({
         type="submit"
         aria-label="Send message"
         title="Send message"
-        disabled={isPending || draft.trim().length === 0}>
+        disabled={!canSend}>
         <SendHorizontalIcon className="copilot-send-icon" />
       </button>
     </form>

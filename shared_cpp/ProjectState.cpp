@@ -50,9 +50,13 @@ std::string ProjectState::resolveAssetPath(const std::string& relativePath) cons
 
 void ProjectState::updateUiTracks(const std::vector<UiTrackRecord>& tracks) {
   uiTracks_ = tracks;
+  trackIndexById_.clear();
+  trackIndexById_.reserve(uiTracks_.size());
 
   std::unordered_set<std::string> liveTrackIds;
-  for (const auto& track : uiTracks_) {
+  for (std::size_t index = 0; index < uiTracks_.size(); ++index) {
+    const auto& track = uiTracks_[index];
+    trackIndexById_.emplace(track.id, static_cast<int>(index));
     liveTrackIds.insert(track.id);
   }
 
@@ -74,12 +78,8 @@ void ProjectState::updateUiTracks(const std::vector<UiTrackRecord>& tracks) {
 }
 
 int ProjectState::trackIndexForId(const std::string& trackId) const {
-  for (std::size_t index = 0; index < uiTracks_.size(); ++index) {
-    if (uiTracks_[index].id == trackId) {
-      return static_cast<int>(index);
-    }
-  }
-  return -1;
+  const auto it = trackIndexById_.find(trackId);
+  return it != trackIndexById_.end() ? it->second : -1;
 }
 
 bool ProjectState::upsertTrackAutomationPoint(

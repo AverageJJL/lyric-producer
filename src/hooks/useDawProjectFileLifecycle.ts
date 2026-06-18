@@ -5,8 +5,7 @@ import {
   importDawProjectFile,
   type DawProjectFileActionResult,
 } from '../arrangement/dawProjectActions';
-import {createProjectDocument, serializeProjectDocument} from '../arrangement/projectDocument';
-import {captureProjectSnapshot} from '../arrangement/projectSnapshot';
+import {currentSourceFiles} from '../arrangement/apc';
 import {writeAutosaveDraft} from '../arrangement/projectLifecycleStorage';
 import {getProjectFileBridge} from '../native/projectFileApi';
 
@@ -49,9 +48,8 @@ function exportStatus(result: Extract<DawProjectFileActionResult, {ok: true}>): 
 }
 
 function writeImportedAutosave(savedFingerprint: string): void {
-  const snapshot = captureProjectSnapshot();
   writeAutosaveDraft({
-    content: serializeProjectDocument(createProjectDocument(snapshot)),
+    files: currentSourceFiles(),
     path: null,
     savedAt: new Date().toISOString(),
     savedFingerprint,

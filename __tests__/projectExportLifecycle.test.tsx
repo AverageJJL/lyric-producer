@@ -30,8 +30,9 @@ function Harness() {
 beforeEach(() => {
   window.audioEngine = {sendCommand};
   window.projectFiles = {
-    saveProject: jest.fn(),
-    openProject: jest.fn(),
+    saveProjectFolder: jest.fn(),
+    openProjectFolder: jest.fn(),
+    setProjectAssetRoot: jest.fn(),
     exportMixdown,
   };
   sendCommand.mockReturnValue(JSON.stringify({ok: true, data: {path: '/tmp/mix.wav'}}));

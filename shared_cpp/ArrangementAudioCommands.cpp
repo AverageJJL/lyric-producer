@@ -107,43 +107,49 @@ CommandResult handleUpsertAudioClip(
                                   ? payload["absoluteAudioFilePath"].get<std::string>()
                                   : projectState.resolveAssetPath(relativePath);
     const juce::File file(absolutePath);
+    if (!file.existsAsFile() || file.getSize() <= 64) {
+      return makeError("upsert_audio_clip", "file_not_found", "Audio file is missing or empty.");
+    }
+
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(
-        file.existsAsFile() && file.getSize() > 64
-            ? formatManager.createReaderFor(file)
-            : nullptr);
-    if (reader != nullptr && reader->lengthInSamples > 0) {
-      juce::File playbackFile(file);
-      if (isReversed) {
-        auto reversedFile = reversedCacheFile(projectState, clipId, file);
-        if (!reversedFile.getParentDirectory().createDirectory()) {
-          return makeError("upsert_audio_clip", "reverse_cache_failed", "Could not create reverse cache directory.");
-        }
-        if (!reversedFile.existsAsFile()) {
-          std::atomic<float> progress{0.0f};
-          if (!te::AudioFileUtils::reverse(engine, file, reversedFile, progress, nullptr)) {
-            return makeError("upsert_audio_clip", "reverse_render_failed", "Could not create reversed audio cache.");
-          }
-        }
-        playbackFile = reversedFile;
-      }
-
-      auto waveClip = track->insertWaveClip(
-          juce::String(clipId),
-          playbackFile,
-          beatRangeToClipPosition(edit, blockStartBeat, blockLengthBeats, playbackSourceOffsetBeats),
-          false);
-      if (waveClip != nullptr) {
-        waveClip->setGainDB(clipGainDb);
-        waveClip->setFadeIn(beatDurationAt(edit, blockStartBeat, fadeInBeats));
-        waveClip->setFadeOut(beatDurationAt(
-            edit,
-            blockStartBeat + blockLengthBeats - fadeOutBeats,
-            fadeOutBeats));
-        createdClips.push_back({"", waveClip.get()});
-      }
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
+    if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0) {
+      return makeError("upsert_audio_clip", "unsupported_file", "Audio file could not be decoded.");
     }
+    reader.reset();
+
+    juce::File playbackFile(file);
+    if (isReversed) {
+      auto reversedFile = reversedCacheFile(projectState, clipId, file);
+      if (!reversedFile.getParentDirectory().createDirectory()) {
+        return makeError("upsert_audio_clip", "reverse_cache_failed", "Could not create reverse cache directory.");
+      }
+      if (!reversedFile.existsAsFile()) {
+        std::atomic<float> progress{0.0f};
+        if (!te::AudioFileUtils::reverse(engine, file, reversedFile, progress, nullptr)) {
+          return makeError("upsert_audio_clip", "reverse_render_failed", "Could not create reversed audio cache.");
+        }
+      }
+      playbackFile = reversedFile;
+    }
+
+    auto waveClip = track->insertWaveClip(
+        juce::String(clipId),
+        playbackFile,
+        beatRangeToClipPosition(edit, blockStartBeat, blockLengthBeats, playbackSourceOffsetBeats),
+        false);
+    if (waveClip == nullptr) {
+      return makeError("upsert_audio_clip", "clip_insert_failed", "Audio file could not be inserted.");
+    }
+
+    waveClip->setGainDB(clipGainDb);
+    waveClip->setFadeIn(beatDurationAt(edit, blockStartBeat, fadeInBeats));
+    waveClip->setFadeOut(beatDurationAt(
+        edit,
+        blockStartBeat + blockLengthBeats - fadeOutBeats,
+        fadeOutBeats));
+    createdClips.push_back({"", waveClip.get()});
   }
 
   const auto placeDrumHitAtBeat =

@@ -37,6 +37,15 @@ function syncMasterMix(volumeDb: number, pan: number): void {
   );
 }
 
+function syncTrackMapping(tracks: DAWTrack[]): void {
+  const nextActiveTracks = activeTracks(tracks);
+  sendNativeAudioCommand('setTracks', {
+    tracks: buildNativeTracksPayload(tracks),
+  });
+  syncTrackInstruments(tracks);
+  syncRecordArm(nextActiveTracks);
+}
+
 function playableTrackOrder(tracks: DAWTrack[]): string[] {
   return playableTracks(tracks).map(track => track.id);
 }
@@ -60,8 +69,12 @@ function syncTempoMap(state = useDAWStore.getState()): void {
 function ensureArrangementSynced(blocks: DAWBlock[], state = useDAWStore.getState()): void {
   syncTempoMap(state);
   blocks.forEach(block => {
+    const fingerprint = nativeBlockFingerprint(block);
+    if (blockFingerprints.get(block.id) === fingerprint) {
+      return;
+    }
     upsertBlockToEngine(block);
-    blockFingerprints.set(block.id, nativeBlockFingerprint(block));
+    blockFingerprints.set(block.id, fingerprint);
   });
   syncLoopRange(state);
 }
@@ -174,6 +187,8 @@ export function useDAWNativeBridge(): void {
         if (nextState.isPlaying) {
           sendNativeAudioCommand('stop_pattern_preview', {});
           sendNativeAudioCommand('midi_all_notes_off', {});
+          syncTrackMapping(nextState.tracks);
+          syncMasterMix(nextState.masterVolumeDb, nextState.masterPan);
           const blocksToSync =
             nextState.isRecording && nextState.recordingBlockId
               ? nextState.blocks.filter(block => block.id !== nextState.recordingBlockId)
@@ -190,13 +205,13 @@ export function useDAWNativeBridge(): void {
           nextState.playheadSeconds,
         );
         const transportResponse = sendNativeAudioCommand('transport_play', transportPayload);
-        applyTransportStatusFromResponse(transportResponse);
+        applyTransportStatusFromResponse(transportResponse, nextState.isPlaying);
         if (nextState.isPlaying && transportResponse?.includes('"ok":false')) {
           const retryResponse = sendNativeAudioCommand('transport_play', {
             ...transportPayload,
             isPlaying: true,
           });
-          applyTransportStatusFromResponse(retryResponse);
+          applyTransportStatusFromResponse(retryResponse, true);
         }
       }
 
@@ -232,13 +247,7 @@ export function useDAWNativeBridge(): void {
       }
 
       if (nextState.tracks !== prevState.tracks) {
-        const nextActiveTracks = activeTracks(nextState.tracks);
-        sendNativeAudioCommand('setTracks', {
-          tracks: buildNativeTracksPayload(nextState.tracks),
-        });
-
-        syncTrackInstruments(nextState.tracks);
-        syncRecordArm(nextActiveTracks);
+        syncTrackMapping(nextState.tracks);
 
         const prevPlayableIds = playableTrackIds(prevState.tracks);
         const nextPlayableIds = playableTrackIds(nextState.tracks);

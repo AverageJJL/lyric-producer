@@ -1,6 +1,15 @@
 import React from 'react';
 import {act, cleanup, createEvent, fireEvent, render, screen} from '@testing-library/react';
 
+// <App/> transitively imports CopilotPanel → react-markdown (ESM); stub the markdown
+// stack so jest (CommonJS transform) can parse this suite. Behaviour is unaffected.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -114,7 +123,10 @@ test('renders the Logic-style LCD project fields', () => {
   expect(screen.getByLabelText('Transport position')).toHaveTextContent('Beat');
   expect(screen.getByLabelText('Tempo BPM')).toHaveValue('120');
   expect(screen.getByText('Tempo')).toBeInTheDocument();
-  expect(screen.getByRole('button', {name: 'Project key'})).toHaveTextContent('C Maj');
+  // Default project key is null → show "no key" (a muted dash), never a fabricated "C Maj".
+  const projectKey = screen.getByRole('button', {name: 'Project key'});
+  expect(projectKey).not.toHaveTextContent('Maj');
+  expect(projectKey).toHaveTextContent('—');
   expect(screen.getByLabelText('Time signature')).toHaveValue('4/4');
   expect(screen.getByLabelText('Time signature').closest('.lcd-project-column')).toContainElement(
     screen.getByRole('button', {name: 'Project key'}),

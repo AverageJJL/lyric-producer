@@ -117,6 +117,8 @@ try {
   expectOk(send('set_bpm', {bpm: 128}));
   expectOk(send('setBpm', {bpm: 112}, 'set_bpm'));
   expectOk(send('set_click_track', {enabled: false}));
+  expectOkOrDeviceUnavailable(send('start_count_in_click', {beats: 4, recordStartBeat: 0}));
+  expectOk(send('stop_count_in_click'));
   expectOk(send('set_tempo_map', {
     bpm: 112,
     timeSignature: {numerator: 4, denominator: 4},
@@ -241,6 +243,17 @@ try {
   expectOkOrDeviceUnavailable(send('midi_note_on', {trackId: 'track-1', note: 60, velocity: 90}));
   expectOk(send('midi_note_off', {trackId: 'track-1', note: 60}));
   expectOk(send('midi_all_notes_off', {trackId: 'track-1'}));
+  expectOkOrDeviceUnavailable(send('start_midi_phrase_preview', {
+    trackId: 'track-1',
+    lengthBeats: 4,
+    notes: [{note: 60, velocity: 90, startBeat: 0, lengthBeats: 1}],
+  }));
+  expectOkOrDeviceUnavailable(send('start_midi_phrase_preview', {
+    trackId: 'track-1',
+    lengthBeats: 4,
+    notes: [{note: 64, velocity: 88, startBeat: 1, lengthBeats: 1}],
+  }));
+  expectOk(send('stop_midi_phrase_preview'));
   expectOk(send('stop_pattern_preview'));
 
   expectError(sendRaw('set_bpm', '{'), 'invalid_payload');
@@ -257,7 +270,7 @@ try {
   expectError(send('unknown_native_command', {}), 'unknown_command');
   const required = [
     'engine_init', 'engine_status', 'engine_status_fast', 'set_asset_root', 'set_bpm', 'setBpm',
-    'set_click_track', 'set_tempo_map', 'get_tempo_map', 'set_transport_position',
+    'set_click_track', 'start_count_in_click', 'stop_count_in_click', 'set_tempo_map', 'get_tempo_map', 'set_transport_position',
     'transport_stop', 'return_to_zero', 'returnToZero', 'set_loop_range', 'setTracks',
     'set_tracks', 'set_record_arm', 'assign_track_instrument', 'list_instrument_presets',
     'set_track_preset', 'set_track_instrument_param', 'upsert_midi_clip', 'upsert_audio_clip',
@@ -267,7 +280,8 @@ try {
     'set_input_device', 'set_output_device', 'set_audio_device_settings',
     'release_mic_capture', 'refresh_audio_device', 'transport_play',
     'setPlaybackState', 'midi_note_on', 'midi_note_off', 'midi_all_notes_off',
-    'stop_pattern_preview', 'render_mixdown', 'render_mixdown_async',
+    'start_midi_phrase_preview', 'stop_midi_phrase_preview', 'stop_pattern_preview',
+    'render_mixdown', 'render_mixdown_async',
     'cancel_render_mixdown', 'get_render_mixdown_status', 'analyze_audio_file',
     'detect_audio_transients', 'render_spectrogram', 'unknown_native_command',
   ];

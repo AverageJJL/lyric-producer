@@ -10,10 +10,11 @@ jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus:
 
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
+import {resetCopilotChatHistoryForTests} from '../src/assistant/copilotChatHistory';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
-const ask = jest.fn();
+const agentAsk = jest.fn();
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -52,6 +53,7 @@ function resetStore(): void {
 
 beforeEach(() => {
   resetStore();
+  resetCopilotChatHistoryForTests();
   sendCommand.mockImplementation((command: string) => {
     if (command === 'engine_status' || command === 'engine_status_fast') {
       return JSON.stringify({ok: true, data: {deviceName: 'Mock Output', sampleRate: 48000}});
@@ -59,7 +61,7 @@ beforeEach(() => {
     return JSON.stringify({ok: true, data: {}});
   });
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.copilot = {ask};
+  window.copilot = {agentAsk};
   HTMLElement.prototype.scrollIntoView = jest.fn();
   HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
     const target = this.getAttribute('data-guide-target');
@@ -75,20 +77,18 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetCopilotChatHistoryForTests();
   sendCommand.mockReset();
-  ask.mockReset();
+  agentAsk.mockReset();
   delete window.audioEngine;
   delete window.copilot;
 });
 
 test('moves Mixer into the side-panel group and opens Copilot from the standalone button', async () => {
   render(<App />);
-
   const sidePanelGroup = screen.getByRole('group', {name: 'Side panels'});
   expect(within(sidePanelGroup).getByRole('button', {name: 'Mixer'})).toBeInTheDocument();
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-
   expect(screen.getByRole('complementary', {name: 'Copilot'})).toBeInTheDocument();
   expect(screen.queryByText('Copilot ready.')).not.toBeInTheDocument();
   await waitFor(() => {
@@ -97,23 +97,26 @@ test('moves Mixer into the side-panel group and opens Copilot from the standalon
 });
 
 test('shows a Copilot answer and highlights the add-track target', async () => {
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'Use + Add track in the Tracks sidebar.',
+    patch: null,
     answer: {
       text: 'Use + Add track in the Tracks sidebar.',
       actions: [{type: 'show_ui_guide', targetId: 'add-track-button'}],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'How do I add a track?'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('How do I add a track?'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Use + Add track in the Tracks sidebar.')).toBeInTheDocument();
-  const request = ask.mock.calls[0][0];
+  const request = agentAsk.mock.calls[0][0];
   expect(request.context.visibleTargets.some((target: {id: string}) => target.id === 'add-track-button')).toBe(true);
   expect(request.context.project).toMatchObject({bpm: 120, trackCount: 0, isPlaying: false});
   expect(screen.getByLabelText('Message Copilot')).toHaveFocus();
@@ -126,38 +129,47 @@ test('shows a Copilot answer and highlights the add-track target', async () => {
 
 test('sends visible Track Details popup controls in Copilot context', async () => {
   useDAWStore.getState().addTrackFromTemplate('drum_machine');
-  ask.mockResolvedValueOnce({ok: true, answer: {text: 'I can see the details.', actions: []}});
+  agentAsk.mockResolvedValueOnce({
+    ok: true,
+    text: 'I can see the details.',
+    patch: null,
+    answer: {text: 'I can see the details.', actions: []},
+    model: 'mimo',
+    turns: 1,
+  });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: /Show track details for/}));
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'What controls are in this popup?'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('What controls are in this popup?'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
-  await waitFor(() => expect(ask).toHaveBeenCalled());
-  const targets = ask.mock.calls[0][0].context.visibleTargets as Array<{label: string; id: string}>;
+  await waitFor(() => expect(agentAsk).toHaveBeenCalled());
+  const targets = agentAsk.mock.calls[0][0].context.visibleTargets as Array<{label: string; id: string}>;
   expect(targets.some(target => target.label.includes('Freeze'))).toBe(true);
   expect(targets.some(target => target.id.includes(':routing-output'))).toBe(true);
 });
 
 test('can reveal selected track details from a Copilot navigation action', async () => {
   useDAWStore.getState().addTrackFromTemplate('drum_machine');
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'Opening track details.',
+    patch: null,
     answer: {
       text: 'Opening track details.',
       actions: [{type: 'reveal_ui_target', targetId: 'track-details'}],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Show me track details'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Show me track details'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
@@ -167,42 +179,48 @@ test('can reveal selected track details from a Copilot navigation action', async
 test('can reveal the selected track volume control from a hidden workflow action', async () => {
   useDAWStore.getState().addTrackFromTemplate('drum_machine');
   const trackId = useDAWStore.getState().tracks[0]!.id;
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'Opening the selected track volume control.',
+    patch: null,
     answer: {
       text: 'Opening the selected track volume control.',
       actions: [{type: 'reveal_ui_target', targetId: `track:${trackId}:volume`}],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Show me the piano volume'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Show me the piano volume'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
   await waitFor(() => expect(screen.getByLabelText(/Guided target: Volume for/)).toBeInTheDocument());
-  const request = ask.mock.calls[0][0];
+  const request = agentAsk.mock.calls[0][0];
   expect(request.context.workflows.map((workflow: {entrypointTargetId: string}) => workflow.entrypointTargetId))
     .toContain(`track:${trackId}:volume`);
 });
 
 test('can reveal the Add Track menu without creating a track', async () => {
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'Opening Add Track.',
+    patch: null,
     answer: {
       text: 'Opening Add Track.',
       actions: [{type: 'reveal_ui_target', targetId: 'add-track-button'}],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Show me add track options'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Show me add track options'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('menu', {name: 'Add track menu'})).toBeInTheDocument());
@@ -210,8 +228,10 @@ test('can reveal the Add Track menu without creating a track', async () => {
 });
 
 test('renders MIDI option cards, previews natively, and imports a bass track', async () => {
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'I made a bassline option.',
+    patch: null,
     answer: {
       text: 'I made a bassline option.',
       actions: [],
@@ -227,13 +247,14 @@ test('renders MIDI option cards, previews natively, and imports a bass track', a
         notes: [{note: 40, velocity: 100, startBeat: 0, lengthBeats: 1}],
       }],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Give me a bassline'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Give me a bassline'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Root Push')).toBeInTheDocument();
@@ -247,8 +268,10 @@ test('renders MIDI option cards, previews natively, and imports a bass track', a
 });
 
 test('can open an existing right panel from a Copilot action', async () => {
-  ask.mockResolvedValueOnce({
+  agentAsk.mockResolvedValueOnce({
     ok: true,
+    text: 'Audio settings are in the top-right toolbar.',
+    patch: null,
     answer: {
       text: 'Audio settings are in the top-right toolbar.',
       actions: [
@@ -256,13 +279,14 @@ test('can open an existing right panel from a Copilot action', async () => {
         {type: 'show_ui_guide', targetId: 'audio-settings-button'},
       ],
     },
+    model: 'mimo',
+    turns: 1,
   });
   render(<App />);
-
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  fireEvent.change(screen.getByLabelText('Message Copilot'), {
-    target: {value: 'Open audio settings'},
-  });
+  const input = screen.getByLabelText('Message Copilot');
+  input.replaceChildren(document.createTextNode('Open audio settings'));
+  fireEvent.input(input);
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => {

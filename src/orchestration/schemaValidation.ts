@@ -63,6 +63,35 @@ export function numberField(
     : add(errors, `${path}.${key}`, `Expected a finite number >= ${min}.`);
 }
 
+/**
+ * Read an OPTIONAL numeric field. Returns `undefined` when the key is absent (a
+ * legitimate omission), the validated number when present and in range, or `null`
+ * when present but invalid (an error is recorded). Callers treat `null` as "reject
+ * the operation" and `undefined` as "field not supplied".
+ */
+export function optionalNumber(
+  value: JsonRecord,
+  key: string,
+  path: string,
+  errors: ArrangementValidationError[],
+  bounds?: {min?: number; max?: number},
+): number | null | undefined {
+  const raw = value[key];
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return add(errors, `${path}.${key}`, 'Expected a finite number.');
+  }
+  if (bounds?.min !== undefined && raw < bounds.min) {
+    return add(errors, `${path}.${key}`, `Expected a number >= ${bounds.min}.`);
+  }
+  if (bounds?.max !== undefined && raw > bounds.max) {
+    return add(errors, `${path}.${key}`, `Expected a number <= ${bounds.max}.`);
+  }
+  return raw;
+}
+
 export function booleanField(
   value: JsonRecord,
   key: string,

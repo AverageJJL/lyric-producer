@@ -1,5 +1,14 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+
+// <App /> mounts the Copilot panel (react-markdown is ESM) — stub the markdown/
+// highlighter deps jest can't transform, matching the other App-render tests.
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
 import {openProjectMenu} from './helpers/projectMenu';
 
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
@@ -76,8 +85,9 @@ beforeEach(() => {
     onEvent: () => () => undefined,
   };
   window.projectFiles = {
-    saveProject: jest.fn(),
-    openProject: jest.fn(),
+    saveProjectFolder: jest.fn(),
+    openProjectFolder: jest.fn(),
+    setProjectAssetRoot: jest.fn(),
     exportMixdown,
     exportStems,
   };

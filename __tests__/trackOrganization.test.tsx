@@ -5,14 +5,28 @@ jest.mock('../src/native/NativeAudioEngine', () => ({
 import React from 'react';
 import {fireEvent, render, screen} from '@testing-library/react';
 
-import {createProjectDocument, openProjectDocument} from '../src/arrangement/projectDocument';
+import {compileApcSourceToSnapshot, decomposeSnapshotToApcSource} from '../src/arrangement/apc';
 import {captureProjectSnapshot} from '../src/arrangement/projectSnapshot';
+import {restoreProjectSnapshot} from '../src/arrangement/projectRestore';
 import {buildNativeTracksPayload} from '../src/native/trackPayload';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
 import {TrackSidebar} from '../src/web/components/TrackSidebar';
+
+const TS = '2026-06-03T12:00:00.000Z';
+
+function roundTripCurrentSnapshot(): void {
+  const compiled = compileApcSourceToSnapshot(
+    decomposeSnapshotToApcSource(captureProjectSnapshot(), TS),
+  );
+  if (!compiled.ok) {
+    throw new Error(compiled.errors.map(error => error.message).join('; '));
+  }
+  resetStore();
+  restoreProjectSnapshot(compiled.snapshot, {skipNativeRefresh: true});
+}
 
 function track(id: string, name: string, options?: {archived?: boolean; disabled?: boolean}): DAWTrack {
   return {
@@ -151,35 +165,26 @@ describe('track organization', () => {
       .toBeUndefined();
   });
 
-  it('persists archived tracks through project documents', () => {
+  it('persists archived tracks through the .apc source round-trip', () => {
     useDAWStore.getState().setTrackArchived('track-b', true);
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
-
-    resetStore();
-    openProjectDocument(document, {skipNativeRefresh: true});
+    roundTripCurrentSnapshot();
 
     expect(useDAWStore.getState().tracks.find(item => item.id === 'track-b')?.isArchived)
       .toBe(true);
     expect(useDAWStore.getState().blocks.find(item => item.trackId === 'track-b')).toBeTruthy();
   });
 
-  it('persists disabled tracks through project documents', () => {
+  it('persists disabled tracks through the .apc source round-trip', () => {
     useDAWStore.getState().setTrackDisabled('track-b', true);
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
-
-    resetStore();
-    openProjectDocument(document, {skipNativeRefresh: true});
+    roundTripCurrentSnapshot();
 
     expect(useDAWStore.getState().tracks.find(item => item.id === 'track-b')?.isDisabled)
       .toBe(true);
   });
 
-  it('persists per-track height scale through project documents', () => {
+  it('persists per-track height scale through the .apc source round-trip', () => {
     useDAWStore.getState().setTrackHeightScale('track-b', 1.5);
-    const document = createProjectDocument(captureProjectSnapshot(), '2026-06-03T12:00:00.000Z');
-
-    resetStore();
-    openProjectDocument(document, {skipNativeRefresh: true});
+    roundTripCurrentSnapshot();
 
     expect(useDAWStore.getState().tracks.find(item => item.id === 'track-b')?.trackHeightScale)
       .toBe(1.5);

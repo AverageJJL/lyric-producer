@@ -263,6 +263,11 @@
   font-size: 14px;
 }
 
+/* No key set (project default scale === null): show a muted dash, not a fake "C Maj". */
+.project-key-empty {
+  color: rgba(217, 237, 246, 0.4);
+}
+
 .lcd-map-trigger {
   display: grid;
   place-items: center;

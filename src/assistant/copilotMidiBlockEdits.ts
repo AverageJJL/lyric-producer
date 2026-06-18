@@ -1,7 +1,5 @@
 import type {ArrangementOperation} from '../arrangement/operations';
-import {applyArrangementOperations} from '../arrangement/operations';
 import type {DAWBlock, DAWNote, DAWTrack} from '../store/useDAWStore';
-import {useDAWStore} from '../store/useDAWStore';
 
 export type CopilotMidiBlockEdit =
   | {op: 'upsertMidiBlock'; id?: string; trackId: string; name: string; startBeat: number; lengthBeats: number; notes: DAWNote[]}
@@ -273,16 +271,6 @@ export function copilotMidiBlockEditsToOperations(
     }
   }
   return {ok: true, operations, message: `${operations.length} MIDI block edit${operations.length === 1 ? '' : 's'} applied.`};
-}
-
-export function applyCopilotMidiBlockEdits(edits: CopilotMidiBlockEdit[]): CopilotMidiBlockApplyResult {
-  const state = useDAWStore.getState();
-  const converted = copilotMidiBlockEditsToOperations(edits, state);
-  if (!converted.ok) {
-    return converted;
-  }
-  applyArrangementOperations(converted.operations);
-  return converted;
 }
 
 export function describeCopilotMidiBlockEdit(edit: CopilotMidiBlockEdit): string {

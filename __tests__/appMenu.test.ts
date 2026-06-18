@@ -35,16 +35,19 @@ describe('Electron app menu', () => {
   });
 
   it('detects project document paths for macOS open-file events', () => {
-    expect(isProjectDocumentPath('/tmp/song.apcproject')).toBe(true);
-    expect(isProjectDocumentPath('/tmp/song.JSON')).toBe(true);
+    // Project documents are now `.apc` folders; `.apcproject`/`.json` are no longer project paths.
+    expect(isProjectDocumentPath('/tmp/song.apc')).toBe(true);
+    expect(isProjectDocumentPath('/tmp/song.APC')).toBe(true);
+    expect(isProjectDocumentPath('/tmp/song.apcproject')).toBe(false);
+    expect(isProjectDocumentPath('/tmp/song.JSON')).toBe(false);
     expect(isDawProjectPath('/tmp/song.dawproject')).toBe(true);
     expect(projectCommandForPath('/tmp/song.dawproject')).toEqual({
       command: 'importDawProjectPath',
       path: '/tmp/song.dawproject',
     });
-    expect(projectCommandForPath('/tmp/song.apcproject')).toEqual({
+    expect(projectCommandForPath('/tmp/song.apc')).toEqual({
       command: 'openProjectPath',
-      path: '/tmp/song.apcproject',
+      path: '/tmp/song.apc',
     });
     expect(isProjectDocumentPath('/tmp/audio.wav')).toBe(false);
   });

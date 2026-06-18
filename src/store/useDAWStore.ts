@@ -2760,12 +2760,7 @@ export const useDAWStore = create<DAWStore>((set, get) => ({
         updates.isPlaying = true;
       }
 
-      const enginePosForHandoff = payload.positionSeconds ?? state.playheadSeconds;
-      const engineCaughtUp =
-        payload.isPlaying === true &&
-        enginePosForHandoff > state.playStartSeconds + 0.2;
-
-      if (engineCaughtUp && state.playAwaitingEngine) {
+      if (payload.isPlaying === true && state.playAwaitingEngine) {
         updates.playAwaitingEngine = false;
         updates.playWallClockAnchor = null;
       }

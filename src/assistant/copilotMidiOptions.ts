@@ -114,17 +114,24 @@ function parseNotes(value: unknown, lengthBeats: number, range: Range): DAWNote[
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.slice(0, MAX_NOTES).filter(record).map(item => {
+  const notes: DAWNote[] = [];
+  const limit = Math.min(value.length, MAX_NOTES);
+  for (let index = 0; index < limit; index += 1) {
+    const item = value[index];
+    if (!record(item)) {
+      continue;
+    }
     const startBeat = finiteNumber(item.startBeat, 0);
     const requestedLength = finiteNumber(item.lengthBeats, 0.5, 0.000001);
     const safeStart = Math.min(startBeat, Math.max(0, lengthBeats - 0.000001));
-    return {
+    notes.push({
       note: clampInt(item.note, range.min, range.max, range.min),
       velocity: clampInt(item.velocity, 1, 127, 96),
       startBeat: safeStart,
       lengthBeats: Math.min(requestedLength, Math.max(0.05, lengthBeats - safeStart)),
-    };
-  });
+    });
+  }
+  return notes;
 }
 
 function parseCreateTrack(value: unknown, target: CopilotMidiInstrumentIntent) {
@@ -171,10 +178,15 @@ export function sanitizeCopilotMidiOptions(value: unknown): CopilotMidiOption[] 
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .slice(0, MAX_OPTIONS)
-    .map(parseOption)
-    .filter((option): option is CopilotMidiOption => option !== null);
+  const options: CopilotMidiOption[] = [];
+  const limit = Math.min(value.length, MAX_OPTIONS);
+  for (let index = 0; index < limit; index += 1) {
+    const option = parseOption(value[index], index);
+    if (option) {
+      options.push(option);
+    }
+  }
+  return options;
 }
 
 function isEditableSoftwareTrack(track: DAWTrack): boolean {
@@ -249,7 +261,15 @@ export function importCopilotMidiOption(
   }
   operations.push({
     op: 'upsertMidiClip',
-    clip: {id: clipId, trackId, name: option.label, startBeat, lengthBeats: option.lengthBeats, notes: option.notes},
+    clip: {
+      id: clipId,
+      trackId,
+      name: option.label,
+      startBeat,
+      lengthBeats: option.lengthBeats,
+      notes: option.notes,
+      fitToNotes: true,
+    },
   });
   applyArrangementOperations(operations);
   useDAWStore.setState({selectedTrackId: trackId, selectedBlockId: clipId, selectedBlockIds: [clipId], syncSource: 'ui'});
