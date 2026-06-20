@@ -7,26 +7,15 @@ import {
   projectCommandForPath,
   type AppProjectCommand,
 } from './appMenu';
-import {registerCopilotIpc} from './copilotIpc';
 import {startCrashReporting} from './crashReporting';
-import {registerDawProjectIpc} from './dawProjectIpc';
-import {registerFileIpc} from './fileIpc';
-import {registerApcProjectIpc} from './apcProjectIpc';
 import {appWideAssetRoots, projectMediaRoots} from './assetRoots';
-import {registerMediaRevealIpc} from './mediaRevealIpc';
-import {registerMidiImportIpc} from './midiImportIpc';
-import {registerOfflineMediaRecoveryIpc} from './offlineMediaRecoveryIpc';
 import {installPermissionPolicy} from './permissionPolicy';
 import {installRuntimeUpdater} from './runtimeUpdater';
-import {registerSampleLibraryIpc} from './sampleLibraryIpc';
-import {registerSampleProviderIpc} from './sampleProviderIpc';
-import {registerStemExportIpc} from './stemExportIpc';
-import {registerFxWindowIpc} from './fxWindow';
 import {
   attachProjectCloseGuard,
-  registerProjectCloseGuardIpc,
   resetProjectCloseGuard,
 } from './projectCloseGuard';
+import {registerMainIpc} from './mainIpc';
 import {
   createNativeSurfaceWindowOptions,
   installNativeSurfaceWebContents,
@@ -245,39 +234,14 @@ ipcMain.on('app-lifecycle:renderer-ready', () => {
   flushPendingProjectCommands();
 });
 
-registerProjectCloseGuardIpc();
-registerCopilotIpc({
-  sendNativeCommand: (command, payloadJson) =>
-    resolveNativeAddon().sendCommand(command, payloadJson),
-});
-
-registerFileIpc({
+registerMainIpc({
   getMainWindow: () => mainWindow,
   assetRoots,
-});
-registerApcProjectIpc({
-  getMainWindow: () => mainWindow,
-  assetRoots,
+  appWideRoots,
   recordActiveProjectFolder,
   sendNativeCommand: (command, payloadJson) =>
     resolveNativeAddon().sendCommand(command, payloadJson),
 });
-registerDawProjectIpc({
-  getMainWindow: () => mainWindow,
-  assetRoots,
-});
-registerMediaRevealIpc();
-registerMidiImportIpc({getMainWindow: () => mainWindow});
-registerOfflineMediaRecoveryIpc({
-  getMainWindow: () => mainWindow,
-  assetRoots,
-});
-// Sample library + sample provider state is shared, not project content. Keep it
-// on the app-wide root so it never moves per-project.
-registerSampleLibraryIpc({assetRoots: appWideRoots});
-registerSampleProviderIpc({assetRoots: appWideRoots});
-registerStemExportIpc({getMainWindow: () => mainWindow});
-registerFxWindowIpc(() => mainWindow);
 
 if (shouldRunApp) {
   app.on('second-instance', (_event, argv) => {

@@ -131,10 +131,11 @@ export function TimelineGrid({
     () =>
       computeVisibleTimelineBeats({
         blocks,
+        sections,
         playheadBeat,
         recordingBlockId,
       }),
-    [blocks, playheadBeat, recordingBlockId],
+    [blocks, playheadBeat, recordingBlockId, sections],
   );
 
   const timelineWidth = timelineWidthPx(visibleTimelineBeats, pixelsPerBeat);

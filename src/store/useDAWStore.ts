@@ -142,11 +142,13 @@ import {
 
 function maxTimelineBeatForState(state: {
   blocks: DAWBlock[];
+  sections: SectionMarker[];
   playheadBeat: number;
   recordingBlockId: string | null;
 }): number {
   return computeVisibleTimelineBeats({
     blocks: state.blocks,
+    sections: state.sections,
     playheadBeat: state.playheadBeat,
     recordingBlockId: state.recordingBlockId,
   });
@@ -376,7 +378,7 @@ function resolveAudioRecordedLengthBeats(
 
 export type SyncSource = 'ui' | 'engine';
 
-/** Live keyboard or clip preview — not scheduled transport playback. */
+  /** Live keyboard or clip preview, not scheduled transport playback. */
 export type MidiAuditionSource = 'keyboard' | 'clip';
 
 export type MidiAuditionState = {
@@ -426,7 +428,7 @@ type DAWState = {
   playAwaitingEngine: boolean;
   /** Wall-clock anchor when Play was pressed (drives playhead until engine catches up). */
   playWallClockAnchor: number | null;
-  /** Transport seconds at Play press — pairs with playWallClockAnchor. */
+  /** Transport seconds at Play press, pairs with playWallClockAnchor. */
   playStartSeconds: number;
   syncSource: SyncSource;
   timeSignature: TimeSignature;
@@ -435,9 +437,9 @@ type DAWState = {
   sections: SectionMarker[];
   /** When set, sound is from explicit audition (keyboard/clip), not transport crossing clips. */
   midiAudition: MidiAuditionState | null;
-  /** Transient MIDI input visualization — not in undo/snapshots. */
+  /** Transient MIDI input visualization, not in undo/snapshots. */
   liveMidiPreviewByTrack: Record<string, LiveMidiPreview>;
-  /** Transient audio waveform while recording — not in undo/snapshots. */
+  /** Transient audio waveform while recording, not in undo/snapshots. */
   liveAudioPreviewByClip: Record<string, LiveAudioPreview>;
   /** Temporary take-folder audition source; not persisted as a real comp selection. */
   auditionedRecordingTakeId: string | null;
@@ -2696,7 +2698,7 @@ export const useDAWStore = create<DAWStore>((set, get) => ({
           syncSource: 'engine',
         };
       }
-      // Start from UI playhead — never use `??` with engine 0 (0 is valid and was wiping the store).
+      // Start from UI playhead; never use `??` with engine 0 (0 is valid and was wiping the store).
       let nextSeconds = state.playheadSeconds;
 
       let nextIsPlaying = state.isPlaying;
@@ -2807,7 +2809,7 @@ export function isBottomPanelTrack(track: DAWTrack): boolean {
   return isBottomPanelTrackType(track.type);
 }
 
-/** @deprecated Use isBottomPanelTrack — kept for tests referencing keyboard lanes. */
+/** @deprecated Use isBottomPanelTrack; kept for tests referencing keyboard lanes. */
 export function isKeyboardCapableTrack(track: DAWTrack): boolean {
   return isBottomPanelTrack(track);
 }

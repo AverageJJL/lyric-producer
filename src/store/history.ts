@@ -1,7 +1,7 @@
 import type {DrumPattern} from '../music/drumPatterns';
 import {refreshPlaybackAndInstruments} from '../native/refreshPlayback';
 import type {DAWBlock, DAWTrack} from './useDAWStore';
-import type {ChordMetadata, ScaleMetadata, SectionMarker, TimeSignature} from './projectMetadata';
+import {cloneSectionMarker, type ChordMetadata, type ScaleMetadata, type SectionMarker, type TimeSignature} from './projectMetadata';
 import type {LooperLengthBars, ProjectPerformanceMode} from '../transport/performanceMode';
 import type {MeterMapEvent, TempoMapEvent} from '../transport/tempoMap';
 
@@ -85,7 +85,7 @@ export function captureArrangementHistorySnapshot(
     timeSignature: {...state.timeSignature},
     scale: state.scale ? {...state.scale} : null,
     chord: state.chord ? {...state.chord} : null,
-    sections: state.sections.map(section => ({...section})),
+    sections: state.sections.map(cloneSectionMarker),
   };
 }
 

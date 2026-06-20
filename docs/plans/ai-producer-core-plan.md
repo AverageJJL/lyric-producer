@@ -2,8 +2,6 @@
 
 > **Canonical reference document.** This file holds the *durable* pieces of the AI Producer Core: product vision, non-negotiable design principles, architecture, product requirements, and command contracts. It is **not** a status tracker or task checklist — buildable, time-bound work lives in focused per-feature plans under `docs/plans/`. Treat the design principles and command contracts here as binding.
 
----
-
 ## 1. Product Vision
 
 Transform the existing **cross-platform headless DAW core** (Electron + React DOM UI + pure C++ `shared_cpp` engine + JSON command bridge) into a **collaborative, AI-driven creative studio** (“AI Producer Core”).
@@ -150,13 +148,14 @@ Any future sidecar proposal must first update this plan and `AGENTS.md` with a n
 **Target flow**
 
 1. **Project choice:** Empty project, or **Head start** (assisted).
-2. **Creative brief:** What kind of song / vibe / genre (conversational or short form).
+2. **Creative brief:** What kind of song / vibe / genre (conversational or short form), including the song-idea path that starts from an existing title, artist, or lyric seed.
 3. **Sample curation:** Swipe (or pick) through curated combinations from the sample provider / catalog — user selects a small stack they like (drum, bass, melody, texture roles).
 4. **Session bootstrap:** Import chosen samples via the existing native-analyzed audio import path; optionally lay down section markers from templates (Beat sketch / Full song) for linear arrangement.
 
 **Implementation notes**
 
 - Reuse `src/arrangement/structureStacking.ts`, `StructureStackPanel` (or a dedicated onboarding screen), and `SampleProviderPanel` import plumbing — do not duplicate audio analysis in JS.
+- Song-idea startup may use Musixmatch text search/lyrics plus metadata providers for BPM/key/structure hints, plus approved credit-safe YouTube-backed Cyanite.ai reference intelligence for normalized mood, energy, valence/arousal, movement, character, instrument, voice, genre, segment curves, and authoritative BPM/key when analysis succeeds. Cyanite/YouTube credentials, local audio paths, raw provider responses, and credit-spending enqueue decisions stay in Electron main; the renderer receives only normalized JSON and must never process audio or expose provider API keys.
 - Direct local audio drops onto the timeline are allowed when they reuse the same native-analyzed import path and only send placement metadata from the renderer.
 - **Linear mode** after startup: section banners above timeline; draggable boundaries (existing marker lane).
 - **Looper mode:** Circular paradigm for beatmakers (looper mode) — startup may offer looper-oriented templates when performance mode is looper.
@@ -197,7 +196,7 @@ Callers (future orchestrator) must:
 
 Location: `src/arrangement/projectSnapshot.ts`
 
-Extend for AI: locks, sections, FX summaries, time signature, musical key/scale.
+Extend for AI: locks, lyric-aware sections, FX summaries, time signature, musical key/scale, and song-seed analysis metadata.
 
 ### 4.3 Native commands (existing reference)
 

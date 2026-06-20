@@ -3,6 +3,7 @@ import type {DrumPattern} from '../music/drumPatterns';
 import {STEPS_PER_BAR} from '../music/drumPatterns';
 import type {SamplerSliceIntent} from '../music/samplerSlicing';
 import type {TrackTemplateId} from '../music/trackTemplates';
+import {normalizeSectionMarker, type SectionMarker} from '../store/projectMetadata';
 import type {DAWNote} from '../store/useDAWStore';
 import {SNAP_GRID_OPTIONS, type SnapGrid} from '../ui/snapGrid';
 import {
@@ -193,6 +194,20 @@ export function chord(value: unknown, path: string, errors: ArrangementValidatio
   return symbol ? {symbol} : null;
 }
 
+function sectionAnalysis(
+  item: Record<string, unknown>,
+  path: string,
+  errors: ArrangementValidationError[],
+): SectionMarker['analysis'] | undefined | null {
+  if (item.analysis === undefined) {
+    return undefined;
+  }
+  const normalized = normalizeSectionMarker(item);
+  return normalized?.analysis
+    ? normalized.analysis
+    : add(errors, `${path}.analysis`, 'Expected a section analysis object.');
+}
+
 export function sections(value: unknown, path: string, errors: ArrangementValidationError[]) {
   if (!Array.isArray(value)) {
     return add(errors, path, 'Expected an array of section markers.');
@@ -202,13 +217,14 @@ export function sections(value: unknown, path: string, errors: ArrangementValida
     if (!record(item)) {
       return add(errors, itemPath, 'Expected a section marker object.');
     }
-    exactKeys(item, itemPath, ['id', 'name', 'startBeat', 'lengthBeats'], errors);
+    exactKeys(item, itemPath, ['id', 'name', 'startBeat', 'lengthBeats', 'analysis'], errors);
     const id = stringField(item, 'id', itemPath, errors);
     const name = stringField(item, 'name', itemPath, errors);
     const startBeat = numberField(item, 'startBeat', itemPath, errors, 0);
     const lengthBeats = numberField(item, 'lengthBeats', itemPath, errors, 0.000001);
-    return id && name && startBeat !== null && lengthBeats !== null
-      ? {id, name, startBeat, lengthBeats}
+    const analysis = sectionAnalysis(item, itemPath, errors);
+    return id && name && startBeat !== null && lengthBeats !== null && analysis !== null
+      ? {id, name, startBeat, lengthBeats, ...(analysis ? {analysis} : {})}
       : null;
   });
   return parsed.every(item => item !== null) ? parsed : null;
@@ -222,13 +238,14 @@ export function drumPattern(
   if (!record(value) || !record(value.steps)) {
     return add(errors, path, 'Expected a drum pattern object with steps.');
   }
+  const rawSteps = value.steps;
   exactKeys(value, path, ['id', 'name', 'steps'], errors);
-  exactKeys(value.steps, `${path}.steps`, [...DRUM_SAMPLE_KEYS], errors);
+  exactKeys(rawSteps, `${path}.steps`, [...DRUM_SAMPLE_KEYS], errors);
   const id = stringField(value, 'id', path, errors);
   const name = stringField(value, 'name', path, errors);
   const steps = {} as DrumPattern['steps'];
   DRUM_SAMPLE_KEYS.forEach(key => {
-    const row = value.steps[key];
+    const row = rawSteps[key];
     if (!Array.isArray(row) || row.length !== STEPS_PER_BAR || row.some(item => typeof item !== 'boolean')) {
       add(errors, `${path}.steps.${key}`, `Expected ${STEPS_PER_BAR} booleans.`);
       return;

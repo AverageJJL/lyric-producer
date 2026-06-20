@@ -2,13 +2,14 @@ import type {BrowserWindowConstructorOptions, WebContents} from 'electron';
 import {installNativeContextMenu} from './nativeContextMenu';
 
 const FALLBACK_BACKGROUND_COLOR = '#161719';
+const TRANSPARENT_BACKGROUND_COLOR = '#00000000';
 
 export function createNativeSurfaceWindowOptions(
   platform: NodeJS.Platform,
 ): BrowserWindowConstructorOptions {
   if (platform === 'darwin') {
     return {
-      backgroundColor: FALLBACK_BACKGROUND_COLOR,
+      backgroundColor: TRANSPARENT_BACKGROUND_COLOR,
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: {x: 14, y: 16},
       transparent: true,

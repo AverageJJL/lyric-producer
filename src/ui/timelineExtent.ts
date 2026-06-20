@@ -1,4 +1,5 @@
 import {blockEndBeat} from '../music/timelineCollision';
+import type {SectionMarker} from '../store/projectMetadata';
 import type {DAWBlock} from '../store/useDAWStore';
 import {DEFAULT_TIMELINE_BEATS, PIXELS_PER_BEAT} from './timelineLayout';
 
@@ -10,6 +11,7 @@ export const TIMELINE_EXTENT_ROUND_BEATS = 16;
 
 export type TimelineExtentInput = {
   blocks: DAWBlock[];
+  sections?: SectionMarker[];
   playheadBeat: number;
   recordingBlockId?: string | null;
   minBeats?: number;
@@ -28,14 +30,25 @@ function maxBlockEndBeat(blocks: DAWBlock[], recordingBlockId: string | null | u
   return maxEnd;
 }
 
+function maxSectionEndBeat(sections: SectionMarker[] | undefined): number {
+  return (sections ?? []).reduce(
+    (maxEnd, section) => Math.max(maxEnd, Math.max(0, section.startBeat) + Math.max(0, section.lengthBeats)),
+    0,
+  );
+}
+
 /**
- * Arrangement width in beats — grows with clips/playhead like Logic/Waveform scroll areas.
+ * Arrangement width in beats grows with clips, markers, and playhead like Logic/Waveform scroll areas.
  * Not literally infinite; extends in 16-beat steps with trailing buffer.
  */
 export function computeVisibleTimelineBeats(input: TimelineExtentInput): number {
   const minBeats = input.minBeats ?? DEFAULT_TIMELINE_BEATS;
   const buffer = input.bufferBeats ?? TIMELINE_EXTENT_BUFFER_BEATS;
-  const contentEnd = Math.max(input.playheadBeat, maxBlockEndBeat(input.blocks, input.recordingBlockId));
+  const contentEnd = Math.max(
+    input.playheadBeat,
+    maxBlockEndBeat(input.blocks, input.recordingBlockId),
+    maxSectionEndBeat(input.sections),
+  );
   const withBuffer = contentEnd + buffer;
   const rounded =
     Math.ceil(Math.max(minBeats, withBuffer) / TIMELINE_EXTENT_ROUND_BEATS)

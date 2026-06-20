@@ -1,0 +1,276 @@
+.onboarding-page {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, rgba(192, 218, 255, 0.08), transparent 34%),
+    linear-gradient(245deg, rgba(78, 131, 212, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(18, 23, 32, 0.2), rgba(7, 10, 16, 0.36));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(34px) saturate(168%) contrast(106%);
+  -webkit-backdrop-filter: blur(34px) saturate(168%) contrast(106%);
+}
+
+html[data-onboarding='active'],
+html[data-onboarding='active'] body,
+html[data-onboarding='active'] #root {
+  background: transparent;
+  background-image: none;
+}
+
+html[data-onboarding='active'] .app-shell {
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-onboarding='active'] .app-shell::before {
+  opacity: 0;
+}
+.onboarding-page::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 22% 16%, rgba(231, 243, 255, 0.18), transparent 32%),
+    radial-gradient(ellipse at 72% 28%, rgba(126, 174, 255, 0.16), transparent 36%),
+    radial-gradient(ellipse at 50% 92%, rgba(70, 96, 148, 0.18), transparent 42%);
+  filter: blur(26px);
+  opacity: 0.78;
+}
+.onboarding-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.04)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 22%, rgba(0, 0, 0, 0.16));
+  mix-blend-mode: screen;
+  opacity: 0.34;
+}
+.onboarding-page.analysis-active {
+  place-items: stretch;
+  padding: 0;
+}
+.onboarding-frame {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 24px;
+  width: min(1120px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 32px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.onboarding-header {
+  display: grid;
+  gap: 20px;
+}
+.onboarding-header h1 {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-main);
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+.onboarding-link {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  color: rgba(238, 240, 244, 0.86);
+  font-size: 22px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+.onboarding-link:hover {
+  color: var(--text-main);
+  background: rgba(126, 174, 255, 0.12);
+}
+.onboarding-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 10px;
+  width: min(520px, 100%);
+}
+.onboarding-choice {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  cursor: pointer;
+  min-height: 72px;
+  padding: 13px 16px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.075);
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  backdrop-filter: blur(16px) saturate(122%);
+  -webkit-backdrop-filter: blur(16px) saturate(122%);
+  transition: background 180ms ease, transform 180ms ease;
+}
+.onboarding-choice:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+.onboarding-choice.primary {
+  background: rgba(255, 255, 255, 0.095);
+}
+.onboarding-choice span {
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.onboarding-choice strong {
+  max-width: 230px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.onboarding-link:active,
+.onboarding-secondary:active,
+.song-idea-form button:active,
+.onboarding-choice:active {
+  transform: translateY(1px);
+}
+
+.song-idea-workbench {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+  gap: 18px;
+  min-height: 560px;
+}
+
+.song-idea-form,
+.lyrics-analyser-panel {
+  background:
+    linear-gradient(155deg, rgba(126, 174, 255, 0.13), rgba(20, 27, 40, 0.48) 42%, rgba(10, 14, 22, 0.34));
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 24px 72px rgba(3, 8, 18, 0.24);
+  backdrop-filter: blur(24px) saturate(122%);
+  -webkit-backdrop-filter: blur(24px) saturate(122%);
+}
+
+.song-idea-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.song-idea-form label {
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.song-idea-form input {
+  width: 100%;
+  height: 46px;
+  padding: 0 18px 0 48px;
+  color: var(--text-main);
+  background: rgba(5, 8, 14, 0.64);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background 160ms ease;
+}
+
+.song-idea-form input:focus-visible {
+  outline: none;
+  background: rgba(7, 11, 18, 0.76);
+}
+
+.song-idea-form input::placeholder {
+  color: var(--text-dim);
+}
+
+.song-idea-form button,
+.onboarding-secondary {
+  cursor: pointer;
+  min-height: 38px;
+  padding: 0 14px;
+  color: var(--accent-primary-contrast);
+  font-size: 13px;
+  font-weight: 800;
+  background: var(--accent-primary);
+  border: 0;
+  border-radius: 6px;
+}
+
+.onboarding-secondary {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.onboarding-secondary:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.lyrics-analyser-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lyrics-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 42px;
+  padding: 0 16px;
+  color: var(--text-muted);
+  border-bottom: 0;
+}
+
+.lyrics-panel-header span {
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lyrics-panel-header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-main);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-lyrics {
+  max-width: 420px;
+}
+
+@media (max-width: 760px) {
+  .onboarding-page,
+  .onboarding-page.analysis-active { padding: 14px; place-items: center; }
+  .onboarding-frame { max-height: calc(100dvh - 28px); padding: 18px; }
+  .onboarding-choice-grid,
+  .song-idea-workbench { grid-template-columns: 1fr; }
+  .onboarding-header { display: grid; }
+}

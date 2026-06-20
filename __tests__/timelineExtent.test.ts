@@ -41,4 +41,17 @@ describe('computeVisibleTimelineBeats', () => {
     });
     expect(beats).toBeGreaterThanOrEqual(96 + TIMELINE_EXTENT_BUFFER_BEATS);
   });
+
+  it('extends blank song-seed timelines to include all section markers', () => {
+    const beats = computeVisibleTimelineBeats({
+      blocks: [],
+      playheadBeat: 0,
+      sections: [
+        {id: 'intro', name: 'Intro', startBeat: 0, lengthBeats: 16},
+        {id: 'outro', name: 'Outro', startBeat: 224, lengthBeats: 16},
+      ],
+    });
+    expect(beats).toBeGreaterThanOrEqual(240 + TIMELINE_EXTENT_BUFFER_BEATS);
+    expect(beats).toBe(272);
+  });
 });

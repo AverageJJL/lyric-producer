@@ -17,7 +17,7 @@ export const DEFAULT_TIMELINE_BEATS = 64;
 export const TIMELINE_BEATS = DEFAULT_TIMELINE_BEATS;
 export const PIXELS_PER_BEAT = 48;
 export const ROW_HEIGHT = 128;
-export const RULER_HEIGHT = 28;
+export const RULER_HEIGHT = 82;
 /** Matches `.track-sidebar-actions` so timeline scroll range aligns with the sidebar footer. */
 export const TRACK_SIDEBAR_FOOTER_HEIGHT = 148;
 export const BLOCK_VERTICAL_PADDING = 12;

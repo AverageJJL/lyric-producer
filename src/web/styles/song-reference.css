@@ -1,0 +1,114 @@
+.song-reference-readout {
+  display: grid;
+  gap: 11px;
+  max-width: 520px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(238, 240, 244, 0.08);
+}
+
+.song-reference-readout.loading .song-reference-heading span {
+  color: #f3d174;
+}
+
+.song-reference-readout.confirming .song-reference-heading span {
+  color: #f4b866;
+}
+
+.song-reference-readout.error .song-reference-heading span {
+  color: #f27e7e;
+}
+
+.song-reference-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.song-reference-heading span {
+  color: #a9d8c2;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.song-reference-heading strong {
+  color: rgba(238, 240, 244, 0.9);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.song-reference-meta {
+  margin: 0;
+  color: rgba(238, 240, 244, 0.64);
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.song-reference-ribbon {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(4px, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 38px;
+}
+
+.song-reference-ribbon span {
+  min-height: 7px;
+  background: linear-gradient(180deg, #f3d174 0%, #7fc6b0 58%, #6c8ee6 100%);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.86;
+}
+
+.song-reference-source {
+  display: grid;
+  gap: 3px;
+  color: rgba(238, 240, 244, 0.84);
+  font-size: 11px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.song-reference-source small {
+  color: rgba(238, 240, 244, 0.52);
+  font-size: 10px;
+}
+
+.song-reference-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.song-reference-chips span {
+  padding: 4px 7px;
+  color: rgba(238, 240, 244, 0.82);
+  font-size: 10px;
+  font-weight: 820;
+  line-height: 1;
+  background: rgba(238, 240, 244, 0.065);
+  border: 1px solid rgba(238, 240, 244, 0.08);
+  border-radius: 5px;
+}
+
+.song-reference-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.song-reference-action .onboarding-secondary {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.song-reference-action p {
+  color: rgba(238, 240, 244, 0.62);
+}
+
+@media (max-width: 860px) {
+  .song-reference-ribbon {
+    grid-template-columns: repeat(10, minmax(5px, 1fr));
+  }
+}

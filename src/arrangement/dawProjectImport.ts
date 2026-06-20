@@ -4,6 +4,7 @@ import {audioSampleRateWarning, type AudioAnalysis} from '../music/audioImport';
 import {createTrackFromTemplate, type TrackTemplateId} from '../music/trackTemplates';
 import {DEFAULT_TRACK_VOLUME_DB} from '../music/trackMix';
 import type {DAWBlock, DAWNote, DAWTrack, TrackType} from '../store/useDAWStore';
+import {normalizeSectionMarker, type SectionMarker} from '../store/projectMetadata';
 import {BLOCK_COLORS} from '../ui/timelineLayout';
 import {emptyProjectSnapshot} from './projectSnapshot';
 import type {DawProjectAudioAnalyzer, DawProjectImportPackage, DawProjectImportResult, DawProjectImportedMedia} from './dawProjectTypes';
@@ -280,7 +281,7 @@ export function dawProjectSnapshotFromPackage(
     denominator: attrNumber(signature, 'denominator', snapshot.timeSignature.denominator),
     numerator: attrNumber(signature, 'numerator', snapshot.timeSignature.numerator),
   };
-  snapshot.sections = extension.sections as typeof snapshot.sections;
+  snapshot.sections = extension.sections.map(normalizeSectionMarker).filter((section): section is SectionMarker => section !== null);
   snapshot.tracks = tracks.map(track => track.local);
   snapshot.blocks = blocks;
   snapshot.patterns = patterns;

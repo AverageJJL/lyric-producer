@@ -10,7 +10,7 @@ import type {
   SectionMarker,
   TimeSignature,
 } from '../store/projectMetadata';
-import {DEFAULT_TIME_SIGNATURE} from '../store/projectMetadata';
+import {cloneSectionMarker, DEFAULT_TIME_SIGNATURE} from '../store/projectMetadata';
 import type {DAWBlock, DAWTrack} from '../store/useDAWStore';
 import type {DAWStore} from '../store/useDAWStore';
 import {useDAWStore} from '../store/useDAWStore';
@@ -225,7 +225,7 @@ export function captureProjectSnapshot(): ProjectSnapshot {
     timeSignature: {...state.timeSignature},
     scale: state.scale ? {...state.scale} : null,
     chord: state.chord ? {...state.chord} : null,
-    sections: state.sections.map(section => ({...section})),
+    sections: state.sections.map(cloneSectionMarker),
     tracks: state.tracks.map(cloneTrack),
     patterns: Object.fromEntries(
       Object.entries(state.patterns).map(([id, pattern]) => [id, clonePattern(pattern)]),

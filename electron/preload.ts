@@ -146,6 +146,28 @@ contextBridge.exposeInMainWorld('copilot', {
   },
 });
 
+contextBridge.exposeInMainWorld('songSeed', {
+  search(request: {query?: string; limit?: number}) {
+    return ipcRenderer.invoke('song-seed:search', request);
+  },
+
+  getLyrics(request: {trackId?: string}) {
+    return ipcRenderer.invoke('song-seed:get-lyrics', request);
+  },
+
+  lookupBpmKey(request: {title?: string; artist?: string}) {
+    return ipcRenderer.invoke('song-seed:lookup-bpm-key', request);
+  },
+
+  analyze(request: Record<string, unknown>) {
+    return ipcRenderer.invoke('song-seed:analyze', request);
+  },
+
+  analyzeReference(request: Record<string, unknown>) {
+    return ipcRenderer.invoke('song-seed:analyze-reference', request);
+  },
+});
+
 contextBridge.exposeInMainWorld('fxWindow', {
   open(trackId: string): void {
     ipcRenderer.send('fx-window:open', trackId);

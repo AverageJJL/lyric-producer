@@ -1,0 +1,148 @@
+export type SongSeedTrack = {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  releaseYear?: string;
+  hasLyrics: boolean;
+  source: 'musixmatch';
+};
+
+export type SongSeedSearchRequest = {
+  query?: string;
+  limit?: number;
+};
+
+export type SongSeedLyricsRequest = {
+  trackId?: string;
+};
+
+export type SongSeedBpmKeyRequest = {
+  title?: string;
+  artist?: string;
+  album?: string;
+  releaseYear?: string;
+};
+
+export type ProviderErrorCode =
+  | 'missing_key'
+  | 'empty_query'
+  | 'not_found'
+  | 'network_error'
+  | 'unauthorized';
+
+export type SongSeedReferenceErrorCode =
+  | ProviderErrorCode
+  | 'analysis_failed'
+  | 'confirmation_required'
+  | 'invalid_file'
+  | 'limit_exceeded'
+  | 'rate_limited'
+  | 'timeout';
+
+export type SongSeedSearchResponse =
+  | {ok: true; tracks: SongSeedTrack[]}
+  | {ok: false; code: ProviderErrorCode; error: string};
+
+export type SongSeedLyricsResponse =
+  | {ok: true; trackId: string; lyrics: string; copyright?: string}
+  | {ok: false; code: ProviderErrorCode | 'no_lyrics'; error: string};
+
+export type SongSeedBpmKeyCandidate = {
+  title: string;
+  artist?: string;
+  album?: string;
+  releaseYear?: string;
+  bpm?: number;
+  key?: string;
+  source: 'getsongbpm' | 'public-context' | 'openrouter-web';
+  confidence: number;
+  matchReason: string;
+  sources?: Array<{title?: string; url: string}>;
+};
+
+export type SongSeedBpmKeyResponse =
+  | {
+      ok: true;
+      title: string;
+      artist?: string;
+      bpm?: number;
+      key?: string;
+      source: 'getsongbpm' | 'public-context' | 'openrouter-web';
+      confidence: number;
+      candidates: SongSeedBpmKeyCandidate[];
+      note?: string;
+    }
+  | {ok: false; code: ProviderErrorCode; error: string};
+
+export type SongSeedReferenceSegment = {
+  timestamp: number;
+  mood?: string;
+  moodScore?: number;
+  valence?: number;
+  arousal?: number;
+  genre?: string;
+  genreScore?: number;
+  instrument?: string;
+  instrumentScore?: number;
+  voice?: string;
+  voiceScore?: number;
+};
+
+export type SongSeedReferenceSource = {
+  kind: 'youtube';
+  url: string;
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  confidence: number;
+  matchReason?: string;
+};
+
+export type SongSeedReferenceAnalysis = {
+  provider: 'cyanite';
+  libraryTrackId: string;
+  source?: SongSeedReferenceSource;
+  cacheStatus?: SongSeedReferenceCacheStatus;
+  title?: string;
+  caption?: string;
+  bpm?: number;
+  key?: string;
+  timeSignature?: string;
+  valence?: number;
+  arousal?: number;
+  energyLevel?: string;
+  energyDynamics?: string;
+  emotionalProfile?: string;
+  emotionalDynamics?: string;
+  moodTags: string[];
+  moodAdvancedTags: string[];
+  movementTags: string[];
+  characterTags: string[];
+  genreTags: string[];
+  subgenreTags: string[];
+  instrumentTags: string[];
+  voiceTags: string[];
+  freeGenreTags: string[];
+  voiceoverDegree?: number;
+  voiceoverExists?: boolean;
+  waveformUrl?: string;
+  scoreMaps?: Record<string, Record<string, number>>;
+  curves?: Record<string, Array<{label: string; points: Array<{timestamp: number; value: number}>}>>;
+  segments: SongSeedReferenceSegment[];
+};
+
+export type SongSeedReferenceAnalyzeRequest = {
+  track?: SongSeedTrack;
+  title?: string;
+  artist?: string;
+  album?: string;
+  releaseYear?: string;
+  allowCreditSpend?: boolean;
+};
+
+export type SongSeedReferenceCacheStatus = 'cache' | 'library' | 'analyzed';
+
+export type SongSeedReferenceAnalyzeResponse =
+  | {ok: true; analysis: SongSeedReferenceAnalysis; cacheStatus?: SongSeedReferenceCacheStatus}
+  | {ok: false; code: SongSeedReferenceErrorCode; error: string; source?: SongSeedReferenceSource};

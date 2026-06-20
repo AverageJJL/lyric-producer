@@ -152,6 +152,30 @@ export function TimelineMarkerLane({
     splitSectionAtBeat(section.id, playheadBeat);
   };
 
+  const markerTitle = (section: SectionMarker): string => {
+    if (!section.analysis) {
+      return section.name;
+    }
+    return [
+      section.name,
+      `Mood: ${section.analysis.mood}`,
+      `Key: ${section.analysis.key}`,
+      section.analysis.bpm
+        ? `BPM: ${section.analysis.bpm} (${section.analysis.bpmSource ?? 'unknown source'})`
+        : null,
+      `Meaning: ${section.analysis.meaning}`,
+      section.analysis.productionDrivers?.length
+        ? `Created by: ${section.analysis.productionDrivers.join(', ')}`
+        : `Created by: ${section.analysis.productionCue}`,
+      section.analysis.producerInsight
+        ? `Producer move: ${section.analysis.producerInsight.arrangementMove}`
+        : null,
+      section.analysis.producerInsight
+        ? `Mix focus: ${section.analysis.producerInsight.mixFocus}`
+        : null,
+    ].filter(Boolean).join('\n');
+  };
+
   return (
     <div ref={laneRef} className="marker-lane" aria-label="Marker lane">
       {markerLayouts.map(({section, startBeat, width}) => {
@@ -164,7 +188,7 @@ export function TimelineMarkerLane({
             onPointerUp={finishDrag}
             onPointerCancel={finishDrag}
             style={{left: startBeat * pixelsPerBeat, width}}
-            title={section.name}>
+            title={markerTitle(section)}>
             <button
               type="button"
               className="marker-resize-handle left"

@@ -28,7 +28,7 @@ import {
 } from '../transport/tempoMap';
 import {normalizeTrackOrganizationLabel} from '../music/trackOrganization';
 import {storedTrackRoutingRole} from '../music/trackRouting';
-import {normalizeTimeSignature} from '../store/projectMetadata';
+import {cloneSectionMarker, normalizeTimeSignature} from '../store/projectMetadata';
 
 export type RestoreProjectSnapshotOptions = ApplyArrangementOptions & {
   /** Copilot staging reuses project snapshots as transient previews; those must not rewind live chat. */
@@ -127,7 +127,7 @@ export function restoreProjectSnapshot(
     timeSignature: normalizeTimeSignature(snapshot.timeSignature),
     scale: snapshot.scale ? {...snapshot.scale} : null,
     chord: snapshot.chord ? {...snapshot.chord} : null,
-    sections: snapshot.sections.map(section => ({...section})),
+    sections: snapshot.sections.map(cloneSectionMarker),
     midiAudition: null,
     liveMidiPreviewByTrack: {},
     liveAudioPreviewByClip: {},

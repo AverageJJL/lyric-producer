@@ -9,6 +9,7 @@ import type {MeterMapEvent, TempoMapEvent} from '../../transport/tempoMap';
 import type {SnapGrid} from '../../ui/snapGrid';
 import {buildTimelineRulerModel} from '../../ui/timelineRulerMap';
 import {TimelineCycleLocator} from './TimelineCycleLocator';
+import {TimelineLyricsLane} from './TimelineLyricsLane';
 import {TimelineMarkerLane} from './TimelineMarkerLane';
 
 type TimelineRulerLayerProps = {
@@ -83,6 +84,13 @@ export function TimelineRulerLayer({
         pixelsPerBeat={pixelsPerBeat}
         snapGrid={snapGrid}
         beatsPerBar={beatsPerBar}
+      />
+      <TimelineLyricsLane
+        sections={sections}
+        visibleTimelineBeats={visibleTimelineBeats}
+        pixelsPerBeat={pixelsPerBeat}
+        beatsPerBar={beatsPerBar}
+        onJumpToBeat={onJumpToBeat}
       />
       <TimelineMarkerLane
         sections={sections}

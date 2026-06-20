@@ -1,0 +1,146 @@
+.onboarding-home {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  grid-template-areas:
+    "title title"
+    "recent begin";
+  align-items: start;
+  column-gap: clamp(42px, 6vw, 90px);
+  row-gap: clamp(34px, 5vh, 62px);
+  width: min(1060px, 100%);
+  padding-inline: clamp(28px, 4.5vw, 76px);
+}
+
+.onboarding-home-title {
+  grid-area: title;
+}
+
+.onboarding-begin {
+  grid-area: begin;
+  display: grid;
+  gap: 14px;
+  justify-self: end;
+  width: min(300px, 100%);
+  margin-right: clamp(92px, 8vw, 146px);
+}
+
+.onboarding-home .onboarding-choice-grid {
+  grid-template-columns: 1fr;
+  width: 100%;
+  margin-top: 0;
+}
+
+.onboarding-recent {
+  grid-area: recent;
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+}
+
+.onboarding-recent-heading {
+  display: grid;
+}
+
+.onboarding-begin h2,
+.onboarding-recent h2 {
+  margin: 0;
+  color: rgba(238, 240, 244, 0.74);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.onboarding-open-link {
+  justify-self: start;
+  cursor: pointer;
+  padding: 0;
+  color: rgba(188, 207, 238, 0.82);
+  font-size: 12px;
+  font-weight: 760;
+  background: transparent;
+  border: 0;
+}
+
+.onboarding-open-link:hover {
+  color: var(--text-main);
+  text-decoration: underline;
+}
+
+.onboarding-open-link:disabled,
+.onboarding-recent-item:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.onboarding-recent-list {
+  display: grid;
+  gap: 4px;
+}
+
+.onboarding-recent-list p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.onboarding-recent-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 0;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.onboarding-recent-item:hover span {
+  color: var(--text-main);
+}
+
+.onboarding-recent-item span {
+  overflow: hidden;
+  color: rgba(238, 240, 244, 0.86);
+  font-size: 13px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.onboarding-recent-item small {
+  overflow: hidden;
+  color: rgba(168, 173, 184, 0.58);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 920px) {
+  .onboarding-begin {
+    margin-right: clamp(24px, 4vw, 48px);
+  }
+}
+
+@media (max-width: 760px) {
+  .onboarding-home {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "begin"
+      "recent";
+    gap: 24px;
+    padding-inline: 0;
+  }
+
+  .onboarding-begin,
+  .onboarding-home .onboarding-choice-grid {
+    justify-self: stretch;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .onboarding-recent-heading {
+    display: grid;
+    gap: 8px;
+  }
+}

@@ -25,7 +25,7 @@ import {
 } from '../transport/tempoMap';
 import {normalizeTrackOrganizationLabel, storedTrackHeightScale} from '../music/trackOrganization';
 import {storedTrackRoutingRole} from '../music/trackRouting';
-import {normalizeTimeSignature} from '../store/projectMetadata';
+import {normalizeSectionMarker, normalizeTimeSignature, type SectionMarker} from '../store/projectMetadata';
 import {
   emptyCopilotChatProjectState,
   normalizeCopilotChatProjectState,
@@ -85,6 +85,12 @@ function normalizeBlocks(snapshot: ProjectSnapshot): ProjectSnapshot['blocks'] {
   return snapshot.blocks.map(block => ({...block, isLocked: block.isLocked === true}));
 }
 
+function normalizeSections(snapshot: ProjectSnapshot): SectionMarker[] {
+  return snapshot.sections
+    .map(normalizeSectionMarker)
+    .filter((section): section is SectionMarker => section !== null);
+}
+
 function normalizeFxState(state: TrackFxState): TrackFxState {
   return withNormalizedPluginChain({
     trackId: state.trackId,
@@ -115,6 +121,7 @@ export function normalizeSnapshot(snapshot: ProjectSnapshot): ProjectSnapshot {
     bpm: normalizeTempoBpm(snapshot.bpm),
     tempoMap: normalizeTempoMap(snapshot.tempoMap),
     meterMap: normalizeMeterMap(snapshot.meterMap),
+    sections: normalizeSections(snapshot),
     tracks: normalizeTracks(snapshot),
     blocks: normalizeBlocks(snapshot),
     snapGrid: normalizeSnapGrid(snapshot.snapGrid),
