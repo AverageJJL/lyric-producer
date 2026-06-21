@@ -4,6 +4,7 @@ import {
   AGENT_LIST_MAX_RESULTS,
   AGENT_READ_MAX_BYTES,
 } from './copilotAgentContract';
+import {inspectTimelineBlocks} from './timelineBlockInventory';
 
 /** Structural mirror of the renderer's ApcVirtualTree (electron tsconfig can't import src/). */
 export type ApcAgentTree = {
@@ -119,6 +120,8 @@ export function executeReadOnlyTool(
         tree,
         safeArgs as {pattern: string; glob?: string; isRegex?: boolean; maxMatches?: number},
       );
+    case 'inspect_timeline_blocks':
+      return inspectTimelineBlocks(tree, safeArgs).result;
     default:
       return {error: `Unknown tool: ${name}`};
   }

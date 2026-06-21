@@ -228,4 +228,25 @@ describe('askCopilotAgent', () => {
       expect(result.turns).toBe(2);
     }
   });
+
+  it('nudges a reasoning-only first turn instead of failing Build mode', async () => {
+    const t = tree();
+    const {impl, bodies} = mockFetch([
+      chat({content: null, reasoning: 'I need to inspect the project first.'}),
+      chat({content: null, tool_calls: [toolCall('answer_copilot', {text: 'I can structure the existing clip without generating music.', actions: []})]}),
+    ]);
+
+    const result = await askCopilotAgent(
+      {message: 'build structure without generating music', tree: t},
+      {env: ENV, fetchImpl: impl},
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.text).toContain('existing clip');
+      expect(result.turns).toBe(2);
+    }
+    expect(bodies).toHaveLength(2);
+    expect(JSON.stringify(bodies[1].messages)).toContain('You returned nothing usable');
+  });
 });

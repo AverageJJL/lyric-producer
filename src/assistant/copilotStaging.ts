@@ -6,6 +6,7 @@ import {
   recordArrangementHistory,
   runWithoutHistory,
 } from '../store/history';
+import {runWithNativeBridgeSyncSuppressed} from '../store/dawRecording';
 import {refreshPlaybackAndInstruments} from '../native/refreshPlayback';
 import {useCopilotStagingStore} from './copilotStagingStore';
 import type {StagedEdit} from './copilotStagedEdit';
@@ -25,12 +26,29 @@ const STAGING_RESTORE_OPTIONS = {restoreCopilotChats: false} as const;
  * Engine snapshot state lives in this module (snapshots are large; they don't belong
  * in reactive store state); only small render-relevant flags go to the staging store.
  */
-let active: {proposalId: string; editId: string; baseSnapshot: ProjectSnapshot} | null = null;
+let active: {
+  proposalId: string;
+  editId: string;
+  baseSnapshot: ProjectSnapshot;
+  previewSkipsNativeSync: boolean;
+} | null = null;
+
+function restoreSnapshot(snapshot: ProjectSnapshot, skipNativeSync: boolean): void {
+  const restore = () => restoreProjectSnapshot(snapshot, {
+    ...STAGING_RESTORE_OPTIONS,
+    skipNativeRefresh: skipNativeSync,
+  });
+  if (skipNativeSync) {
+    runWithNativeBridgeSyncSuppressed(restore);
+  } else {
+    restore();
+  }
+}
 
 function applyEdit(edit: StagedEdit): void {
   runWithoutHistory(() => {
     if (edit.kind === 'snapshot') {
-      restoreProjectSnapshot(edit.snapshot, STAGING_RESTORE_OPTIONS);
+      restoreSnapshot(edit.snapshot, edit.previewSkipsNativeSync === true);
     } else {
       applyArrangementOperations(edit.operations);
     }
@@ -39,7 +57,7 @@ function applyEdit(edit: StagedEdit): void {
 
 function restoreBase(): void {
   if (active) {
-    runWithoutHistory(() => restoreProjectSnapshot(active!.baseSnapshot, STAGING_RESTORE_OPTIONS));
+    runWithoutHistory(() => restoreSnapshot(active!.baseSnapshot, active!.previewSkipsNativeSync));
   }
 }
 
@@ -63,7 +81,12 @@ export function stageCopilotEdit(edit: StagedEdit): void {
   // project-lifecycle dirty subscriber synchronously; if pending were still false there,
   // it would autosave this un-accepted preview. Setting active + syncing first closes
   // that race — the subscriber sees isCopilotStagePending() === true and skips autosave.
-  active = {proposalId: edit.proposalId, editId: edit.id, baseSnapshot};
+  active = {
+    proposalId: edit.proposalId,
+    editId: edit.id,
+    baseSnapshot,
+    previewSkipsNativeSync: edit.kind === 'snapshot' && edit.previewSkipsNativeSync === true,
+  };
   syncStore();
   applyEdit(edit);
 }
@@ -73,8 +96,11 @@ export function revertStagedEdit(): void {
   if (!active) {
     return;
   }
+  const shouldRefreshNative = !active.previewSkipsNativeSync;
   restoreBase();
-  refreshPlaybackAndInstruments();
+  if (shouldRefreshNative) {
+    refreshPlaybackAndInstruments();
+  }
   active = null;
   syncStore();
 }

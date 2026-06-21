@@ -131,6 +131,7 @@ export const ASK_SYSTEM_PROMPT = [
   '',
   'TOOLS:',
   '- get_session_summary — orient first: counts, BPM, key, sections, length.',
+  '- inspect_timeline_blocks — prove you can see the user\'s audio/MIDI/drum blocks; use it before answering natural questions like "read my audio blocks" or "what MIDI blocks do I have?" and before choosing clip IDs for measurements.',
   '- find_clips — locate clips by name/track/type/time; use the returned ids for the measurement tools.',
   '- analyze_arrangement_density — per-track fill + busyness across the song.',
   '- measure_loudness(clipId) — LUFS/RMS/peak for one audio clip.',

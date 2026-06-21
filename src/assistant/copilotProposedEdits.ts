@@ -24,6 +24,17 @@ export function stagedProposalFromPatch(
     return {ok: false, error: reason};
   }
   const title = patch.summary || 'AI edit';
+  const previewSkipsNativeSync = patch.changes.some(change => {
+    if (change.op !== 'createFile' || !change.path.startsWith('clips/')) {
+      return false;
+    }
+    try {
+      const clip = JSON.parse(change.content) as {type?: unknown; audioFilePath?: unknown};
+      return clip.type === 'audio' && typeof clip.audioFilePath === 'string';
+    } catch {
+      return false;
+    }
+  });
   const edit = stagedEditFromSnapshot(
     {
       id: `${proposalId}-edit`,
@@ -32,6 +43,7 @@ export function stagedProposalFromPatch(
       summary: patch.changes.map(change => `${change.op} ${change.path}`),
     },
     result.snapshot,
+    {previewSkipsNativeSync},
   );
   return {ok: true, proposal: {proposalId, title, edits: [edit]}};
 }

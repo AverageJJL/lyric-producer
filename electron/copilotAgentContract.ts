@@ -88,6 +88,29 @@ export const READ_ONLY_NAV_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'inspect_timeline_blocks',
+      description:
+        'Inventory timeline blocks as user-facing audio, MIDI, and drum-pattern blocks. Returns IDs, tracks, beat ranges, file-backed audio measurement readiness, MIDI note counts/ranges, drum activity, and demo-safe follow-up prompts. Use this before block-aware Ask/Build work.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: {type: 'string', enum: ['audio', 'midi', 'drum']},
+          blockIds: {
+            type: 'array',
+            items: {type: 'string'},
+            description: 'Optional block IDs, e.g. selected IDs from copilotContext.arrangement.',
+          },
+          minBeat: {type: 'number', description: 'Only blocks overlapping at/after this beat.'},
+          maxBeat: {type: 'number', description: 'Only blocks overlapping before this beat.'},
+          maxResults: {type: 'integer', minimum: 1, maximum: 80},
+        },
+      },
+    },
+  },
 ] as const;
 
 /** Read-only navigation tools + the terminal patch tool (the `.apc` edit channel). */
@@ -160,6 +183,7 @@ export const COPILOT_AGENT_SYSTEM_PROMPT = [
   '',
   'TOOLS:',
   '- list_project_files / grep_project_files / read_project_file — navigate and inspect the tree. read_project_file returns a file\'s contents.',
+  '- inspect_timeline_blocks — quick block inventory: audio vs MIDI vs drum-pattern blocks, beat ranges, IDs, note counts, and which audio clips can be measured. Use this before block-aware work instead of making the user know clip IDs.',
   '- submit_project_patch — TERMINAL. Propose concrete edits as one patch over the JSON tree. Prefer mergeFields for single-value edits (e.g. {op:"mergeFields", path:"project.json", fields:{"bpm":128}} or a track\'s "volumeDb"); use replaceFile/createFile/deleteFile for structural edits. Set baseFingerprint to the tree fingerprint, and each change\'s beforeHash to that file\'s hash.',
   'ENTITY FILES: tracks/<id>.json, clips/<id>.json, and patterns/<id>.json must contain the same top-level "id"; fx/<trackId>.json must contain fx.trackId. Never create or rewrite an entity file with a missing or different id.',
   'BE FAST (only once the user has explicitly asked for a metadata change): the projectTree index already lists every file\'s path, bytes, and hash. For a blind metadata edit (BPM, cycle, a track\'s volume/pan, mute/solo) set beforeHash straight from the index hash and patch in ONE turn — do NOT read or list first. Only read_project_file when you genuinely need a file\'s current contents (e.g. editing existing notes or FX params). project.json holds bpm, master volume/pan, snap, cycle (isCycleEnabled / cycleStartBeat / cycleEndBeat), scale, chord.',
@@ -181,6 +205,7 @@ export const COPILOT_AGENT_SYSTEM_PROMPT = [
   '- Call each terminal tool at most once.',
   '',
   'EDIT RULES:',
+  '- Demo-safe non-generative Build moves are encouraged when asked: duplicate, move, resize, rename, mute/solo, gain/pan, organize, or transform EXISTING clips/notes. Read the original block first and preserve its musical material unless the user explicitly asks for a generated idea.',
   '- For UI guidance use only the provided action types (show_ui_guide, reveal_ui_target, focus_ui_target, open_right_panel, set_mixer_open) and only target IDs from copilotContext. Max 4 actions.',
   '- In answer_copilot emit only whole-MIDI-block ops: upsertMidiBlock, moveMidiBlock, resizeMidiBlock, renameMidiBlock. Do not patch individual notes or mutate sliders/selects/toggles that way. midiOptions may include createTrack intent for later user import.',
   '- For add requests use the selected software-instrument track or an exact unique target; otherwise ask a short follow-up. For replace/edit requests use the selected MIDI block or an exact unique target; otherwise ask.',

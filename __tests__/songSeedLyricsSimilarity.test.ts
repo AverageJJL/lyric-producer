@@ -50,14 +50,15 @@ describe('song seed lyric similarity', () => {
     const fetchMock = jest
       .fn()
       .mockImplementationOnce(() => response(searchPayload()))
-      .mockImplementationOnce(() => response(lyricsPayload()));
+      .mockImplementationOnce(() => response(lyricsPayload()))
+      .mockImplementationOnce(() => response({message: {body: {}}}));
 
     const result = await checkLyricsSimilarity({
       lyrics: 'remember those walls i built\nsomething brand new',
       lineIds: ['line-a', 'line-b'],
     }, {MUSIXMATCH_API_KEY: 'key'}, fetchMock as typeof fetch);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(result).toMatchObject({
       ok: true,
       report: {

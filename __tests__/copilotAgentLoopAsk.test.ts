@@ -46,11 +46,26 @@ function toolNamesFrom(body: Record<string, unknown>): string[] {
 const ENV = {OPENROUTER_API_KEY: 'test-key'} as NodeJS.ProcessEnv;
 
 describe('askCopilotAgent — Ask (read-only) mode', () => {
+  it('answers demo block-reading prompts locally without a model call or API key', async () => {
+    const fetchImpl = jest.fn() as unknown as typeof fetch;
+    const result = await askCopilotAgent(
+      {message: 'Read my audio blocks. What clips are in this session?', tree: askTree(), mode: 'ask'},
+      {env: {} as NodeJS.ProcessEnv, fetchImpl},
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.model).toBe('local-ask-analysis');
+      expect(result.turns).toBe(0);
+      expect(result.reports?.map(report => report.kind)).toContain('blocks');
+    }
+  });
+
   it('offers read-only analysis tools and withholds the editing tools', async () => {
     const {impl, bodies} = mockFetch([chat({content: 'You have one vocal track.'})]);
-    await askCopilotAgent({message: 'what is in my session?', tree: askTree(), mode: 'ask'}, {env: ENV, fetchImpl: impl});
+    await askCopilotAgent({message: 'give me a production risk assessment', tree: askTree(), mode: 'ask'}, {env: ENV, fetchImpl: impl});
     const toolNames = toolNamesFrom(bodies[0]);
-    expect(toolNames).toEqual(expect.arrayContaining(['get_session_summary', 'find_clips', 'measure_loudness', 'list_project_files']));
+    expect(toolNames).toEqual(expect.arrayContaining(['get_session_summary', 'find_clips', 'measure_loudness', 'inspect_timeline_blocks', 'list_project_files']));
     expect(toolNames).not.toContain('submit_project_patch');
     expect(toolNames).not.toContain('answer_copilot');
   });
@@ -83,7 +98,7 @@ describe('askCopilotAgent — Ask (read-only) mode', () => {
       chat({content: 'Your vocal sits at -13.5 LUFS.'}),
     ]);
     const result = await askCopilotAgent(
-      {message: 'how loud is the vocal', tree: askTree(), mode: 'ask'},
+      {message: 'measure the vocal through the model path', tree: askTree(), mode: 'ask'},
       {env: ENV, fetchImpl: impl, sendNativeCommand},
     );
     expect(calls).toContain('measure_loudness');
@@ -114,6 +129,7 @@ describe('askCopilotAgent — Ask (read-only) mode', () => {
     await askCopilotAgent({message: 'make it louder', tree: askTree()}, {env: ENV, fetchImpl: impl});
     const toolNames = toolNamesFrom(bodies[0]);
     expect(toolNames).toContain('submit_project_patch');
+    expect(toolNames).toContain('inspect_timeline_blocks');
     expect(toolNames).not.toContain('get_session_summary');
   });
 });

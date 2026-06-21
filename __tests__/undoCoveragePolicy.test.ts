@@ -78,6 +78,7 @@ const actionPolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
   stampLyricLine: {policy: 'history', reason: 'authored lyrics playhead stamp'},
   estimateLyricSectionTimings: {policy: 'history', reason: 'authored lyrics timing estimate'}, syncLyricTimings: {policy: 'history', reason: 'authored lyrics timing sync'},
   setLyricSimilarityReport: {policy: 'history', reason: 'authored lyrics similarity metadata'},
+  removeLyricAnalysis: {policy: 'history', reason: 'authored lyrics and section analysis reset'},
   toggleTrackRecordArm: {policy: 'history', reason: 'track record-arm state'},
   selectTrack: {policy: 'no-history', reason: 'selection state'},
   setIsRecording: {policy: 'no-history', reason: 'recording runtime state'},

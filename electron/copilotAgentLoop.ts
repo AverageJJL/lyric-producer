@@ -16,6 +16,8 @@ import {dispatchToolCalls} from './copilotAgentDispatch';
 import {ASK_AGENT_TOOLS, ASK_SYSTEM_PROMPT, type CopilotMode} from './askContract';
 import type {NativeCommandFn} from './askAudioTools';
 import type {AskReport} from './askReportTypes';
+import {buildAskShortcut} from './copilotAskShortcuts';
+import {buildBlockStructureShortcut} from './copilotBuildShortcuts';
 
 export type {CopilotAgentRequest, CopilotAgentAnswer} from './copilotAgentTurn';
 
@@ -140,9 +142,11 @@ async function runLoop(
       if (text) {
         return {ok: true, text, patch: null, turns: turn + 1, reports};
       }
-      // Empty turn-0 (no tools, no text) → the model is likely not tool-calling; fall
-      // back to the proven model. Mid-loop blanks get one nudge before giving up.
-      if (turn === 0) {
+      // Some reasoning models can spend the first turn thinking without emitting public
+      // content or a tool call. If they did produce reasoning, keep the same loop alive
+      // and explicitly ask for a terminal move before falling back or failing.
+      const reasoning = cleanString(choice.reasoning);
+      if (turn === 0 && !reasoning) {
         return {ok: false, error: 'Agent returned no actionable response.', fallback: true};
       }
       if (turn < AGENT_MAX_TURNS - 1) {
@@ -199,13 +203,27 @@ export async function askCopilotAgent(
   if (!message || message.length > 2000) {
     return {ok: false, error: 'Copilot needs a shorter non-empty message.'};
   }
-  const apiKey = cleanString(env.OPENROUTER_API_KEY);
-  if (!apiKey) {
-    return {ok: false, error: 'Missing OPENROUTER_API_KEY for Copilot.'};
-  }
   const tree = request.tree;
   if (!tree || typeof tree.fingerprint !== 'string' || !Array.isArray(tree.index)) {
     return {ok: false, error: 'Copilot agent requires a project source tree.'};
+  }
+  const mode = request.mode === 'ask' ? 'ask' : 'build';
+  if (mode === 'ask') {
+    const shortcut = buildAskShortcut(message, tree, options.sendNativeCommand);
+    if (shortcut) {
+      return {ok: true, text: shortcut.text, patch: null, reports: shortcut.reports, model: 'local-ask-analysis', turns: 0};
+    }
+  }
+  if (mode === 'build') {
+    const shortcut = buildBlockStructureShortcut(message, tree);
+    if (shortcut) {
+      return {ok: true, text: shortcut.text, patch: shortcut.patch, reports: [], model: 'local-block-structure', turns: 0};
+    }
+  }
+
+  const apiKey = cleanString(env.OPENROUTER_API_KEY);
+  if (!apiKey) {
+    return {ok: false, error: 'Missing OPENROUTER_API_KEY for Copilot.'};
   }
 
   const debug = agentDebugEnabled(env);
@@ -215,7 +233,7 @@ export async function askCopilotAgent(
     fetchImpl: options.fetchImpl ?? globalThis.fetch,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     debug,
-    mode: request.mode === 'ask' ? 'ask' : 'build',
+    mode,
     sendNativeCommand: options.sendNativeCommand,
   };
   const primary = cleanString(env.AI_PRODUCER_AGENT_MODEL) ?? DEFAULT_AGENT_MODEL;

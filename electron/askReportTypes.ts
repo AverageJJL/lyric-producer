@@ -4,7 +4,7 @@
  * (src/assistant/askReports.ts) before rendering/persisting. Keep the two in sync.
  */
 
-export type AskReportKind = 'summary' | 'clips' | 'density' | 'loudness' | 'masking' | 'reference';
+export type AskReportKind = 'summary' | 'clips' | 'blocks' | 'density' | 'loudness' | 'masking' | 'reference';
 
 export type AskReportMetric = {label: string; value: string; hint?: string};
 export type AskReportBar = {label: string; value: string; level: number};

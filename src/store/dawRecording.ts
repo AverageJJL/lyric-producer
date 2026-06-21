@@ -13,6 +13,16 @@ import {useDAWStore} from './useDAWStore';
 /** While true, useDAWNativeBridge skips transport + block upserts during voice-stop heal. */
 export let suppressNativeBridgeSync = false;
 
+export function runWithNativeBridgeSyncSuppressed<T>(fn: () => T): T {
+  const previous = suppressNativeBridgeSync;
+  suppressNativeBridgeSync = true;
+  try {
+    return fn();
+  } finally {
+    suppressNativeBridgeSync = previous;
+  }
+}
+
 /** Toggle play/pause from transport UI or global shortcuts (e.g. Space). */
 export function toggleTransportPlayback(): void {
   const state = useDAWStore.getState();

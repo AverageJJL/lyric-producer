@@ -10,7 +10,7 @@
  * import from src/.
  */
 
-export type AskReportKind = 'summary' | 'clips' | 'density' | 'loudness' | 'masking' | 'reference';
+export type AskReportKind = 'summary' | 'clips' | 'blocks' | 'density' | 'loudness' | 'masking' | 'reference';
 
 /** A single headline number, e.g. {label:'Integrated', value:'-14.2 LUFS'}. */
 export type AskReportMetric = {label: string; value: string; hint?: string};
@@ -32,6 +32,7 @@ export type AskReport = {
 const REPORT_KINDS: readonly AskReportKind[] = [
   'summary',
   'clips',
+  'blocks',
   'density',
   'loudness',
   'masking',

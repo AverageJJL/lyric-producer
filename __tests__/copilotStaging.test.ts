@@ -11,6 +11,7 @@ import {
 } from '../src/assistant/copilotStaging';
 import {isCopilotStagePending, useCopilotStagingStore} from '../src/assistant/copilotStagingStore';
 import {stagedEditFromSnapshot} from '../src/assistant/copilotStagedEdit';
+import {refreshPlaybackAndInstruments} from '../src/native/refreshPlayback';
 import {
   resetCopilotChatHistoryForTests,
   useCopilotChatHistoryStore,
@@ -46,6 +47,7 @@ function edit(id: string, proposalId: string, snapshot: ProjectSnapshot) {
 describe('copilot staging engine', () => {
   beforeEach(() => {
     resetStore();
+    jest.clearAllMocks();
     window.audioEngine = undefined;
   });
 
@@ -125,5 +127,22 @@ describe('copilot staging engine', () => {
     const liveMessages = useCopilotChatHistoryStore.getState().sessions
       .find(session => session.id === sessionId)?.messages.map(message => message.content);
     expect(liveMessages).toEqual(['Try a faster chorus', 'I proposed a tempo lift.']);
+  });
+
+  it('skips native refresh for visual audio snapshot previews', () => {
+    const base = captureProjectSnapshot();
+    const preview = stagedEditFromSnapshot(
+      {id: 'audio-preview', proposalId: 'A', label: 'audio guide', summary: []},
+      snapshotWithBpm(base, 140),
+      {previewSkipsNativeSync: true},
+    );
+
+    stageCopilotEdit(preview);
+    expect(useDAWStore.getState().bpm).toBe(140);
+    expect(refreshPlaybackAndInstruments).not.toHaveBeenCalled();
+
+    revertStagedEdit();
+    expect(useDAWStore.getState().bpm).toBe(120);
+    expect(refreshPlaybackAndInstruments).not.toHaveBeenCalled();
   });
 });

@@ -143,6 +143,10 @@ CommandResult handleUpsertAudioClip(
       return makeError("upsert_audio_clip", "clip_insert_failed", "Audio file could not be inserted.");
     }
 
+    // The Electron main thread also hosts JUCE's message pump in dev. Tracktion's
+    // async proxy generation can block that thread waiting for itself, so runtime
+    // DAW clips play directly from their validated source files.
+    waveClip->setUsesProxy(false);
     waveClip->setGainDB(clipGainDb);
     waveClip->setFadeIn(beatDurationAt(edit, blockStartBeat, fadeInBeats));
     waveClip->setFadeOut(beatDurationAt(
@@ -180,6 +184,7 @@ CommandResult handleUpsertAudioClip(
 
     auto waveClip = track->insertWaveClip(clipLabel, file, {{clipStart, clipEnd - clipStart}, {}}, false);
     if (waveClip != nullptr) {
+      waveClip->setUsesProxy(false);
       createdClips.push_back({clipKey, waveClip.get()});
     }
   };

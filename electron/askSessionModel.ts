@@ -17,9 +17,13 @@ export type ClipFile = {
   patternId?: string;
   mediaSourceName?: string;
   durationSeconds?: number;
+  audioFilePath?: string;
+  sourceLengthBeats?: number;
+  sourceOffsetBeats?: number;
+  isLocked?: boolean;
 };
 
-export type TrackFile = {id?: string; name?: string; type?: string};
+export type TrackFile = {id?: string; name?: string; type?: string; isLocked?: boolean; isFrozen?: boolean};
 
 export function num(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;

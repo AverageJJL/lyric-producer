@@ -22,6 +22,7 @@ import {
   trackMap,
   type ClipFile,
 } from './askSessionModel';
+import {inspectTimelineBlocks} from './timelineBlockInventory';
 
 export type {AskToolResult} from './askReportTypes';
 
@@ -117,6 +118,7 @@ function findClips(tree: ApcAgentTree, args: Record<string, unknown>): AskToolRe
     trackId: clip.trackId,
     trackName: clip.trackId ? tracks.get(clip.trackId)?.name ?? clip.trackId : undefined,
     type: clip.type,
+    kind: clip.type === 'audio' && clip.patternId ? 'drum' : clip.type,
     startBeat: num(clip.startBeat),
     lengthBeats: num(clip.lengthBeats),
     noteCount: Array.isArray(clip.notes) ? clip.notes.length : undefined,
@@ -214,6 +216,8 @@ export function runAskSessionTool(
   args: Record<string, unknown>,
 ): AskToolResult | null {
   switch (name) {
+    case 'inspect_timeline_blocks':
+      return inspectTimelineBlocks(tree, args);
     case 'get_session_summary':
       return sessionSummary(tree);
     case 'find_clips':
