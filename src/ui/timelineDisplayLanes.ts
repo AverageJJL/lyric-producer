@@ -64,6 +64,7 @@ export function buildTimelineDisplayLaneLayout(
   blocks: DAWBlock[],
   expandedTakeGroups: string[],
   baseRowHeight = ROW_HEIGHT,
+  rulerHeight = RULER_HEIGHT,
 ): TimelineDisplayLaneLayout {
   const expandedGroupIds = new Set(expandedTakeGroups);
   const lanes: TimelineDisplayLane[] = [];
@@ -112,12 +113,12 @@ export function buildTimelineDisplayLaneLayout(
   return {
     lanes,
     rowAreaHeight,
-    contentHeight: RULER_HEIGHT + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
+    contentHeight: rulerHeight + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
     maxTrackRows: Math.max(lanes.length, 1),
     realTrackLaneLayout: {
       lanes: realTrackLanes,
       rowAreaHeight,
-      contentHeight: RULER_HEIGHT + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
+      contentHeight: rulerHeight + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
       maxTrackRows: Math.max(tracks.length, 1),
     },
   };

@@ -71,6 +71,15 @@ describe('song idea Cyanite metadata helpers', () => {
     );
   });
 
+  it('separates cached analyses when synced lyric timings change', () => {
+    const track = {id: 'mxm-1', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch' as const};
+    const lyrics = 'Oh, woah\nBaby, baby, baby, oh';
+
+    expect(analysisKey(track, lyrics, undefined, '', [{text: 'Oh, woah', startSeconds: 1}])).not.toBe(
+      analysisKey(track, lyrics, undefined, '', [{text: 'Oh, woah', startSeconds: 2}]),
+    );
+  });
+
   it('does not let enrichment replace protected lyric sections', () => {
     const base = createSongIdeaAnalysis({
       track: {id: 'mxm-1', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch'},
@@ -100,6 +109,35 @@ describe('song idea Cyanite metadata helpers', () => {
       lyrics: ['Oh, woah'],
       mood: 'web enriched',
       sectionSource: 'musixmatch-structure',
+    });
+  });
+
+  it('keeps synced lyric ranges when enrichment replaces fallback sections', () => {
+    const base = createSongIdeaAnalysis({
+      track: {id: 'mxm-1', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch'},
+      lyrics: 'Quiet setup line\nBaby, baby, baby, oh',
+      syncedLyrics: [
+        {text: 'Quiet setup line', startSeconds: 4},
+        {text: 'Baby, baby, baby, oh', startSeconds: 12},
+      ],
+    });
+    const enriched = {
+      ...base,
+      sections: base.sections.map(section => ({
+        ...section,
+        lyrics: ['model changed lyric'],
+        lyricPreview: ['model changed lyric'],
+        lyricTimings: undefined,
+        mood: 'web enriched',
+        sectionSource: 'model' as const,
+      })),
+    };
+
+    const merged = mergeSectionEnrichment(base, enriched);
+    expect(merged.sections[0]).toMatchObject({
+      lyrics: base.sections[0]?.lyrics,
+      lyricTimings: base.sections[0]?.lyricTimings,
+      mood: 'web enriched',
     });
   });
 });

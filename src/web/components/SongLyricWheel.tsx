@@ -27,11 +27,14 @@ function phaseLabel(phase: SongAnalysisPhase, lyricsState: SongLyricWheelProps['
   return lyricsState === 'ready' ? 'Lyrics' : 'Waiting';
 }
 
+const LYRIC_FOCUS_RATIO = 0.5;
+
 function centeredScrollTop(container: HTMLElement, target: HTMLElement): number {
   const containerRect = container.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
+  const focusY = container.clientHeight * LYRIC_FOCUS_RATIO;
   if (targetRect.height > 0 || targetRect.top !== 0 || containerRect.top !== 0) {
-    return Math.max(0, container.scrollTop + targetRect.top - containerRect.top + targetRect.height / 2 - container.clientHeight / 2);
+    return Math.max(0, container.scrollTop + targetRect.top - containerRect.top + targetRect.height / 2 - focusY);
   }
   let offset = 0;
   let node: HTMLElement | null = target;
@@ -39,7 +42,7 @@ function centeredScrollTop(container: HTMLElement, target: HTMLElement): number 
     offset += node.offsetTop;
     node = node.offsetParent as HTMLElement | null;
   }
-  return Math.max(0, offset + target.offsetHeight / 2 - container.clientHeight / 2);
+  return Math.max(0, offset + target.offsetHeight / 2 - focusY);
 }
 
 export function SongLyricWheel({

@@ -37,7 +37,7 @@ function displayNameFromPath(path: string | null): string {
   return name ? name.replace(/\.apc$/i, '') : 'Untitled';
 }
 
-export function useProjectFileLifecycle() {
+export function useProjectFileLifecycle(options: {onRequestNewProject?: () => void} = {}) {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -45,6 +45,7 @@ export function useProjectFileLifecycle() {
   const [recentProjects, setRecentProjects] = useState(() => loadRecentProjects());
   const [statusMessage, setStatusMessage] = useState('Unsaved project');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const newProjectDiscardApprovedRef = useRef(false);
   const savedFingerprintRef = useRef<string | null>(
     snapshotFingerprint(captureProjectSnapshot()),
   );
@@ -119,16 +120,30 @@ export function useProjectFileLifecycle() {
     [applySavedState, confirmDiscardDirtyChanges],
   );
 
-  const newProject = useCallback(async () => {
+  const requestNewProject = useCallback(async () => {
     if (!confirmDiscardDirtyChanges()) {
-      return;
+      return false;
+    }
+
+    newProjectDiscardApprovedRef.current = true;
+    options.onRequestNewProject?.();
+    return true;
+  }, [confirmDiscardDirtyChanges, options.onRequestNewProject]);
+
+  const newProject = useCallback(async () => {
+    const hasApprovedDiscard = newProjectDiscardApprovedRef.current;
+    newProjectDiscardApprovedRef.current = false;
+    if (!hasApprovedDiscard && !confirmDiscardDirtyChanges()) {
+      return false;
     }
 
     const result = await createNewApcProject(getProjectFileBridge());
     if (result.ok) {
       applySavedState(undefined, result.fingerprint);
       setStatusMessage('New project');
+      return true;
     }
+    return false;
   }, [applySavedState, confirmDiscardDirtyChanges]);
 
   const openProject = useCallback(
@@ -245,7 +260,7 @@ export function useProjectFileLifecycle() {
     exportStems,
     importDawProject,
     importDawProjectPath,
-    newProject,
+    newProject: options.onRequestNewProject ? requestNewProject : newProject,
     openProject,
     openRecentProject,
     recoverAutosave,
@@ -263,6 +278,7 @@ export function useProjectFileLifecycle() {
     statusMessage,
     errorMessage,
     newProject,
+    requestNewProject: options.onRequestNewProject ? requestNewProject : undefined,
     openProject,
     openRecentProject,
     importDawProject,

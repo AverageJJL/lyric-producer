@@ -1,6 +1,7 @@
 import {
   clientXToBeat,
   createPlayheadScrubHandlers,
+  snapPlayheadBeatToBar,
   type PlayheadScrubSession,
 } from '../src/ui/playheadScrubPointer';
 import {DEFAULT_TIMELINE_BEATS, PIXELS_PER_BEAT} from '../src/ui/timelineLayout';
@@ -28,6 +29,21 @@ describe('clientXToBeat', () => {
 
   it('uses the active timeline zoom scale', () => {
     expect(clientXToBeat(192, 0, 64, 96)).toBe(2);
+  });
+});
+
+describe('snapPlayheadBeatToBar', () => {
+  it('snaps to a bar start inside the visual magnet radius', () => {
+    expect(snapPlayheadBeatToBar(3.9, 4, PIXELS_PER_BEAT)).toBe(4);
+    expect(snapPlayheadBeatToBar(4.1, 4, PIXELS_PER_BEAT)).toBe(4);
+  });
+
+  it('keeps fractional positions outside the visual magnet radius', () => {
+    expect(snapPlayheadBeatToBar(3.75, 4, PIXELS_PER_BEAT)).toBe(3.75);
+  });
+
+  it('uses the active bar length', () => {
+    expect(snapPlayheadBeatToBar(2.9, 3, PIXELS_PER_BEAT)).toBe(3);
   });
 });
 
@@ -107,6 +123,52 @@ describe('createPlayheadScrubHandlers', () => {
       getTimelineClientX: () => 0,
       getPlayheadBeat: () => 0,
       getMaxTimelineBeat: () => 128,
+      sessionRef,
+      onScrubStart: jest.fn(),
+      onScrubEnd: jest.fn(),
+      onScrubBeat: beat => scrubbed.push(beat),
+    });
+
+    handlers.onPointerDown({button: 0, pointerId: 1, clientX: 0});
+    handlers.onPointerMove({pointerId: 1, clientX: 2.37 * PIXELS_PER_BEAT});
+    handlers.onPointerUp({pointerId: 1, clientX: 2.62 * PIXELS_PER_BEAT});
+
+    expect(scrubbed[0]).toBe(0);
+    expect(scrubbed[1]).toBeCloseTo(2.37);
+    expect(scrubbed[2]).toBeCloseTo(2.62);
+  });
+
+  it('snaps scrubbed playhead positions to nearby bar starts', () => {
+    const sessionRef: {current: PlayheadScrubSession | null} = {current: null};
+    const scrubbed: number[] = [];
+    const handlers = createPlayheadScrubHandlers({
+      getTimelineClientX: () => 0,
+      getPlayheadBeat: () => 0,
+      getMaxTimelineBeat: () => 128,
+      pixelsPerBeat: PIXELS_PER_BEAT,
+      barSnap: {beatsPerBar: 4},
+      sessionRef,
+      onScrubStart: jest.fn(),
+      onScrubEnd: jest.fn(),
+      onScrubBeat: beat => scrubbed.push(beat),
+    });
+
+    handlers.onPointerDown({button: 0, pointerId: 1, clientX: 0});
+    handlers.onPointerMove({pointerId: 1, clientX: 3.9 * PIXELS_PER_BEAT});
+    handlers.onPointerUp({pointerId: 1, clientX: 4.1 * PIXELS_PER_BEAT});
+
+    expect(scrubbed).toEqual([0, 4, 4]);
+  });
+
+  it('keeps scrubbed playhead positions continuous between bar magnets', () => {
+    const sessionRef: {current: PlayheadScrubSession | null} = {current: null};
+    const scrubbed: number[] = [];
+    const handlers = createPlayheadScrubHandlers({
+      getTimelineClientX: () => 0,
+      getPlayheadBeat: () => 0,
+      getMaxTimelineBeat: () => 128,
+      pixelsPerBeat: PIXELS_PER_BEAT,
+      barSnap: {beatsPerBar: 4},
       sessionRef,
       onScrubStart: jest.fn(),
       onScrubEnd: jest.fn(),

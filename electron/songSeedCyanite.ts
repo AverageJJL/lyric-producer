@@ -93,7 +93,8 @@ export async function cyaniteGraphql<T>(
     body: JSON.stringify({query, variables}),
   });
   if (!response.ok) {
-    throw new CyaniteError(response.status === 401 ? 'unauthorized' : 'network_error', `Cyanite returned ${response.status}.`);
+    const code = response.status === 401 ? 'unauthorized' : response.status === 402 ? 'limit_exceeded' : response.status === 429 ? 'rate_limited' : 'network_error';
+    throw new CyaniteError(code, `Cyanite returned ${response.status}.`);
   }
   const payload = await response.json() as {data?: T; errors?: Array<{message?: string}>};
   const error = payload.errors?.map(item => item.message).filter(Boolean).join('; ');

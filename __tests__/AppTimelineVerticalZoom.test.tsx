@@ -1,9 +1,10 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWTrack} from '../src/store/useDAWStore';
-import {ROW_HEIGHT, RULER_HEIGHT, TRACK_SIDEBAR_FOOTER_HEIGHT} from '../src/ui/timelineLayout';
+import {ROW_HEIGHT, RULER_BASE_HEIGHT, TRACK_SIDEBAR_FOOTER_HEIGHT} from '../src/ui/timelineLayout';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
@@ -53,6 +54,7 @@ function resetStore(): void {
     scale: null,
     chord: null,
     sections: [],
+    lyrics: defaultLyricDocument(),
     midiAudition: null,
     liveMidiPreviewByTrack: {},
     liveAudioPreviewByClip: {},
@@ -83,7 +85,7 @@ test('zooms timeline track height from the toolbar', () => {
   const surface = document.querySelector('.timeline-surface') as HTMLDivElement;
   const sidebarRow = document.querySelector('.track-row') as HTMLDivElement;
 
-  expect(surface.style.height).toBe(`${RULER_HEIGHT + ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`);
+  expect(surface.style.height).toBe(`${RULER_BASE_HEIGHT + ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`);
   expect(sidebarRow.style.height).toBe(`${ROW_HEIGHT}px`);
 
   fireEvent.change(screen.getByLabelText('Track height'), {
@@ -91,14 +93,14 @@ test('zooms timeline track height from the toolbar', () => {
   });
 
   expect(surface.style.height).toBe(
-    `${RULER_HEIGHT + ROW_HEIGHT + 16 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
+    `${RULER_BASE_HEIGHT + ROW_HEIGHT + 16 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
   );
   expect(sidebarRow.style.height).toBe(`${ROW_HEIGHT + 16}px`);
 
   fireEvent.change(screen.getByLabelText('Track height'), {
     target: {value: String(ROW_HEIGHT)},
   });
-  expect(surface.style.height).toBe(`${RULER_HEIGHT + ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`);
+  expect(surface.style.height).toBe(`${RULER_BASE_HEIGHT + ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`);
 });
 
 test('applies per-track height scale from the sidebar control', () => {
@@ -110,7 +112,7 @@ test('applies per-track height scale from the sidebar control', () => {
   const sidebarRow = document.querySelector('.track-row') as HTMLDivElement;
 
   expect(surface.style.height).toBe(
-    `${RULER_HEIGHT + ROW_HEIGHT * 1.5 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
+    `${RULER_BASE_HEIGHT + ROW_HEIGHT * 1.5 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
   );
   expect(sidebarRow.style.height).toBe(`${ROW_HEIGHT * 1.5}px`);
 
@@ -121,7 +123,7 @@ test('applies per-track height scale from the sidebar control', () => {
 
   expect(useDAWStore.getState().tracks[0]?.trackHeightScale).toBe(1.25);
   expect(surface.style.height).toBe(
-    `${RULER_HEIGHT + ROW_HEIGHT * 1.25 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
+    `${RULER_BASE_HEIGHT + ROW_HEIGHT * 1.25 + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
   );
   expect(sidebarRow.style.height).toBe(`${ROW_HEIGHT * 1.25}px`);
 });

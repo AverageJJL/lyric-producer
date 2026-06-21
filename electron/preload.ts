@@ -160,7 +160,6 @@ contextBridge.exposeInMainWorld('songSeed', {
     trackIsrc?: string;
     commontrackId?: string;
     hasTrackStructure?: boolean;
-    debugLog?: boolean;
   }) {
     return ipcRenderer.invoke('song-seed:get-lyrics', request);
   },

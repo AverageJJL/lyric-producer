@@ -7,19 +7,11 @@ import {
 } from '../electron/songSeedProviders';
 
 function okJson(payload: unknown) {
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve(payload),
-  } as Response);
+  return Promise.resolve({ok: true, json: () => Promise.resolve(payload)} as Response);
 }
 
 function failed(status: number) {
-  return Promise.resolve({
-    ok: false,
-    status,
-    statusText: 'Unauthorized',
-    json: () => Promise.resolve({}),
-  } as Response);
+  return Promise.resolve({ok: false, status, statusText: 'Unauthorized', json: () => Promise.resolve({})} as Response);
 }
 
 describe('song seed providers', () => {
@@ -32,7 +24,9 @@ describe('song seed providers', () => {
               track_id: 42,
               track_name: 'Dreams',
               artist_name: 'Fleetwood Mac',
+              album_id: 77,
               album_name: 'Rumours',
+              album_coverart_350x350: 'http://s.mxmcdn.net/images-storage/rumours-350.jpg',
               first_release_date: '1977-02-04',
               has_lyrics: 1,
             },
@@ -46,10 +40,53 @@ describe('song seed providers', () => {
       title: 'Dreams',
       artist: 'Fleetwood Mac',
       album: 'Rumours',
+      albumId: '77',
+      albumCoverUrl: 'https://s.mxmcdn.net/images-storage/rumours-350.jpg',
+      artworkSource: 'musixmatch',
       releaseYear: '1977',
       hasLyrics: true,
       source: 'musixmatch',
     }]);
+  });
+
+  it('adds iTunes album art to search results with one fallback lookup', async () => {
+    const fetchMock = jest.fn((url: URL) => {
+      const href = String(url);
+      if (href.includes('itunes.apple.com/search')) {
+        expect(href).toContain('term=dreams');
+        expect(href).toContain('limit=25');
+        return okJson({results: [{
+          trackName: 'Dreams',
+          artistName: 'Fleetwood Mac',
+          collectionName: 'Rumours',
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/rumours/100x100bb.jpg',
+        }]});
+      }
+      return okJson({message: {body: {track_list: [{track: {
+        track_id: 42,
+        track_name: 'Dreams',
+        artist_name: 'Fleetwood Mac',
+        album_id: 77,
+        album_name: 'Rumours',
+        first_release_date: '1977-02-04',
+        has_lyrics: 1,
+      }}]}}});
+    });
+
+    await expect(searchMusixmatchTracks(
+      {query: 'dreams'},
+      {MUSIXMATCH_API_KEY: 'mxm'},
+      fetchMock as typeof fetch,
+    )).resolves.toMatchObject({
+      ok: true,
+      tracks: [{
+        id: '42',
+        albumId: '77',
+        albumCoverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/rumours/100x100bb.jpg',
+        artworkSource: 'itunes',
+      }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('requires a Musixmatch key before searching', async () => {
@@ -145,14 +182,13 @@ describe('song seed providers', () => {
     )).resolves.toMatchObject({
       ok: false,
       code: 'network_error',
-      error: 'GetSongBPM timed out.',
+      error: 'GetSongBPM API call failed: GetSongBPM timed out.',
     });
   });
 
-  it('uses OpenRouter web metadata after a GetSongBPM authorization failure', async () => {
+  it('uses OpenRouter web metadata before GetSongBPM', async () => {
     const fetchMock = jest
       .fn()
-      .mockImplementationOnce(() => failed(401))
       .mockImplementationOnce(() => okJson({
         choices: [{
           message: {
@@ -183,24 +219,18 @@ describe('song seed providers', () => {
       })],
     });
 
-    const [, openRouterCall] = fetchMock.mock.calls;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [openRouterCall] = fetchMock.mock.calls;
     expect(openRouterCall[0]).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(JSON.parse(openRouterCall[1].body)).toMatchObject({
-      plugins: [{id: 'web', max_results: 4}],
+      model: 'openai/gpt-4o-mini-search-preview',
+      plugins: [{id: 'web', max_results: 8}],
     });
   });
 
-  it('uses OpenRouter web metadata when GetSongBPM has only weak matches', async () => {
+  it('prefers OpenRouter web metadata over GetSongBPM search', async () => {
     const fetchMock = jest
       .fn()
-      .mockImplementationOnce(() => okJson({
-        search: [{
-          title: 'Dreams Live Rehearsal',
-          artist: {name: 'Another Band'},
-          tempo: 137,
-          key_of: 'F# major',
-        }],
-      }))
       .mockImplementationOnce(() => okJson({
         choices: [{
           message: {
@@ -226,28 +256,35 @@ describe('song seed providers', () => {
       key: 'A minor',
       source: 'openrouter-web',
     });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the original metadata error when OpenRouter web validation fails', async () => {
+  it('falls back to GetSongBPM when OpenRouter web validation fails', async () => {
     const fetchMock = jest
       .fn()
-      .mockImplementationOnce(() => failed(401))
       .mockImplementationOnce(() => okJson({
         choices: [{message: {content: '{"bpm":300,"key":"H major","confidence":0.99,"sources":[]}'}}],
-      }));
+      }))
+      .mockImplementationOnce(() => failed(401));
 
-    await expect(lookupGetSongBpm(
+    const result = await lookupGetSongBpm(
       {title: 'Dreams', artist: 'Fleetwood Mac'},
       {GETSONGBPM_API_KEY: 'bad-key', OPENROUTER_API_KEY: 'openrouter'},
       fetchMock as typeof fetch,
-    )).resolves.toMatchObject({ok: false, code: 'unauthorized'});
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'unauthorized',
+      error: expect.stringContaining('OpenRouter web metadata failed validation (missing valid BPM, missing valid key, missing source URL). Raw OpenRouter output:'),
+    });
+    expect('error' in result ? result.error : '').toContain('GetSongBPM API call failed: GetSongBPM returned 401.');
   });
 
-  it('keeps the original metadata error when OpenRouter web times out', async () => {
+  it('falls back to GetSongBPM when OpenRouter web times out', async () => {
     const fetchMock = jest
       .fn()
-      .mockImplementationOnce(() => failed(401))
-      .mockImplementationOnce(() => new Promise<Response>(() => undefined));
+      .mockImplementationOnce(() => new Promise<Response>(() => undefined))
+      .mockImplementationOnce(() => failed(401));
 
     await expect(lookupGetSongBpm(
       {title: 'Dreams', artist: 'Fleetwood Mac'},

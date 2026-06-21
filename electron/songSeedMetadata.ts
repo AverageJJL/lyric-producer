@@ -154,16 +154,30 @@ function responseFromCandidate(
   };
 }
 
-async function webFallbackOrError(
+async function openRouterFirst(
   request: SongSeedBpmKeyRequest,
-  fallback: SongSeedBpmKeyResponse,
   env: NodeJS.ProcessEnv,
   fetchImpl: FetchLike,
-): Promise<SongSeedBpmKeyResponse> {
+): Promise<{response?: SongSeedBpmKeyResponse; error?: string}> {
   const web = await lookupOpenRouterWebBpmKey(request, env, fetchImpl);
-  return web.ok
-    ? responseFromCandidate(web.candidate, [web.candidate], web.candidate.matchReason)
-    : fallback;
+  if ('candidate' in web) {
+    return {response: responseFromCandidate(web.candidate, [web.candidate], web.candidate.matchReason)};
+  }
+  return {error: web.error === 'OPENROUTER_API_KEY is not set.' ? undefined : web.error};
+}
+
+function metadataError(
+  fallback: SongSeedBpmKeyResponse,
+  openRouterError?: string,
+): SongSeedBpmKeyResponse {
+  if (!('error' in fallback)) return fallback;
+  const getSongBpmError = fallback.error.startsWith('GetSongBPM')
+    ? `GetSongBPM API call failed: ${fallback.error}`
+    : fallback.error;
+  return {
+    ...fallback,
+    error: [openRouterError, getSongBpmError].filter(Boolean).join('; '),
+  };
 }
 
 function getSongBpmLookup(title: string, artist?: string): string {
@@ -204,16 +218,14 @@ export async function lookupGetSongBpm(
     return {ok: false, code: 'empty_query', error: 'Select a song first.'};
   }
   const publicContext = knownPublicSongContext(request);
+  if (publicContext) {
+    return responseFromCandidate(publicCandidate(publicContext), [publicCandidate(publicContext)], publicContext.note);
+  }
+  const web = await openRouterFirst(request, env, fetchImpl);
+  if (web.response) return web.response;
   const apiKey = getSongBpmKey(env);
   if (!apiKey) {
-    return publicContext
-      ? responseFromCandidate(publicCandidate(publicContext), [publicCandidate(publicContext)], publicContext.note)
-      : webFallbackOrError(
-          request,
-          {ok: false, code: 'missing_key', error: 'GETSONGBPM_API_KEY is not set.'},
-          env,
-          fetchImpl,
-        );
+    return metadataError({ok: false, code: 'missing_key', error: 'GETSONGBPM_API_KEY is not set.'}, web.error);
   }
   const url = new URL('https://api.getsong.co/search/');
   url.searchParams.set('api_key', apiKey);
@@ -227,21 +239,16 @@ export async function lookupGetSongBpm(
       'GetSongBPM timed out.',
     );
     if (!response.ok) {
-      return publicContext
-        ? responseFromCandidate(publicCandidate(publicContext), [publicCandidate(publicContext)], publicContext.note)
-        : webFallbackOrError(request, {
-          ok: false,
-          code: response.status === 401 ? 'unauthorized' : 'network_error',
-          error: `GetSongBPM returned ${response.status}.`,
-        }, env, fetchImpl);
+      return metadataError({
+        ok: false,
+        code: response.status === 401 ? 'unauthorized' : 'network_error',
+        error: `GetSongBPM returned ${response.status}.`,
+      }, web.error);
     }
     const parsed = parseGetSongBpmPayload(await response.json(), title, request, publicContext);
-    return parsed.ok ? parsed : webFallbackOrError(request, parsed, env, fetchImpl);
+    return parsed.ok ? parsed : metadataError(parsed, web.error);
   } catch (error) {
-    if (publicContext) {
-      return responseFromCandidate(publicCandidate(publicContext), [publicCandidate(publicContext)], publicContext.note);
-    }
     const message = error instanceof Error ? error.message : String(error);
-    return webFallbackOrError(request, {ok: false, code: 'network_error', error: message}, env, fetchImpl);
+    return metadataError({ok: false, code: 'network_error', error: message}, web.error);
   }
 }

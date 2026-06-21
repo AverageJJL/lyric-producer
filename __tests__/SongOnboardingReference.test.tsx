@@ -125,7 +125,8 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     expect(screen.getAllByText(/driving/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Cyanite section reference')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', {name: /Open DAW with this structure/i}));
+    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /Fast Forward/i}));
     expect(openSongIdeaProject).toHaveBeenCalledWith(expect.objectContaining({
       bpm: 122,
       scale: {root: 'A', mode: 'minor'},
@@ -146,7 +147,8 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     await act(async () => { fireEvent.click(option); });
 
     expect(await screen.findByText('Spend 1 Cyanite analysis credit for Beyonce - Halo (Official Audio)?')).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: /Open DAW with this structure/i})).toBeDisabled();
+    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Fast Forward/i})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: /Skip Cyanite/i}));
     expect(await screen.findByText('Cyanite reference skipped to save credits. Continuing with existing metadata.')).toBeInTheDocument();
     for (let step = 0; step < 12; step += 1) await act(async () => { jest.advanceTimersByTime(2500); });
@@ -168,6 +170,24 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
 
     await screen.findByText('A dark energetic reference with driving synth percussion.');
     expect(referenceMock).toHaveBeenLastCalledWith({track: expect.objectContaining({title: 'Halo'}), allowCreditSpend: true});
+  });
+
+  it('shows the demo-video message when Cyanite credits are exhausted', async () => {
+    referenceMock.mockResolvedValue({
+      ok: false,
+      code: 'limit_exceeded',
+      error: 'Monthly credit limit exceeded.',
+    });
+    render(<SongOnboardingPage onOpenEmptyProject={jest.fn()} onOpenSongIdeaProject={jest.fn()} />);
+
+    fireEvent.click(screen.getByText('I have an idea already'));
+    fireEvent.change(screen.getByLabelText('Search for a song'), {target: {value: 'Halo'}});
+    await act(async () => { jest.advanceTimersByTime(320); });
+    const option = await screen.findByRole('option', {name: /Halo/i});
+    await act(async () => { fireEvent.click(option); });
+
+    expect(await screen.findByText("We ran out of Cyanite credits, oops. Please see the demo video for how it would've worked.")).toBeInTheDocument();
+    expect(screen.queryByText('Monthly credit limit exceeded.')).not.toBeInTheDocument();
   });
 
   it('still applies Cyanite Eb key after the user edits BPM', async () => {
@@ -229,7 +249,8 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     await act(async () => { jest.advanceTimersByTime(12000); });
 
     expect(openSongIdeaProject).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', {name: /Open DAW with this structure/i})).toBeDisabled();
+    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Fast Forward/i})).not.toBeInTheDocument();
 
     await act(async () => {
       resolveReference({ok: false, code: 'not_found', error: 'No reliable YouTube reference match was found.'});

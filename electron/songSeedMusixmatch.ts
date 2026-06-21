@@ -7,8 +7,11 @@ import type {
   SongSeedSearchResponse,
   SongSeedTrack,
 } from './songSeedTypes';
-import {lyricContentLines} from './songSeedLyricSections';
+import {enrichSongSeedArtwork, musixmatchAlbumCoverUrlFromRecord} from './songSeedArtwork';
+import {getMusixmatchSyncedLyrics} from './songSeedMusixmatchSubtitle';
 import {numberText, numberValue, text, type FetchLike, yearFromDate} from './songSeedUtils';
+
+export {parseMusixmatchSubtitlePayload} from './songSeedMusixmatchSubtitle';
 
 function musixmatchKey(env: NodeJS.ProcessEnv): string | undefined {
   return text(env.MUSIXMATCH_API_KEY);
@@ -38,57 +41,10 @@ const STRUCTURE_ROLES: SongSeedLyricStructureRole[] = ['intro', 'verse', 'pre-ch
 
 type StructureLookup = {structure?: SongSeedLyricStructure; reason?: string};
 
-function shouldLogMusixmatchDebug(request: SongSeedLyricsRequest, env: NodeJS.ProcessEnv): boolean {
-  return request.debugLog === true
-    && env.MUSIXMATCH_DEBUG_LOG !== '0'
-    && (env.MUSIXMATCH_DEBUG_LOG === '1' || Boolean(env.ELECTRON_RENDERER_URL));
-}
-
 function rawDumpStructure(payload: unknown): unknown {
   const body = (payload as {message?: {body?: unknown}})?.message?.body;
   const item = Array.isArray(body) ? body[0] : body;
   return (item as {structure?: unknown} | undefined)?.structure;
-}
-
-function logLyricsPayload(
-  trackId: string,
-  request: SongSeedLyricsRequest,
-  lyrics: string | undefined,
-  copyright: string | undefined,
-  debugLog: boolean,
-): void {
-  if (!debugLog) return;
-  const indexedLines = lyricContentLines(lyrics).map((line, index) => ({index, line}));
-  console.info('[musixmatch] track.lyrics.get', {
-    trackId,
-    track_isrc: request.trackIsrc,
-    commontrack_id: request.commontrackId,
-    has_track_structure: request.hasTrackStructure === true,
-    lyricsLineCount: indexedLines.length,
-    lyricsBody: lyrics,
-    indexedLines,
-    copyright,
-  });
-}
-
-function logStructurePayload(
-  label: string,
-  trackId: string,
-  rawStructure: unknown,
-  structure: SongSeedLyricStructure | undefined,
-  debugLog: boolean,
-): void {
-  if (!debugLog) return;
-  console.info(`[musixmatch] ${label}`, {
-    trackId,
-    rawStructure,
-    sanitizedStructure: structure,
-  });
-}
-
-function logStructureUnavailable(label: string, trackId: string, reason: string, debugLog: boolean): void {
-  if (!debugLog) return;
-  console.info(`[musixmatch] ${label} unavailable`, {trackId, reason});
 }
 
 export function parseMusixmatchSearchPayload(payload: unknown): SongSeedTrack[] {
@@ -106,12 +62,16 @@ export function parseMusixmatchSearchPayload(payload: unknown): SongSeedTrack[] 
       ? undefined
       : structureFlag === true || Number(structureFlag) === 1;
     const isrc = text(track.track_isrc);
+    const albumId = numberText(track.album_id);
+    const albumCoverUrl = musixmatchAlbumCoverUrlFromRecord(track);
     const commontrackId = numberText(track.commontrack_id);
     return [{
       id,
       title,
       artist: text(track.artist_name),
       album: text(track.album_name),
+      ...(albumId ? {albumId} : {}),
+      ...(albumCoverUrl ? {albumCoverUrl, artworkSource: 'musixmatch' as const} : {}),
       releaseYear: yearFromDate(track.first_release_date),
       ...(isrc ? {isrc} : {}),
       ...(commontrackId ? {commontrackId} : {}),
@@ -184,7 +144,8 @@ export async function searchMusixmatchTracks(
     if (status && status >= 400) {
       return httpError('Musixmatch', status);
     }
-    return {ok: true, tracks: parseMusixmatchSearchPayload(payload)};
+    const tracks = parseMusixmatchSearchPayload(payload);
+    return {ok: true, tracks: await enrichSongSeedArtwork(tracks, env, fetchImpl, query)};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {ok: false, code: 'network_error', error: message};
@@ -192,16 +153,12 @@ export async function searchMusixmatchTracks(
 }
 
 async function getMusixmatchDumpStructure(
-  trackId: string,
   trackIsrc: string | undefined,
   apiKey: string,
   fetchImpl: FetchLike,
-  debugLog: boolean,
 ): Promise<StructureLookup> {
   if (!trackIsrc) {
-    const reason = 'missing track_isrc from track.search';
-    logStructureUnavailable('track.dump.get', trackId, reason, debugLog);
-    return {reason};
+    return {reason: 'missing track_isrc from track.search'};
   }
   const url = new URL('https://api.musixmatch.com/ws/1.1/track.dump.get');
   url.searchParams.set('apikey', apiKey);
@@ -209,17 +166,13 @@ async function getMusixmatchDumpStructure(
   try {
     const response = await fetchImpl(url);
     if (!response.ok) {
-      const reason = `HTTP ${response.status}`;
-      logStructureUnavailable('track.dump.get', trackId, reason, debugLog);
-      return {reason};
+      return {reason: `HTTP ${response.status}`};
     }
     const payload = await response.json();
     const structure = parseMusixmatchDumpPayload(payload);
-    logStructurePayload('track.dump.get', trackId, rawDumpStructure(payload), structure, debugLog);
     return structure ? {structure} : {reason: 'track.dump.get did not include message.body[0].structure'};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logStructureUnavailable('track.dump.get', trackId, message, debugLog);
     return {reason: message};
   }
 }
@@ -240,7 +193,6 @@ export async function getMusixmatchLyrics(
   const url = new URL('https://api.musixmatch.com/ws/1.1/track.lyrics.get');
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('track_id', trackId);
-  const debugLog = shouldLogMusixmatchDebug(request, env);
   try {
     const response = await fetchImpl(url);
     if (!response.ok) {
@@ -248,19 +200,20 @@ export async function getMusixmatchLyrics(
     }
     const payload = await response.json();
     const {lyrics, copyright} = parseMusixmatchLyricsPayload(payload);
-    logLyricsPayload(trackId, request, lyrics, copyright, debugLog);
     if (!lyrics) {
       return {ok: false, code: 'no_lyrics', error: 'No lyrics were returned.'};
     }
     let lookup: StructureLookup = {reason: 'selected track was not flagged with has_track_structure'};
     if (request.hasTrackStructure) {
-      lookup = await getMusixmatchDumpStructure(trackId, text(request.trackIsrc), apiKey, fetchImpl, debugLog);
-    } else {
-      logStructureUnavailable('track.dump.get', trackId, lookup.reason ?? 'unavailable', debugLog);
+      lookup = await getMusixmatchDumpStructure(text(request.trackIsrc), apiKey, fetchImpl);
     }
+    const syncedLyrics = await getMusixmatchSyncedLyrics(trackId, apiKey, fetchImpl);
+    const syncedFields = syncedLyrics.length > 0
+      ? {syncedLyrics, syncedLyricsSource: 'musixmatch-subtitle' as const}
+      : {};
     return lookup.structure
-      ? {ok: true, trackId, lyrics, copyright, structure: lookup.structure, structureSource: 'catalog-feed'}
-      : {ok: true, trackId, lyrics, copyright, structureSource: 'unavailable', structureUnavailableReason: lookup.reason};
+      ? {ok: true, trackId, lyrics, copyright, structure: lookup.structure, structureSource: 'catalog-feed', ...syncedFields}
+      : {ok: true, trackId, lyrics, copyright, structureSource: 'unavailable', structureUnavailableReason: lookup.reason, ...syncedFields};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {ok: false, code: 'network_error', error: message};

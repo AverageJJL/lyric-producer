@@ -1,7 +1,6 @@
 import React, {useMemo} from 'react';
 
 import type {SectionMarker} from '../../store/projectMetadata';
-import {RULER_HEIGHT} from '../../ui/timelineLayout';
 import {sectionBandTone} from './timelineSectionBandColors';
 
 type TimelineSectionBandsProps = {
@@ -10,6 +9,7 @@ type TimelineSectionBandsProps = {
   strongHeight: number;
   visibleTimelineBeats: number;
   pixelsPerBeat: number;
+  rulerHeight: number;
 };
 
 type SectionBandLayout = {
@@ -66,6 +66,7 @@ export function TimelineSectionBands({
   strongHeight,
   visibleTimelineBeats,
   pixelsPerBeat,
+  rulerHeight,
 }: TimelineSectionBandsProps) {
   const bands = useMemo(
     () => sectionColumnLayouts(sections, visibleTimelineBeats, pixelsPerBeat),
@@ -82,7 +83,7 @@ export function TimelineSectionBands({
     <div
       className="timeline-section-bands"
       aria-hidden="true"
-      style={{top: RULER_HEIGHT, height: arrangementHeight}}>
+      style={{top: rulerHeight, height: arrangementHeight}}>
       {bands.map(band => (
         <span
           key={band.id}

@@ -12,9 +12,10 @@ jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus:
 
 import {emptyProjectSnapshot} from '../src/arrangement/projectSnapshot';
 import {midiBytesToBase64, midiFileBytesFromSnapshot} from '../src/music/midiFileExport';
+import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWTrack} from '../src/store/useDAWStore';
-import {PIXELS_PER_BEAT, RULER_HEIGHT, ROW_HEIGHT} from '../src/ui/timelineLayout';
+import {PIXELS_PER_BEAT, RULER_BASE_HEIGHT, ROW_HEIGHT} from '../src/ui/timelineLayout';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
@@ -120,7 +121,7 @@ async function dropTimelineMedia(
     });
     Object.defineProperty(event, 'clientY', {
       configurable: true,
-      value: 80 + RULER_HEIGHT + laneIndex * ROW_HEIGHT + 20,
+      value: 80 + RULER_BASE_HEIGHT + laneIndex * ROW_HEIGHT + 20,
     });
     fireEvent(surface, event);
     await Promise.resolve();
@@ -173,6 +174,7 @@ function resetStore(): void {
     scale: null,
     chord: null,
     sections: [],
+    lyrics: defaultLyricDocument(),
     midiAudition: null,
   });
 }

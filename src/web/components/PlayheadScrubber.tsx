@@ -5,6 +5,7 @@ import {
   type PlayheadScrubSession,
 } from '../../ui/playheadScrubPointer';
 import {useVisualPlaybackBeat} from '../../hooks/useVisualPlaybackBeat';
+import {beatsPerBarForTimeSignature} from '../../store/projectMetadata';
 import {useDAWStore} from '../../store/useDAWStore';
 
 const SCRUBBER_HIT_WIDTH = 24;
@@ -24,6 +25,7 @@ export function PlayheadScrubber({
   pixelsPerBeat,
 }: PlayheadScrubberProps) {
   const setPlayheadBeat = useDAWStore(state => state.setPlayheadBeat);
+  const beatsPerBar = useDAWStore(state => beatsPerBarForTimeSignature(state.timeSignature));
   const visualPlayheadBeat = useVisualPlaybackBeat(maxTimelineBeat);
   const visualPlayheadBeatRef = useRef(visualPlayheadBeat);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,6 +40,7 @@ export function PlayheadScrubber({
         getPlayheadBeat: () => visualPlayheadBeatRef.current,
         getMaxTimelineBeat: () => maxTimelineBeat,
         pixelsPerBeat,
+        barSnap: {beatsPerBar},
         sessionRef,
         onScrubStart: () => setIsDragging(true),
         onScrubEnd: () => setIsDragging(false),
@@ -48,7 +51,7 @@ export function PlayheadScrubber({
           });
         },
       }),
-    [getTimelineClientX, maxTimelineBeat, pixelsPerBeat, setPlayheadBeat],
+    [beatsPerBar, getTimelineClientX, maxTimelineBeat, pixelsPerBeat, setPlayheadBeat],
   );
 
   const capturePointer = (event: React.PointerEvent<HTMLDivElement>) => {

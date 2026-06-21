@@ -3,6 +3,9 @@ export type SongSeedTrack = {
   title: string;
   artist?: string;
   album?: string;
+  albumId?: string;
+  albumCoverUrl?: string;
+  artworkSource?: 'musixmatch' | 'itunes';
   releaseYear?: string;
   isrc?: string;
   commontrackId?: string;
@@ -24,6 +27,12 @@ export type SongSeedLyricStructure = Partial<Record<SongSeedLyricStructureRole, 
 
 export type SongSeedLyricStructureSource = 'catalog-feed' | 'unavailable';
 
+export type SongSeedSyncedLyricLine = {
+  text: string;
+  startSeconds: number;
+  endSeconds?: number;
+};
+
 export type SongSeedSearchRequest = {
   query?: string;
   limit?: number;
@@ -34,7 +43,6 @@ export type SongSeedLyricsRequest = {
   trackIsrc?: string;
   commontrackId?: string;
   hasTrackStructure?: boolean;
-  debugLog?: boolean;
 };
 
 export type SongSeedLyricsSimilarityRequest = {
@@ -78,6 +86,8 @@ export type SongSeedLyricsResponse =
       structure?: SongSeedLyricStructure;
       structureSource?: SongSeedLyricStructureSource;
       structureUnavailableReason?: string;
+      syncedLyrics?: SongSeedSyncedLyricLine[];
+      syncedLyricsSource?: 'musixmatch-subtitle';
     }
   | {ok: false; code: ProviderErrorCode | 'no_lyrics'; error: string};
 

@@ -2,6 +2,7 @@ import {
   getMusixmatchLyrics,
   parseMusixmatchDumpPayload,
   parseMusixmatchSearchPayload,
+  parseMusixmatchSubtitlePayload,
 } from '../electron/songSeedProviders';
 
 function okJson(payload: unknown) {
@@ -79,6 +80,18 @@ describe('Musixmatch structural lyrics', () => {
     });
   });
 
+  it('parses line-timed Musixmatch LRC subtitle payloads', () => {
+    expect(parseMusixmatchSubtitlePayload({
+      message: {body: {subtitle: {
+        subtitle_body: '[00:01.500]Oh, woah\n[00:03.000]You know you love me\n[00:05.25]Baby, baby, baby, oh',
+      }}},
+    })).toEqual([
+      {text: 'Oh, woah', startSeconds: 1.5, endSeconds: 3},
+      {text: 'You know you love me', startSeconds: 3, endSeconds: 5.25},
+      {text: 'Baby, baby, baby, oh', startSeconds: 5.25},
+    ]);
+  });
+
   it('prefers catalog-feed track.dump.get when structure is flagged and ISRC is known', async () => {
     const fetchMock = jest.fn((url: URL) => {
       const href = String(url);
@@ -104,6 +117,7 @@ describe('Musixmatch structural lyrics', () => {
     expect(fetchMock.mock.calls.map(call => String(call[0]))).toEqual([
       expect.stringContaining('track.lyrics.get'),
       expect.stringContaining('track.dump.get'),
+      expect.stringContaining('track.subtitle.get'),
     ]);
   });
 
@@ -125,56 +139,49 @@ describe('Musixmatch structural lyrics', () => {
       structureSource: 'unavailable',
       structureUnavailableReason: expect.any(String),
     });
-    expect(fetchMock.mock.calls.map(call => String(call[0]).includes('track.lyrics.analysis.get'))).toEqual([false, false]);
+    expect(fetchMock.mock.calls.map(call => String(call[0]).includes('track.lyrics.analysis.get'))).toEqual([false, false, false]);
   });
 
-  it('logs selected-track lyrics and structure output when debug logging is enabled', async () => {
+  it('returns synced subtitle timings when Musixmatch provides them', async () => {
+    const fetchMock = jest.fn((url: URL) => {
+      const href = String(url);
+      if (href.includes('track.subtitle.get')) {
+        return okJson({message: {body: {subtitle: {
+          subtitle_body: '[00:01.000]Oh, woah\n[00:02.500]You know you love me',
+        }}}});
+      }
+      return okJson(lyricsPayload);
+    });
+
+    await expect(getMusixmatchLyrics(
+      {trackId: '42'},
+      {MUSIXMATCH_API_KEY: 'mxm'},
+      fetchMock as typeof fetch,
+    )).resolves.toMatchObject({
+      ok: true,
+      syncedLyricsSource: 'musixmatch-subtitle',
+      syncedLyrics: [
+        {text: 'Oh, woah', startSeconds: 1, endSeconds: 2.5},
+        {text: 'You know you love me', startSeconds: 2.5},
+      ],
+    });
+  });
+
+  it('does not log lyric or structure payloads during lyric fetch', async () => {
     const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    const structurePayload = {message: {body: [{structure: {
-      intro: {lines: [0]},
-      verse: {lines: [1]},
-      chorus: {lines: [2]},
-    }}]}};
     const fetchMock = jest
       .fn()
       .mockImplementationOnce(() => okJson(lyricsPayload))
-      .mockImplementationOnce(() => okJson(structurePayload));
+      .mockImplementationOnce(() => okJson({message: {body: [{structure: {
+        intro: {lines: [0]},
+        verse: {lines: [1]},
+        chorus: {lines: [2]},
+      }}]}}));
 
     try {
       await getMusixmatchLyrics(
-        {trackId: '42', trackIsrc: 'USUM71012345', hasTrackStructure: true, debugLog: true},
-        {MUSIXMATCH_API_KEY: 'mxm', MUSIXMATCH_DEBUG_LOG: '1'},
-        fetchMock as typeof fetch,
-      );
-
-      expect(infoSpy).toHaveBeenCalledWith('[musixmatch] track.lyrics.get', expect.objectContaining({
-        trackId: '42',
-        track_isrc: 'USUM71012345',
-        has_track_structure: true,
-        lyricsBody: 'Oh, woah\nYou know you love me\nBaby, baby, baby, oh',
-        indexedLines: [
-          {index: 0, line: 'Oh, woah'},
-          {index: 1, line: 'You know you love me'},
-          {index: 2, line: 'Baby, baby, baby, oh'},
-        ],
-      }));
-      expect(infoSpy).toHaveBeenCalledWith('[musixmatch] track.dump.get', expect.objectContaining({
-        rawStructure: structurePayload.message.body[0].structure,
-        sanitizedStructure: {intro: [0], verse: [1], chorus: [2]},
-      }));
-    } finally {
-      infoSpy.mockRestore();
-    }
-  });
-
-  it('does not log lyrics for background calls without the selected-track debug flag', async () => {
-    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    const fetchMock = jest.fn(() => okJson(lyricsPayload));
-
-    try {
-      await getMusixmatchLyrics(
-        {trackId: '42'},
-        {MUSIXMATCH_API_KEY: 'mxm', MUSIXMATCH_DEBUG_LOG: '1'},
+        {trackId: '42', trackIsrc: 'USUM71012345', hasTrackStructure: true},
+        {MUSIXMATCH_API_KEY: 'mxm'},
         fetchMock as typeof fetch,
       );
 
@@ -199,7 +206,7 @@ describe('Musixmatch structural lyrics', () => {
       structureSource: 'unavailable',
       structureUnavailableReason: 'selected track was not flagged with has_track_structure',
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it.each([

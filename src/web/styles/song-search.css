@@ -28,6 +28,54 @@
   left: 28px;
 }
 
+.song-discard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 14, 0.62);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.song-discard-dialog {
+  display: grid;
+  width: min(390px, 100%);
+  gap: 14px;
+  padding: 20px;
+  background: rgba(20, 24, 32, 0.96);
+  border: 1px solid rgba(238, 240, 244, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+.song-discard-dialog h2,
+.song-discard-dialog p {
+  margin: 0;
+}
+
+.song-discard-dialog h2 {
+  color: var(--text-main);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.song-discard-dialog p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.song-discard-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+.song-discard-button { min-height: 38px; padding: 0 14px; color: var(--text-main); font-size: 13px; font-weight: 800; border: 0; border-radius: 6px; }
+
+.song-discard-button.secondary { background: rgba(255, 255, 255, 0.09); }
+
+.song-discard-button.primary { color: var(--accent-primary-contrast); background: var(--accent-primary); }
+
 .song-idea-workbench.search-only {
   grid-template-columns: 1fr;
   min-height: auto;
@@ -118,10 +166,12 @@
 
 .song-search-dropdown button {
   display: grid;
-  gap: 5px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
   width: 100%;
-  min-height: 54px;
-  padding: 10px;
+  min-height: 62px;
+  padding: 8px 10px;
   text-align: left;
   background: transparent;
   border-radius: 6px;
@@ -132,7 +182,33 @@
   background: rgba(126, 174, 255, 0.14);
 }
 
-.song-search-dropdown span {
+.song-search-cover {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  overflow: hidden;
+  color: rgba(238, 240, 244, 0.82);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  background: rgba(55, 64, 78, 0.76);
+  border: 1px solid rgba(238, 240, 244, 0.08);
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.song-search-cover.fallback {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.song-search-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.song-search-copy span {
   min-width: 0;
   overflow: hidden;
   color: var(--text-main);

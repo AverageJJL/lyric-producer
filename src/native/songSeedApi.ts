@@ -5,6 +5,9 @@ export type SongSeedTrack = {
   title: string;
   artist?: string;
   album?: string;
+  albumId?: string;
+  albumCoverUrl?: string;
+  artworkSource?: 'musixmatch' | 'itunes';
   releaseYear?: string;
   isrc?: string;
   commontrackId?: string;
@@ -44,6 +47,8 @@ export type SongSeedLyricsResponse =
       structure?: SongSeedLyricStructure;
       structureSource?: 'catalog-feed' | 'unavailable';
       structureUnavailableReason?: string;
+      syncedLyrics?: SongSeedSyncedLyricLine[];
+      syncedLyricsSource?: 'musixmatch-subtitle';
     }
   | {ok: false; code: ProviderErrorCode | 'no_lyrics'; error: string};
 
@@ -57,6 +62,12 @@ export type SongSeedLyricStructureRole =
   | 'outro';
 
 export type SongSeedLyricStructure = Partial<Record<SongSeedLyricStructureRole, number[]>>;
+
+export type SongSeedSyncedLyricLine = {
+  text: string;
+  startSeconds: number;
+  endSeconds?: number;
+};
 
 export type SongSeedLyricsSimilarityReport = {
   checkedAt: string;
@@ -158,7 +169,6 @@ export type SongSeedBridge = {
     trackIsrc?: string;
     commontrackId?: string;
     hasTrackStructure?: boolean;
-    debugLog?: boolean;
   }) => Promise<SongSeedLyricsResponse>;
   checkLyricsSimilarity: (request: {
     lyrics?: string;
@@ -194,13 +204,12 @@ export function searchSongSeed(query: string, limit = 8): Promise<SongSeedSearch
 
 export function getSongSeedLyrics(track: SongSeedTrack | string): Promise<SongSeedLyricsResponse | null> {
   const request = typeof track === 'string'
-    ? {trackId: track, debugLog: true}
+    ? {trackId: track}
     : {
         trackId: track.id,
         trackIsrc: track.isrc,
         commontrackId: track.commontrackId,
         hasTrackStructure: track.hasTrackStructure,
-        debugLog: true,
       };
   return globalThis.window?.songSeed?.getLyrics(request) ?? Promise.resolve(null);
 }

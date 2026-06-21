@@ -33,6 +33,7 @@ export function timelineTrackHeight(
 export function buildTimelineTrackLaneLayout(
   tracks: Array<Pick<DAWTrack, 'id' | 'trackHeightScale'>>,
   baseRowHeight = ROW_HEIGHT,
+  rulerHeight = RULER_HEIGHT,
 ): TimelineTrackLaneLayout {
   let offsetTop = 0;
   const lanes = tracks.map((track, index) => {
@@ -45,7 +46,7 @@ export function buildTimelineTrackLaneLayout(
   return {
     lanes,
     rowAreaHeight,
-    contentHeight: RULER_HEIGHT + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
+    contentHeight: rulerHeight + rowAreaHeight + TRACK_SIDEBAR_FOOTER_HEIGHT,
     maxTrackRows: Math.max(tracks.length, 1),
   };
 }

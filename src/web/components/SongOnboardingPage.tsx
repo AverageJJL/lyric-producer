@@ -1,7 +1,7 @@
 import React from 'react';
 
 import type {ProjectFileLifecycle} from '../../hooks/useProjectFileLifecycle';
-import {analyzeSongSeedReference, type SongSeedReferenceCacheStatus} from '../../native/songSeedApi';
+import {analyzeSongSeedReference, type SongSeedReferenceAnalyzeResponse, type SongSeedReferenceCacheStatus} from '../../native/songSeedApi';
 import type {SongIdeaAnalysis} from '../../onboarding/songIdeaAnalysis';
 import type {ReferenceMoodAnalysis, ReferenceMoodSource} from '../../store/referenceMoodAnalysis';
 import {SongAnalysisPanel} from './SongAnalysisPanel';
@@ -24,12 +24,21 @@ function apcProjects(paths: string[]): string[] {
   return paths.filter(path => /\.apc$/i.test(path.trim())).slice(0, 5);
 }
 
+const CYANITE_CREDITS_DEMO_MESSAGE = "We ran out of Cyanite credits, oops. Please see the demo video for how it would've worked.";
+
+function cyaniteStatus(response: SongSeedReferenceAnalyzeResponse | null | undefined): string {
+  return response && !response.ok && response.code === 'limit_exceeded'
+    ? CYANITE_CREDITS_DEMO_MESSAGE
+    : response?.ok ? 'Cyanite reference ready' : response?.error ?? 'Cyanite reference analysis is unavailable. Continuing without it.';
+}
+
 export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSongIdeaProject}: SongOnboardingPageProps) {
   const [referenceAnalysis, setReferenceAnalysis] = React.useState<ReferenceMoodAnalysis | null>(null);
   const [referenceState, setReferenceState] = React.useState<'idle' | 'loading' | 'confirming' | 'ready' | 'error'>('idle');
   const [referenceStatus, setReferenceStatus] = React.useState<string | null>(null);
   const [referenceSource, setReferenceSource] = React.useState<ReferenceMoodSource | null>(null);
   const [referenceCacheStatus, setReferenceCacheStatus] = React.useState<SongSeedReferenceCacheStatus | null>(null);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = React.useState(false);
   const referenceRunRef = React.useRef(0);
   const referenceRef = React.useRef<ReferenceMoodAnalysis | null>(null);
   React.useEffect(() => { referenceRef.current = referenceAnalysis; }, [referenceAnalysis]);
@@ -75,7 +84,7 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
         setReferenceStatus(`Spend 1 Cyanite analysis credit for ${response.source.title}?`);
       } else {
         setReferenceState('error');
-        setReferenceStatus(response?.error ?? 'Cyanite reference analysis is unavailable. Continuing without it.');
+        setReferenceStatus(cyaniteStatus(response));
       }
     });
   }, [flow.selectedTrack]);
@@ -101,17 +110,46 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
     setReferenceState('error');
     setReferenceStatus('Cyanite reference skipped to save credits. Continuing with existing metadata.');
   }, []);
+  const resetReference = React.useCallback(() => {
+    referenceRunRef.current += 1;
+    setReferenceAnalysis(null); setReferenceSource(null); setReferenceCacheStatus(null);
+    setReferenceState('idle'); setReferenceStatus(null);
+  }, []);
+  const leaveIdeaMode = React.useCallback(() => {
+    resetReference();
+    setIsDiscardConfirmOpen(false);
+    flow.returnToChoice();
+  }, [flow.returnToChoice, resetReference]);
+  const handleBack = React.useCallback(() => {
+    if (hasStartedAnalysis) {
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    leaveIdeaMode();
+  }, [hasStartedAnalysis, leaveIdeaMode]);
 
   return (
     <section className={pageClassName} aria-label="Project onboarding">
       <div className={`onboarding-frame ${isIdeaMode ? 'idea-mode' : ''} ${isSearchOnly ? 'search-only' : ''} ${hasStartedAnalysis ? 'analysis-mode' : ''}`}>
         {flow.mode === 'choice' ? null : (
           <div className="song-idea-topbar">
-            <button type="button" className="onboarding-link" aria-label="Back" onClick={() => flow.setMode('choice')}>
+            <button type="button" className="onboarding-link" aria-label="Back" onClick={handleBack}>
               <span aria-hidden="true">&larr;</span>
             </button>
           </div>
         )}
+        {isDiscardConfirmOpen ? (
+          <div className="song-discard-overlay" role="dialog" aria-modal="true" aria-labelledby="song-discard-title">
+            <div className="song-discard-dialog">
+              <h2 id="song-discard-title">Discard analysis?</h2>
+              <p>This will stop the current song analysis and return to the home page.</p>
+              <div className="song-discard-actions">
+                <button type="button" className="song-discard-button secondary" onClick={leaveIdeaMode}>Discard analysis</button>
+                <button type="button" className="song-discard-button primary" onClick={() => setIsDiscardConfirmOpen(false)}>Keep analysing</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {flow.mode === 'choice' ? (
           <div className="onboarding-home">
@@ -184,6 +222,7 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
                   referenceStatus={referenceStatus}
                   referenceSource={referenceSource}
                   referenceCacheStatus={referenceCacheStatus}
+                  canFastForward={flow.canFastForward}
                   onDraftChange={flow.handleDraftChange}
                   onOpenProject={flow.handleOpenProject}
                   onConfirmReferenceSpend={handleConfirmReferenceSpend}

@@ -1,9 +1,13 @@
 import {analyzeSongSeed} from '../electron/songSeedAnalysis';
 import {
+  applySongIdeaAnalysis,
   createSongIdeaAnalysis,
+  lyricDocumentFromSongIdea,
   sectionsFromSongIdea,
 } from '../src/onboarding/songIdeaAnalysis';
 import {normalizeSectionMarker} from '../src/store/projectMetadata';
+import {defaultLyricDocument} from '../src/store/lyrics';
+import {useDAWStore} from '../src/store/useDAWStore';
 
 function okJson(payload: unknown) {
   return Promise.resolve({
@@ -155,5 +159,84 @@ describe('full song fallback structure', () => {
       sectionSource: 'repetition',
       sectionConfidence: 0.9,
     });
+  });
+
+  it('converts imported song idea lyrics into named authored lyric sections', () => {
+    const analysis = createSongIdeaAnalysis({
+      track: babyTrack,
+      lyrics: '[Verse 1]\nQuiet setup line\nSecond setup line\n[Chorus]\nBaby, baby, baby, oh',
+    });
+    const document = lyricDocumentFromSongIdea(analysis);
+
+    expect(document.similarityReport).toBeNull();
+    expect(document.sections.map(section => section.name)).toEqual(['Verse 1', 'Chorus 1']);
+    expect(document.sections.map(section => section.id)).toEqual(analysis.sections.map(section => section.id));
+    expect(document.sections[0]).toMatchObject({
+      startBeat: 0,
+      endBeat: analysis.sections[0]!.bars * 4,
+    });
+    expect(document.sections[0]?.lines.map(line => line.text)).toEqual(['Quiet setup line', 'Second setup line']);
+    expect(document.sections[0]?.lines.map(line => line.timingSource)).toEqual(['estimated', 'estimated']);
+    expect(document.sections[0]?.lines.map(line => line.startBeat)).toEqual([0, 8]);
+    expect(document.sections[1]?.startBeat).toBe(document.sections[0]?.endBeat);
+  });
+
+  it('uses synced Musixmatch lyric timestamps when creating authored lyric sections', () => {
+    const analysis = createSongIdeaAnalysis({
+      track: babyTrack,
+      lyrics: '[Verse 1]\nQuiet setup line\nSecond setup line\n[Chorus]\nBaby, baby, baby, oh',
+      syncedLyrics: [
+        {text: 'Quiet setup line', startSeconds: 4},
+        {text: 'Second setup line', startSeconds: 6.5},
+        {text: 'Baby, baby, baby, oh', startSeconds: 14},
+      ],
+      bpmKey: {
+        ok: true,
+        title: 'Baby',
+        artist: 'Justin Bieber',
+        bpm: 120,
+        key: 'C major',
+        source: 'getsongbpm',
+        confidence: 0.7,
+        candidates: [],
+      },
+    });
+    const document = lyricDocumentFromSongIdea(analysis);
+    const markers = sectionsFromSongIdea(analysis);
+
+    expect(document.sections[0]).toMatchObject({startBeat: 8, endBeat: 28});
+    expect(document.sections[1]).toMatchObject({startBeat: 28, endBeat: 32});
+    expect(document.sections[0]?.lines.map(line => line.timingSource)).toEqual(['manual', 'manual']);
+    expect(document.sections[0]?.lines.map(line => line.startBeat)).toEqual([8, 13]);
+    expect(document.sections[1]?.lines[0]).toMatchObject({
+      text: 'Baby, baby, baby, oh',
+      startBeat: 28,
+      timingSource: 'manual',
+    });
+    expect(markers[0]).toMatchObject({startBeat: 8, lengthBeats: 20});
+    expect(markers[1]).toMatchObject({startBeat: 28, lengthBeats: 4});
+  });
+
+  it('applies imported song idea lyrics to the DAW store', () => {
+    const analysis = createSongIdeaAnalysis({
+      track: babyTrack,
+      lyrics: '[Verse 1]\nQuiet setup line\n[Chorus]\nBaby, baby, baby, oh',
+    });
+    useDAWStore.setState({
+      bpm: 120,
+      scale: null,
+      sections: [],
+      lyrics: defaultLyricDocument(),
+      playheadBeat: 32,
+      isPlaying: false,
+    });
+
+    applySongIdeaAnalysis(analysis);
+
+    const state = useDAWStore.getState();
+    expect(state.lyrics.sections.map(section => section.name)).toEqual(['Verse 1', 'Chorus 1']);
+    expect(state.lyrics.sections[1]?.lines[0]?.text).toBe('Baby, baby, baby, oh');
+    expect(state.sections.map(section => section.id)).toEqual(analysis.sections.map(section => section.id));
+    expect(state.playheadBeat).toBe(0);
   });
 });

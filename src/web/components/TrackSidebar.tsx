@@ -20,6 +20,7 @@ type TrackSidebarProps = {
   verticalScrollRef: React.RefObject<HTMLDivElement | null>;
   onSidebarWheel: (event: React.WheelEvent<HTMLDivElement>) => void;
   rowHeight: number;
+  rulerHeight?: number;
   blocks?: DAWBlock[];
   expandedTakeGroups?: string[];
   isPlaying?: boolean;
@@ -69,6 +70,7 @@ export function TrackSidebar({
   verticalScrollRef,
   onSidebarWheel,
   rowHeight,
+  rulerHeight = RULER_HEIGHT,
   blocks = [],
   expandedTakeGroups = [],
   isPlaying = false,
@@ -128,11 +130,11 @@ export function TrackSidebar({
     }
     const button = document.querySelector(`[data-copilot-id="track:${trackId}:details"]`) as HTMLElement | null;
     const rect = button?.getBoundingClientRect();
-    setDetailAnchor({x: rect ? rect.left + rect.width / 2 : width, y: rect ? rect.bottom : RULER_HEIGHT});
+    setDetailAnchor({x: rect ? rect.left + rect.width / 2 : width, y: rect ? rect.bottom : rulerHeight});
     onSelectTrack(trackId);
     setDetailTrackId(trackId);
     return true;
-  }), [activeTrackId, onSelectTrack, tracks, width]);
+  }), [activeTrackId, onSelectTrack, rulerHeight, tracks, width]);
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -162,7 +164,7 @@ export function TrackSidebar({
         </strong>
       </div>
       <div className="track-scroll" ref={verticalScrollRef} onWheel={onSidebarWheel}>
-        <div className="ruler-spacer" style={{height: RULER_HEIGHT}} />
+        <div className="ruler-spacer" style={{height: rulerHeight}} />
         {tracks.map(track => (
           <React.Fragment key={track.id}>
             <TrackSidebarRow

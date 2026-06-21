@@ -201,7 +201,7 @@ export const TimelineLyricEvidencePopup = React.forwardRef<HTMLSpanElement, Time
         <span className="lyrics-evidence-head">
           <span>
             <strong>{model.sectionName}</strong>
-            <small>{model.sourceLabel} - {model.barLabel} - {model.timeLabel}</small>
+            <small>{model.barLabel} - {model.timeLabel}</small>
           </span>
           <span className="lyrics-popup-actions">
             <button type="button" aria-label={isPinned ? 'Unpin lyric popup' : 'Pin lyric popup'} onClick={onPin}>

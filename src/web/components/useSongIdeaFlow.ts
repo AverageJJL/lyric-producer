@@ -1,17 +1,16 @@
 import {useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent} from 'react';
 import {applyReferenceAnalysis, createSongIdeaAnalysis, normalizeSongIdeaAnalysis, type SongIdeaAnalysis} from '../../onboarding/songIdeaAnalysis';
-import {analyzeSongSeed, getSongSeedLyrics, lookupSongSeedBpmKey, searchSongSeed, type SongSeedBpmKeyResponse, type SongSeedLyricStructure, type SongSeedTrack} from '../../native/songSeedApi';
+import {analyzeSongSeed, getSongSeedLyrics, lookupSongSeedBpmKey, searchSongSeed, type SongSeedBpmKeyResponse, type SongSeedLyricStructure, type SongSeedSyncedLyricLine, type SongSeedTrack} from '../../native/songSeedApi';
 import type {ReferenceMoodAnalysis} from '../../store/referenceMoodAnalysis';
 import type {SongAnalysisPhase} from './SongAnalysisPanel';
 import {waitForSongMetadata} from './songIdeaMetadataWait';
-import {analysisKey, applyDraft, draftFromAnalysis, hasReferenceMetadata, mergeMetadata, mergeReferenceMetadata, mergeSectionEnrichment, trackKey, trackLabel, type LyricsState, type MetadataDraft, type MetadataFieldState, type SearchState} from './songIdeaFlowHelpers';
+import {analysisKey, applyDraft, canContinueSongIdea, draftFromAnalysis, hasReferenceMetadata, mergeMetadata, mergeReferenceMetadata, mergeSectionEnrichment, metadataFailureStatus, trackKey, trackLabel, type LyricsState, type MetadataDraft, type MetadataFieldState, type SearchState} from './songIdeaFlowHelpers';
 import {lyricHighlightTiming, nextLyricSectionIndex} from './songLyricHighlightTiming';
 export function useSongIdeaFlow(
   onOpenSongIdeaProject: (analysis: SongIdeaAnalysis) => void,
   getReferenceAnalysis: () => ReferenceMoodAnalysis | null = () => null,
   isReferenceSettled = true,
-  referenceAnalysis: ReferenceMoodAnalysis | null = null,
-) {
+  referenceAnalysis: ReferenceMoodAnalysis | null = null) {
   const [mode, setMode] = useState<'choice' | 'idea'>('choice');
   const [songInput, setSongInput] = useState('');
   const [results, setResults] = useState<SongSeedTrack[]>([]);
@@ -39,8 +38,10 @@ export function useSongIdeaFlow(
   const metadataCacheRef = useRef(new Map<string, SongSeedBpmKeyResponse | null>());
   const metadataPromiseRef = useRef(new Map<string, Promise<SongSeedBpmKeyResponse | null>>());
   const analysisCacheRef = useRef(new Map<string, SongIdeaAnalysis>());
+  const metadataStatusRef = useRef<string | null>(null);
   const autoOpenedRef = useRef(false);
   const referenceMetadataAppliedRef = useRef<(MetadataFieldState & {id: string}) | null>(null);
+  const withMetadataStatus = (status: string) => metadataStatusRef.current ? `${metadataStatusRef.current}; ${status}` : status;
   useEffect(() => {
     if (mode !== 'idea') return undefined;
     const query = songInput.trim();
@@ -69,7 +70,7 @@ export function useSongIdeaFlow(
       setResults(response.tracks);
       setHighlightedIndex(0);
       setSearchState(response.tracks.length > 0 ? 'ready' : 'empty');
-    }, 300);
+    }, 180);
     return () => window.clearTimeout(timer);
   }, [mode, selectedTrack, songInput]);
   useEffect(() => {
@@ -80,9 +81,9 @@ export function useSongIdeaFlow(
         const next = nextLyricSectionIndex(analysis.sections, current);
         if (next >= analysis.sections.length) {
           if (!isReferenceSettled) return current;
-          if (!autoOpenedRef.current && metadataDraft) {
+          if (!autoOpenedRef.current && canContinueSongIdea(analysis, metadataDraft, isReferenceSettled, referenceAnalysis, metadataStatusRef.current)) {
             autoOpenedRef.current = true;
-            onOpenSongIdeaProject(applyReferenceAnalysis(applyDraft(analysis, metadataDraft), getReferenceAnalysis()));
+            onOpenSongIdeaProject(applyReferenceAnalysis(applyDraft(analysis, metadataDraft!), getReferenceAnalysis()));
           }
           setAnalysisPhase('complete');
           return current;
@@ -91,7 +92,7 @@ export function useSongIdeaFlow(
       });
     }, lyricHighlightTiming(section?.lyrics ?? []).totalMs);
     return () => window.clearTimeout(timer);
-  }, [activeSection, analysis, analysisPhase, getReferenceAnalysis, isReferenceSettled, metadataDraft, onOpenSongIdeaProject]);
+  }, [activeSection, analysis, analysisPhase, getReferenceAnalysis, isReferenceSettled, metadataDraft, onOpenSongIdeaProject, referenceAnalysis]);
   useEffect(() => {
     const dirty = draftDirtyRef.current;
     if (!analysis || !referenceAnalysis || !hasReferenceMetadata(referenceAnalysis, dirty)) return;
@@ -114,7 +115,7 @@ export function useSongIdeaFlow(
     const existing = metadataPromiseRef.current.get(key);
     if (existing) return existing;
     const promise = lookupSongSeedBpmKey({title: track.title, artist: track.artist, album: track.album, releaseYear: track.releaseYear})
-      .catch(() => null)
+      .catch(error => ({ok: false as const, code: 'network_error' as const, error: error instanceof Error ? error.message : 'GetSongBPM lookup failed.'}))
       .then(response => {
         metadataCacheRef.current.set(key, response);
         return response;
@@ -126,12 +127,16 @@ export function useSongIdeaFlow(
   const applyMetadataResult = (
     track: SongSeedTrack, key: string, sessionId: number, response: SongSeedBpmKeyResponse | null,
   ) => {
-    if (selectionSessionRef.current !== sessionId || currentTrackKeyRef.current !== key || !response?.ok) {
+    if (selectionSessionRef.current !== sessionId || currentTrackKeyRef.current !== key) return;
+    const metadataStatus = metadataFailureStatus(response);
+    metadataStatusRef.current = metadataStatus;
+    if (!response?.ok) {
+      if (metadataStatus) setLookupStatus(current => current?.includes('OpenRouter') ? `${metadataStatus}; ${current}` : metadataStatus);
       return;
     }
     const metadataAnalysis = createSongIdeaAnalysis({track, lyrics: lyricsTextRef.current, lyricStructure: lyricStructureRef.current, bpmKey: response});
-    const locks = referenceMetadataAppliedRef.current ?? {};
-    setLookupStatus(`${response.source} metadata ready`);
+    const locks: MetadataFieldState = referenceMetadataAppliedRef.current ?? {};
+    setLookupStatus(metadataStatus ? `${metadataStatus}; ${response.source} metadata ready` : `${response.source} metadata ready`);
     setAnalysis(current => current ? mergeMetadata(current, metadataAnalysis, locks) : current);
     setMetadataDraft(current => current ? {
       bpm: draftDirtyRef.current.bpm || locks.bpm ? current.bpm : metadataAnalysis.bpm,
@@ -145,12 +150,14 @@ export function useSongIdeaFlow(
     setLookupStatus(null); setActiveSection(0); setAnalysisPhase('idle');
     currentTrackKeyRef.current = null; lyricsTextRef.current = ''; lyricStructureRef.current = undefined;
     draftDirtyRef.current = {bpm: false, key: false};
+    metadataStatusRef.current = null;
     referenceMetadataAppliedRef.current = null;
     autoOpenedRef.current = false;
     lyricsRequestRef.current += 1;
     analysisRequestRef.current += 1;
     selectionSessionRef.current += 1;
   };
+  const returnToChoice = () => { resetIdea(); setSongInput(''); setResults([]); setHighlightedIndex(0); setIsDropdownOpen(false); setSearchState('idle'); setSearchError(null); searchRequestRef.current += 1; setMode('choice'); };
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSongInput(event.target.value);
     resetIdea();
@@ -169,7 +176,7 @@ export function useSongIdeaFlow(
           return;
         }
         if (!response?.ok) {
-          setLookupStatus('Local structure ready; section enrichment unavailable');
+          setLookupStatus(withMetadataStatus('Local structure ready; section enrichment unavailable'));
           return;
         }
         if (response.source === 'openrouter') {
@@ -179,18 +186,18 @@ export function useSongIdeaFlow(
             analysisCacheRef.current.set(cacheKey, merged);
             return merged;
           });
-          setLookupStatus(response.warning ?? 'Enhanced section analysis ready');
-        } else if (response.warning) setLookupStatus(response.warning);
+          setLookupStatus(withMetadataStatus(response.warning ?? 'Enhanced section analysis ready'));
+        } else if (response.warning) setLookupStatus(withMetadataStatus(response.warning));
       });
   };
   const beginAnalysisForTrack = (track: SongSeedTrack, key: string, lyrics: string,
-    metadataPromise: Promise<SongSeedBpmKeyResponse | null>, initialMetadata: SongSeedBpmKeyResponse | null, lyricStructure?: SongSeedLyricStructure, structureStatus = '') => {
+    metadataPromise: Promise<SongSeedBpmKeyResponse | null>, initialMetadata: SongSeedBpmKeyResponse | null, lyricStructure?: SongSeedLyricStructure, structureStatus = '', syncedLyrics?: SongSeedSyncedLyricLine[]) => {
     const cachedMetadata = initialMetadata ?? metadataCacheRef.current.get(key) ?? null;
-    const cacheKey = analysisKey(track, lyrics, lyricStructure, structureStatus);
+    const cacheKey = analysisKey(track, lyrics, lyricStructure, structureStatus, syncedLyrics);
     const cachedAnalysis = analysisCacheRef.current.get(cacheKey);
     const structureNote = structureStatus.startsWith('unavailable') ? 'Musixmatch structure unavailable; using local lyric parser' : undefined;
     const localAnalysis = cachedAnalysis ?? createSongIdeaAnalysis({
-      track, lyrics, lyricStructure, structureNote, bpmKey: cachedMetadata?.ok ? cachedMetadata : null,
+      track, lyrics, lyricStructure, syncedLyrics, structureNote, bpmKey: cachedMetadata?.ok ? cachedMetadata : null,
     });
     draftDirtyRef.current = {bpm: false, key: false};
     autoOpenedRef.current = false;
@@ -199,11 +206,8 @@ export function useSongIdeaFlow(
     setMetadataDraft(draftFromAnalysis(localAnalysis));
     setActiveSection(0);
     setAnalysisPhase('analysing-sections');
-    setLookupStatus(cachedAnalysis
-      ? 'Enhanced analysis ready'
-      : structureNote
-        ? structureNote
-      : cachedMetadata?.ok ? 'Local structure ready; refining in background' : 'Estimating metadata; refining in background');
+    const metadataStatus = metadataStatusRef.current ?? (cachedMetadata?.ok ? 'Online BPM/key ready; refining in background' : 'Waiting for online BPM/key');
+    setLookupStatus(cachedAnalysis ? 'Enhanced analysis ready' : structureNote ? `${structureNote}. ${metadataStatus}` : metadataStatus);
     if (!cachedAnalysis) {
       runBackgroundAnalysis(track, key, lyrics, cacheKey, metadataPromise, lyricStructure);
     }
@@ -229,6 +233,7 @@ export function useSongIdeaFlow(
     setAnalysisPhase('checking-metadata');
     lyricsTextRef.current = ''; lyricStructureRef.current = undefined;
     draftDirtyRef.current = {bpm: false, key: false};
+    metadataStatusRef.current = null;
     referenceMetadataAppliedRef.current = null;
     autoOpenedRef.current = false;
     const metadataPromise = startMetadataLookup(track);
@@ -244,7 +249,7 @@ export function useSongIdeaFlow(
       setLyricsCopyright(response.copyright ?? null);
       setLyricsState('ready');
       const structureStatus = [response.structureSource, response.structureUnavailableReason].filter(Boolean).join(':');
-      beginAnalysisForTrack(track, key, response.lyrics, metadataPromise, metadataCacheRef.current.get(key) ?? null, response.structure, structureStatus);
+      beginAnalysisForTrack(track, key, response.lyrics, metadataPromise, metadataCacheRef.current.get(key) ?? null, response.structure, structureStatus, response.syncedLyrics);
       return;
     }
     lyricStructureRef.current = undefined;
@@ -282,15 +287,13 @@ export function useSongIdeaFlow(
   };
   const handleOpenProject = () => {
     autoOpenedRef.current = true;
-    return analysis && metadataDraft && isReferenceSettled
-      ? onOpenSongIdeaProject(applyReferenceAnalysis(applyDraft(analysis, metadataDraft), getReferenceAnalysis()))
-      : undefined;
+    return canContinueSongIdea(analysis, metadataDraft, isReferenceSettled, referenceAnalysis, metadataStatusRef.current) ? onOpenSongIdeaProject(applyReferenceAnalysis(applyDraft(analysis!, metadataDraft!), getReferenceAnalysis())) : undefined;
   };
+  const canFastForward = canContinueSongIdea(analysis, metadataDraft, isReferenceSettled, referenceAnalysis, metadataStatusRef.current);
   return {
     mode, setMode, songInput, results, selectedTrack, highlightedIndex, isDropdownOpen,
-    searchState, searchError, lyricsState, lyricsText, lyricsCopyright, analysis,
-    metadataDraft, activeSection, analysisPhase, lookupStatus, setActiveSection,
-    setIsDropdownOpen, handleInputChange, selectTrack, handleSearchKeyDown,
-    handleDraftChange, handleOpenProject,
+    searchState, searchError, lyricsState, lyricsText, lyricsCopyright, analysis, metadataDraft,
+    activeSection, analysisPhase, lookupStatus, setActiveSection, setIsDropdownOpen, handleInputChange,
+    selectTrack, handleSearchKeyDown, handleDraftChange, handleOpenProject, returnToChoice, canFastForward,
   };
 }

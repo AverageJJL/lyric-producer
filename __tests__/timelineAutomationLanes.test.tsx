@@ -7,6 +7,7 @@ import {
   automationValueFromLaneRatio,
   buildTimelineAutomationLanes,
 } from '../src/ui/timelineAutomationLanes';
+import {RULER_HEIGHT} from '../src/ui/timelineLayout';
 import {buildTimelineTrackLaneLayout} from '../src/ui/timelineTrackLanes';
 import {TimelineAutomationLanes} from '../src/web/components/TimelineAutomationLanes';
 
@@ -82,6 +83,7 @@ describe('timeline automation lanes', () => {
         tracks={[track]}
         visibleTimelineBeats={12}
         pixelsPerBeat={20}
+        rulerHeight={RULER_HEIGHT}
         trackLaneLayout={trackLaneLayout}
       />,
     );
@@ -103,6 +105,7 @@ describe('timeline automation lanes', () => {
         tracks={[track]}
         visibleTimelineBeats={12}
         pixelsPerBeat={20}
+        rulerHeight={RULER_HEIGHT}
         trackLaneLayout={trackLaneLayout}
         onPointSet={onPointSet}
         onPointRemove={onPointRemove}

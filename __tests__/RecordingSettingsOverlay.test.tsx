@@ -45,6 +45,7 @@ describe('RecordingSettingsOverlay', () => {
     expect(screen.getByRole('dialog', {name: 'Settings'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Recording Settings'})).toHaveClass('selected');
     expect(screen.getByRole('button', {name: 'Project Settings'})).not.toHaveClass('selected');
+    expect(screen.getByRole('button', {name: 'Lyrics'})).not.toHaveClass('selected');
   });
 
   it('updates recording preferences from the overlay controls', () => {
@@ -75,5 +76,23 @@ describe('RecordingSettingsOverlay', () => {
     expect(screen.getByRole('button', {name: 'Project Settings'})).toHaveClass('selected');
     expect(useDAWStore.getState().performanceMode).toBe('looper');
     expect(useDAWStore.getState().looperLengthBars).toBe(8);
+  });
+
+  it('updates lyrics visibility settings from the overlay', () => {
+    const onColoredSectionsHiddenChange = jest.fn();
+    render(
+      <RecordingSettingsOverlay
+        recordingLaunch={recordingLaunch()}
+        areColoredSectionsHidden={false}
+        onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
+        onClose={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: 'Lyrics'}));
+    fireEvent.click(screen.getByLabelText('Hide coloured sections'));
+
+    expect(screen.getByRole('button', {name: 'Lyrics'})).toHaveClass('selected');
+    expect(onColoredSectionsHiddenChange).toHaveBeenCalledWith(true);
   });
 });

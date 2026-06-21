@@ -32,6 +32,7 @@ describe('SongOnboardingPage', () => {
         title: 'Halo',
         artist: 'Beyonce',
         album: 'I Am Sasha Fierce',
+        albumCoverUrl: 'https://images.example.test/halo.jpg',
         releaseYear: '2008',
         hasLyrics: true,
         source: 'musixmatch',
@@ -157,6 +158,7 @@ describe('SongOnboardingPage', () => {
     });
 
     expect(await screen.findByText('Halo')).toBeInTheDocument();
+    expect(container.querySelector('img.song-search-cover')).toHaveAttribute('src', 'https://images.example.test/halo.jpg');
     await act(async () => {
       fireEvent.click(screen.getByRole('option', {name: /Halo/i}));
     });
@@ -173,7 +175,8 @@ describe('SongOnboardingPage', () => {
       releaseYear: '2008',
     })));
 
-    expect(screen.getByRole('button', {name: /Open DAW with this structure/i})).toBeEnabled();
+    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: /Fast Forward/i})).toBeEnabled();
     await waitFor(() => expect(analyzeMock).toHaveBeenCalledWith({
       track: expect.objectContaining({title: 'Halo'}),
       lyrics: 'Remember those walls\nI found a way',
@@ -243,8 +246,9 @@ describe('SongOnboardingPage', () => {
     });
 
     expect(await screen.findByText('Analysing sections')).toBeInTheDocument();
-    expect(screen.getByText('Estimating metadata; refining in background')).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: /Open DAW with this structure/i})).toBeEnabled();
+    expect(screen.getByText('Waiting for online BPM/key')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Fast Forward/i})).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Search for a song')).not.toBeInTheDocument();
   });
 
@@ -292,5 +296,4 @@ describe('SongOnboardingPage', () => {
     await waitFor(() => expect(screen.getByDisplayValue(123)).toBeInTheDocument());
     expect(screen.queryByDisplayValue(80)).not.toBeInTheDocument();
   });
-
 });

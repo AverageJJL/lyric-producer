@@ -117,6 +117,15 @@ export function DeleteLeftIcon({className}: IconProps) {
   );
 }
 
+export function TrashBinIcon({className}: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m-8 0 1 13h8l1-13" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M10 11v5m4-5v5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function SendHorizontalIcon({className}: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true">

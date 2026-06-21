@@ -27,7 +27,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  height: 28px;
+  height: var(--timeline-ruler-height, 28px);
   background: linear-gradient(#37393b, #2f3133);
   border-bottom: 1px solid #191a1b;
   cursor: default;
@@ -134,7 +134,7 @@
 
 .grid-line {
   position: absolute;
-  top: 28px;
+  top: var(--timeline-ruler-height, 28px);
   bottom: 0;
   width: 1px;
   pointer-events: none;

@@ -110,7 +110,28 @@ describe('song seed analysis validation', () => {
     }, jest.fn(() => new Promise<Response>(() => undefined)) as typeof fetch)).resolves.toMatchObject({
       ok: true,
       source: 'fallback',
-      warning: 'OpenRouter analysis failed.',
+      warning: 'OpenRouter analysis failed: OpenRouter analysis timed out.',
+    });
+  });
+
+  it('uses a dedicated structured analysis model and reports empty model content', async () => {
+    const fetchMock = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({choices: [{finish_reason: 'length', message: {content: null}}]}),
+    } as Response));
+    await expect(analyzeSongSeed({
+      track: {id: '1', title: 'Sketch', artist: 'Test Artist', hasLyrics: true, source: 'musixmatch'},
+      lyrics: lines.join('\n'),
+    }, {
+      OPENROUTER_API_KEY: 'openrouter',
+      AI_PRODUCER_MODEL: 'xiaomi/mimo-v2.5',
+    }, fetchMock as typeof fetch)).resolves.toMatchObject({
+      ok: true,
+      source: 'fallback',
+      warning: 'OpenRouter analysis returned no JSON content (length).',
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      model: 'openai/gpt-4o-mini',
     });
   });
 });

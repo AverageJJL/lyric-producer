@@ -27,7 +27,10 @@ type TimelineLyricsLaneProps = {
 type ActivePopup = {id: string; pointerX: number};
 type PopupGeometry = {left: number; width: number; arrowLeft: number; isCursor: boolean};
 
-const CURSOR_POPOVER_WIDTH = 260;
+const LYRIC_POPOVER_WIDTH = 720;
+const LYRIC_POPOVER_MIN_WIDTH = 260;
+const LYRIC_POPOVER_MARGIN = 8;
+const LYRIC_POPOVER_ARROW_MARGIN = 18;
 const HIDE_DELAY_MS = 120;
 
 function clamp(value: number, min: number, max: number): number {
@@ -41,17 +44,36 @@ function pointerXFromEvent(event: React.PointerEvent<HTMLElement>, fallback: num
   return event.clientX - left;
 }
 
-function popupGeometry(layout: TimelineLyricLayout, active: ActivePopup, timelineWidth: number): PopupGeometry {
-  const isCursor = layout.width < CURSOR_POPOVER_WIDTH;
-  const width = isCursor ? CURSOR_POPOVER_WIDTH : layout.width;
-  const desiredLeft = isCursor ? active.pointerX - 24 : layout.startPx;
-  const left = clamp(desiredLeft, 0, Math.max(0, timelineWidth - width));
-  const anchorX = isCursor ? active.pointerX : layout.startPx + 18;
+function visibleRangeInLane(lane: HTMLDivElement | null, timelineWidth: number) {
+  if (!lane) return {min: 0, max: timelineWidth};
+  const laneRect = lane.getBoundingClientRect();
+  const scrollRect = lane.closest('.timeline-horizontal-scroll')?.getBoundingClientRect();
+  const clipLeft = Math.max(0, scrollRect && scrollRect.width > 0 ? scrollRect.left : 0);
+  const viewportRight = window.innerWidth || timelineWidth;
+  const clipRight = Math.min(viewportRight, scrollRect && scrollRect.width > 0 ? scrollRect.right : viewportRight);
+  if (!Number.isFinite(laneRect.left) || clipRight <= clipLeft) return {min: 0, max: timelineWidth};
+  const rawMin = clamp(clipLeft - laneRect.left, 0, timelineWidth);
+  const rawMax = clamp(clipRight - laneRect.left, 0, timelineWidth);
+  const inset = rawMax - rawMin > LYRIC_POPOVER_MARGIN * 2 ? LYRIC_POPOVER_MARGIN : 0;
+  return {
+    min: rawMin + inset,
+    max: rawMax - inset,
+  };
+}
+
+function popupGeometry(active: ActivePopup, timelineWidth: number, lane: HTMLDivElement | null): PopupGeometry {
+  const visibleRange = visibleRangeInLane(lane, timelineWidth);
+  const visibleWidth = Math.max(0, visibleRange.max - visibleRange.min);
+  const width = visibleWidth > 0
+    ? Math.min(LYRIC_POPOVER_WIDTH, Math.max(1, visibleWidth))
+    : Math.min(LYRIC_POPOVER_WIDTH, Math.max(LYRIC_POPOVER_MIN_WIDTH, timelineWidth));
+  const desiredLeft = active.pointerX - width / 2;
+  const left = clamp(desiredLeft, visibleRange.min, Math.max(visibleRange.min, visibleRange.max - width));
   return {
     left,
     width,
-    arrowLeft: clamp(anchorX - left, 18, Math.max(18, width - 18)),
-    isCursor,
+    arrowLeft: clamp(active.pointerX - left, LYRIC_POPOVER_ARROW_MARGIN, Math.max(LYRIC_POPOVER_ARROW_MARGIN, width - LYRIC_POPOVER_ARROW_MARGIN)),
+    isCursor: width < LYRIC_POPOVER_WIDTH,
   };
 }
 
@@ -84,10 +106,11 @@ export function TimelineLyricsLane({
   scale,
   chord,
 }: TimelineLyricsLaneProps) {
+  const laneRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<number | null>(null);
   const [activeHover, setActiveHover] = useState<ActivePopup | null>(null);
   const [pinnedPopup, setPinnedPopup] = useState<ActivePopup | null>(null);
-  const timelineWidth = Math.max(CURSOR_POPOVER_WIDTH, visibleTimelineBeats * pixelsPerBeat);
+  const timelineWidth = Math.max(LYRIC_POPOVER_WIDTH, visibleTimelineBeats * pixelsPerBeat);
   const lyricLayouts = useMemo(
     (): TimelineLyricLayout[] => sections
       .filter(hasAnalysis)
@@ -167,19 +190,19 @@ export function TimelineLyricsLane({
   const activePopup = activeHover ?? pinnedPopup;
   const activeLayout = activePopup ? allLayouts.find(layout => layout.id === activePopup.id) : undefined;
   const geometry = activeLayout && activePopup
-    ? popupGeometry(activeLayout, activePopup, timelineWidth)
+    ? popupGeometry(activePopup, timelineWidth, laneRef.current)
     : null;
   const isPinned = Boolean(activeLayout && pinnedPopup?.id === activeLayout.id);
 
   return (
-    <div className="lyrics-lane" aria-label="Lyrics lane">
+    <div ref={laneRef} className="lyrics-lane" aria-label="Lyrics lane">
       {allLayouts.map(layout => {
         const {id, name, startBeat, startPx, width} = layout;
         const tooltipId = popoverIdFor(id);
         const isActive = activePopup?.id === id;
         const showAt = (pointerX: number) => {
           clearHideTimer();
-          setActiveHover({id, pointerX});
+          setActiveHover({id, pointerX: clamp(pointerX, 0, timelineWidth)});
         };
         return (
           <button
@@ -193,11 +216,7 @@ export function TimelineLyricsLane({
             onFocus={() => showAt(startPx + width / 2)}
             onBlur={scheduleHide}
             onPointerEnter={event => showAt(pointerXFromEvent(event, startPx + width / 2))}
-            onPointerMove={event => {
-              if (width < CURSOR_POPOVER_WIDTH) {
-                showAt(pointerXFromEvent(event, startPx + width / 2));
-              }
-            }}
+            onPointerMove={event => showAt(pointerXFromEvent(event, startPx + width / 2))}
             onPointerLeave={scheduleHide}
             onClick={() => onJumpToBeat(Math.max(0, startBeat))}>
             <span className="lyrics-chip-section">{name}</span>

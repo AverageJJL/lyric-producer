@@ -7,7 +7,7 @@ import type {useAudioImport} from '../../hooks/useAudioImport';
 import type {useMediaConsolidation} from '../../hooks/useMediaConsolidation';
 import type {useMediaDropImport} from '../../hooks/useMediaDropImport';
 import type {useMidiImport} from '../../hooks/useMidiImport';
-import type {useProjectFileLifecycle} from '../../hooks/useProjectFileLifecycle';
+import type {ProjectFileLifecycle} from '../../hooks/useProjectFileLifecycle';
 import type {useRecordingLaunch} from '../../hooks/useRecordingLaunch';
 import type {useSampleProviderBrowser} from '../../hooks/useSampleProviderBrowser';
 import type {useSyncedScrollRefs} from '../../hooks/useSyncedScrollRefs';
@@ -47,6 +47,7 @@ type ViewState = {
   masterVolumeDb: number;
   masterPan: number;
   fxRefreshKey: number;
+  timelineRulerHeight: number;
   copilotTargets: CopilotContextPayload['visibleTargets'];
 };
 
@@ -112,7 +113,7 @@ type WorkspaceHandlers = {
 type AppWorkspaceViewProps = {
   mediaDrop: ReturnType<typeof useMediaDropImport>;
   workspacePanels: ReturnType<typeof useWorkspacePanels>;
-  projectFiles: ReturnType<typeof useProjectFileLifecycle>;
+  projectFiles: ProjectFileLifecycle;
   audioImport: ReturnType<typeof useAudioImport>;
   midiImport: ReturnType<typeof useMidiImport>;
   mediaConsolidation: ReturnType<typeof useMediaConsolidation>;
@@ -178,6 +179,7 @@ export function AppWorkspaceView({
             verticalScrollRef={scrollRefs.sidebarScrollRef}
             onSidebarWheel={scrollRefs.onSidebarWheel}
             rowHeight={state.rowHeight}
+            rulerHeight={state.timelineRulerHeight}
             blocks={data.visibleBlocks}
             expandedTakeGroups={state.expandedTakeGroups}
             isPlaying={state.isPlaying}
@@ -229,6 +231,7 @@ export function AppWorkspaceView({
             onTimelineMediaDropHandled={mediaDrop.clearMediaDragState}
             isLyricsPanelOpen={workspacePanels.rightPanel === 'lyrics'}
             areColoredSectionsHidden={workspacePanels.areColoredSectionsHidden}
+            rulerHeight={state.timelineRulerHeight}
           />
         </section>
         {workspacePanels.isMixerOpen ? (
@@ -271,13 +274,16 @@ export function AppWorkspaceView({
             onCompLooperLayer={handlers.onCompLooperLayer}
             onCompRecordingTake={handlers.onCompRecordingTake}
             audioDeviceSetup={audioDeviceSetup}
-            areColoredSectionsHidden={workspacePanels.areColoredSectionsHidden}
-            onColoredSectionsHiddenChange={workspacePanels.setColoredSectionsHidden}
           />
         ) : null}
       </div>
       {state.isSettingsOpen ? (
-        <RecordingSettingsOverlay recordingLaunch={recordingLaunch} onClose={handlers.onCloseSettings} />
+        <RecordingSettingsOverlay
+          recordingLaunch={recordingLaunch}
+          areColoredSectionsHidden={workspacePanels.areColoredSectionsHidden}
+          onColoredSectionsHiddenChange={workspacePanels.setColoredSectionsHidden}
+          onClose={handlers.onCloseSettings}
+        />
       ) : null}
     </main>
   );

@@ -5,7 +5,8 @@ import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
-import {PIXELS_PER_BEAT, ROW_HEIGHT, RULER_HEIGHT, TRACK_SIDEBAR_FOOTER_HEIGHT} from '../src/ui/timelineLayout';
+import {PIXELS_PER_BEAT, ROW_HEIGHT, TRACK_SIDEBAR_FOOTER_HEIGHT} from '../src/ui/timelineLayout';
+import {timelineRulerHeight} from '../src/ui/timelineHeaderLayout';
 import {TimelineGrid} from '../src/web/components/TimelineGrid';
 
 const noop = () => undefined;
@@ -200,8 +201,9 @@ test('renders coloured section columns through the track area and hides only the
   const {container, unmount} = renderTimelineGrid({tracks});
 
   const bandLayer = container.querySelector('.timeline-section-bands');
+  const markerOnlyHeight = timelineRulerHeight({hasLyricsLane: false, hasMarkerLane: true});
   expect(bandLayer).toHaveStyle({
-    top: `${RULER_HEIGHT}px`,
+    top: `${markerOnlyHeight}px`,
     height: `${ROW_HEIGHT * tracks.length + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
   });
   const bands = container.querySelectorAll('.timeline-section-band');
@@ -230,9 +232,10 @@ test('extends coloured section columns through the empty arrange body before tra
     ],
   });
   const {container} = renderTimelineGrid();
+  const markerOnlyHeight = timelineRulerHeight({hasLyricsLane: false, hasMarkerLane: true});
 
   expect(container.querySelector('.timeline-section-bands')).toHaveStyle({
-    top: `${RULER_HEIGHT}px`,
+    top: `${markerOnlyHeight}px`,
     height: `${ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
   });
   const bands = container.querySelectorAll('.timeline-section-band');

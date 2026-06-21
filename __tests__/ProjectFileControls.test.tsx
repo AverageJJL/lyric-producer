@@ -80,17 +80,28 @@ describe('ProjectFileControls MIDI export scope', () => {
 
   it('opens settings from the project menu', () => {
     const onOpenSettings = jest.fn();
-    render(<ProjectFileControls projectFiles={lifecycle()} onOpenSettings={onOpenSettings} />);
+    render(<ProjectFileControls projectFiles={lifecycle()} onOpenSettings={onOpenSettings} onClearGuide={jest.fn()} />);
     openProjectMenu();
     fireEvent.click(screen.getByRole('menuitem', {name: 'Settings'}));
 
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('routes New through the project chooser when provided', () => {
+    const newProject = jest.fn();
+    const requestNewProject = jest.fn();
+    renderProjectFileControls(lifecycle({newProject, requestNewProject}));
+    openProjectMenu();
+    fireEvent.click(screen.getByRole('menuitem', {name: 'New'}));
+
+    expect(requestNewProject).toHaveBeenCalledTimes(1);
+    expect(newProject).not.toHaveBeenCalled();
+  });
+
   it('closes the project menu from an outside pointer press', () => {
     render(
       <div>
-        <ProjectFileControls projectFiles={lifecycle()} />
+        <ProjectFileControls projectFiles={lifecycle()} onClearGuide={jest.fn()} />
         <button type="button">Outside</button>
       </div>,
     );

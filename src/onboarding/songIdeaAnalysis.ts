@@ -1,8 +1,10 @@
 import type {ProducerInsight, ScaleMetadata, SectionMarker} from '../store/projectMetadata';
 import {cloneReferenceMoodAnalysis, type ReferenceMoodAnalysis} from '../store/referenceMoodAnalysis';
-import type {SongSeedBpmKeyResponse, SongSeedLyricStructure, SongSeedTrack} from '../native/songSeedApi';
+import type {SongSeedBpmKeyResponse, SongSeedLyricStructure, SongSeedSyncedLyricLine, SongSeedTrack} from '../native/songSeedApi';
 import {useDAWStore} from '../store/useDAWStore';
+import {LYRIC_DOCUMENT_SCHEMA_VERSION, defaultLyricDocument, type LyricDocument, type LyricLine, type LyricSection} from '../store/lyrics';
 import {parseLyricSections, type LyricSectionSource} from './lyricSectioning';
+import {alignSyncedLyricTimings, beatFromSyncedSeconds, sectionBeatRangesFromTimings, timingsForLyricRange, type SongIdeaLyricTiming} from './songIdeaLyricTimings';
 import {createProducerInsight} from './producerInsight';
 
 export type SongIdeaSectionAnalysis = {
@@ -21,6 +23,7 @@ export type SongIdeaSectionAnalysis = {
   sectionSource?: LyricSectionSource;
   sectionConfidence?: number;
   structureNote?: string;
+  lyricTimings?: SongIdeaLyricTiming[];
 };
 
 export type SongIdeaAnalysis = {
@@ -45,6 +48,7 @@ export type SongIdeaAnalysisSeed = {
   track: SongSeedTrack;
   lyrics?: string;
   lyricStructure?: SongSeedLyricStructure;
+  syncedLyrics?: SongSeedSyncedLyricLine[];
   structureNote?: string;
   bpmKey?: SongSeedBpmKeyResponse | null;
 };
@@ -99,6 +103,7 @@ export function normalizeSongIdeaAnalysis(analysis: SongIdeaAnalysisInput): Song
       lyrics: [...section.lyrics],
       lyricPreview: section.lyricPreview?.length ? [...section.lyricPreview] : [...section.lyrics],
       lyricRange: {...section.lyricRange},
+      lyricTimings: section.lyricTimings?.map(timing => ({...timing})),
       productionDrivers: [...section.productionDrivers],
       producerInsight: section.producerInsight ? {...section.producerInsight} : undefined,
     })),
@@ -113,6 +118,7 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
   const fallbackScale = {root: ROOTS[hash % ROOTS.length], mode: hash % 3 === 0 ? 'minor' : 'major'};
   const parsedLyrics = parseLyricSections(seed.lyrics, seed.lyricStructure);
   const lines = parsedLyrics.lines;
+  const syncedTimings = alignSyncedLyricTimings(lines, seed.syncedLyrics);
   const best = matched?.candidates?.[0] ?? null;
   const bpm = matched?.bpm ?? best?.bpm ?? 84 + (hash % 54);
   const scale = scaleFromKey(matched?.key ?? best?.key, fallbackScale);
@@ -166,6 +172,7 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
         sectionSource: plan.sectionSource,
         sectionConfidence: plan.sectionConfidence,
         structureNote: seed.structureNote,
+        lyricTimings: timingsForLyricRange(syncedTimings, plan.startLine, plan.endLine),
       };
     }),
   });
@@ -182,13 +189,14 @@ export function applyReferenceAnalysis(
 }
 
 export function sectionsFromSongIdea(analysis: SongIdeaAnalysis): SectionMarker[] {
-  let cursor = 0;
-  return analysis.sections.map(section => {
-    const lengthBeats = section.bars * 4;
+  const ranges = sectionBeatRangesFromTimings(analysis.sections, analysis.bpm);
+  return analysis.sections.map((section, index) => {
+    const range = ranges[index]!;
+    const lengthBeats = fixedBeat(Math.max(1, range.endBeat - range.startBeat));
     const marker: SectionMarker = {
       id: section.id,
       name: section.name,
-      startBeat: cursor,
+      startBeat: range.startBeat,
       lengthBeats,
       analysis: {
         mood: section.mood,
@@ -210,9 +218,46 @@ export function sectionsFromSongIdea(analysis: SongIdeaAnalysis): SectionMarker[
         lyricPreview: [...section.lyricPreview],
       },
     };
-    cursor += lengthBeats;
     return marker;
   });
+}
+
+function fixedBeat(value: number): number {
+  return Number(Math.max(0, value).toFixed(6));
+}
+
+function lyricLinesForSongIdea(section: SongIdeaSectionAnalysis, startBeat: number, endBeat: number, bpm: number): LyricLine[] {
+  const lines = section.lyrics.map(text => text.trim()).filter(Boolean);
+  const span = Math.max(1, endBeat - startBeat);
+  const timings = new Map((section.lyricTimings ?? []).map(timing => [timing.lineIndex, timing]));
+  return lines.map((text, index) => ({
+    id: `${section.id}-line-${index + 1}`,
+    text,
+    startBeat: timings.has(index)
+      ? beatFromSyncedSeconds(timings.get(index)!.startSeconds, bpm)
+      : fixedBeat(startBeat + (span * index) / lines.length),
+    timingSource: timings.has(index) ? 'manual' as const : 'estimated' as const,
+  }));
+}
+
+export function lyricDocumentFromSongIdea(analysis: SongIdeaAnalysis): LyricDocument {
+  const sections: LyricSection[] = [];
+  const ranges = sectionBeatRangesFromTimings(analysis.sections, analysis.bpm);
+  analysis.sections.forEach((section, index) => {
+    const {startBeat, endBeat} = ranges[index]!;
+    const lines = lyricLinesForSongIdea(section, startBeat, endBeat, analysis.bpm);
+    if (lines.length === 0) return;
+    sections.push({
+      id: section.id,
+      name: section.name,
+      startBeat: fixedBeat(startBeat),
+      endBeat: fixedBeat(endBeat),
+      lines,
+    });
+  });
+  return sections.length > 0
+    ? {schemaVersion: LYRIC_DOCUMENT_SCHEMA_VERSION, sections, similarityReport: null}
+    : defaultLyricDocument();
 }
 
 export function applySongIdeaAnalysis(analysis: SongIdeaAnalysis): void {
@@ -220,5 +265,6 @@ export function applySongIdeaAnalysis(analysis: SongIdeaAnalysis): void {
   store.setBpm(analysis.bpm);
   store.setScale(analysis.scale);
   store.setSections(sectionsFromSongIdea(analysis));
+  store.setLyrics(lyricDocumentFromSongIdea(analysis));
   store.setPlayheadBeat(0, {pauseIfPlaying: true});
 }

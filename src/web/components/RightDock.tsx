@@ -39,8 +39,6 @@ type RightDockProps = {
   onCompLooperLayer: (layerId: string) => void;
   onCompRecordingTake: (takeId: string) => void;
   audioDeviceSetup: ReturnType<typeof useAudioDeviceSetup>;
-  areColoredSectionsHidden?: boolean;
-  onColoredSectionsHiddenChange?: (hidden: boolean) => void;
 };
 
 const PANEL_TITLES: Record<RightPanelId, string> = {
@@ -73,8 +71,6 @@ export function RightDock({
   onCompLooperLayer,
   onCompRecordingTake,
   audioDeviceSetup,
-  areColoredSectionsHidden = false,
-  onColoredSectionsHiddenChange,
 }: RightDockProps) {
   const dragRef = useRef<{pointerId: number; originX: number; originWidth: number} | null>(null);
 
@@ -182,10 +178,7 @@ export function RightDock({
           />
         ) : null}
         {panel === 'lyrics' ? (
-          <LyricsPanel
-            areColoredSectionsHidden={areColoredSectionsHidden}
-            onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
-          />
+          <LyricsPanel />
         ) : null}
         {panel === 'copilot' ? copilotPanel : null}
       </div>

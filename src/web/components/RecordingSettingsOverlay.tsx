@@ -20,13 +20,17 @@ type RecordingLaunch = ReturnType<typeof useRecordingLaunch>;
 
 type RecordingSettingsOverlayProps = {
   recordingLaunch: RecordingLaunch;
+  areColoredSectionsHidden?: boolean;
+  onColoredSectionsHiddenChange?: (hidden: boolean) => void;
   onClose: () => void;
 };
 
-type SettingsCategory = 'recording' | 'project';
+type SettingsCategory = 'recording' | 'project' | 'lyrics';
 
 export function RecordingSettingsOverlay({
   recordingLaunch,
+  areColoredSectionsHidden = false,
+  onColoredSectionsHiddenChange,
   onClose,
 }: RecordingSettingsOverlayProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -38,6 +42,9 @@ export function RecordingSettingsOverlay({
   const controlsDisabled = recordingLaunch.isLeadInPending;
   const punchDisabled = controlsDisabled || !recordingLaunch.canPunchRecord;
   const isRecordingSettings = selectedCategory === 'recording';
+  const title = isRecordingSettings
+    ? 'Recording Settings'
+    : selectedCategory === 'project' ? 'Project Settings' : 'Lyrics';
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -66,10 +73,16 @@ export function RecordingSettingsOverlay({
             onClick={() => setSelectedCategory('project')}>
             Project Settings
           </button>
+          <button
+            type="button"
+            className={`settings-category ${selectedCategory === 'lyrics' ? 'selected' : ''}`}
+            onClick={() => setSelectedCategory('lyrics')}>
+            Lyrics
+          </button>
         </nav>
-        <section className="settings-content" aria-label={isRecordingSettings ? 'Recording Settings' : 'Project Settings'}>
+        <section className="settings-content" aria-label={title}>
           <div className="settings-content-header">
-            <span>{isRecordingSettings ? 'Recording Settings' : 'Project Settings'}</span>
+            <span>{title}</span>
             <button type="button" aria-label="Close settings" onClick={onClose}>
               x
             </button>
@@ -144,7 +157,7 @@ export function RecordingSettingsOverlay({
               </span>
             </label>
           </div>
-          ) : (
+          ) : selectedCategory === 'project' ? (
             <div className="recording-settings-grid project-settings-grid">
               <label className="recording-setting-control">
                 <span>Performance Mode</span>
@@ -166,6 +179,20 @@ export function RecordingSettingsOverlay({
                     <option key={bars} value={bars}>{bars} bars</option>
                   ))}
                 </select>
+              </label>
+            </div>
+          ) : (
+            <div className="recording-settings-grid lyrics-settings-grid">
+              <label className="recording-setting-toggle">
+                <input
+                  type="checkbox"
+                  aria-label="Hide coloured sections"
+                  checked={areColoredSectionsHidden}
+                  onChange={event => onColoredSectionsHiddenChange?.(event.currentTarget.checked)}
+                />
+                <span className="recording-setting-toggle-label">
+                  Hide coloured sections
+                </span>
               </label>
             </div>
           )}

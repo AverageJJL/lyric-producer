@@ -28,6 +28,7 @@ import {useDAWNativeEvents} from '../store/useDAWNativeEvents';
 import {useDAWStore} from '../store/useDAWStore';
 import {AppWorkspaceView} from './components/AppWorkspaceView';
 import {ROW_HEIGHT, SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH, sidebarMaxWidth} from '../ui/timelineLayout';
+import {timelineHeaderVisibility, timelineRulerHeight} from '../ui/timelineHeaderLayout';
 import {shouldFocusWorkspaceFromPointer} from './workspaceShortcuts';
 
 const MIN_BPM = 20, MAX_BPM = 300;
@@ -61,6 +62,8 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   const selectedBlockId = useDAWStore(state => state.selectedBlockId);
   const selectedBlockIds = useDAWStore(state => state.selectedBlockIds);
   const selectedTrackId = useDAWStore(state => state.selectedTrackId);
+  const sections = useDAWStore(state => state.sections);
+  const lyrics = useDAWStore(state => state.lyrics);
   const setPlayheadBeat = useDAWStore(state => state.setPlayheadBeat);
   const setBpm = useDAWStore(state => state.setBpm);
   const setTimeSignature = useDAWStore(state => state.setTimeSignature);
@@ -96,6 +99,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   const scrollRefs = useSyncedScrollRefs();
   const visibleTracks = activeTracks(tracks), hiddenTracks = archivedTracks(tracks), visibleBlocks = blocksForActiveTracks(blocks, tracks);
   const selectedBlock = selectedBlockId ? visibleBlocks.find(block => block.id === selectedBlockId) ?? null : null, selectedTrack = selectedTrackId ? visibleTracks.find(track => track.id === selectedTrackId) ?? null : null;
+  const timelineHeaderHeight = timelineRulerHeight(timelineHeaderVisibility({sections, authoredLyrics: lyrics}));
   const {armedTrack, activeTrack} = useEditorTracks();
   const recordingLaunch = useRecordingLaunch({armedTrack, activeTrack});
   const recordTarget = armedTrack ?? activeTrack;
@@ -183,10 +187,6 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
     };
   }, [handleRefreshAudioDevice]);
 
-  const handleTogglePlay = useCallback(() => {
-    toggleTransportPlayback();
-  }, []);
-
   const handleReturnToZero = useCallback(() => {
     setPlayheadBeat(0, {pauseIfPlaying: true, syncTransport: false});
     window.dispatchEvent(new Event(TIMELINE_RETURN_TO_ZERO_EVENT));
@@ -236,7 +236,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   }, []);
 
   useTransportShortcuts({
-    onTogglePlay: handleTogglePlay,
+    onTogglePlay: toggleTransportPlayback,
     onReturnToZero: handleReturnToZero,
     onToggleRecord: handleRecordPress,
     onToggleEditor: workspacePanels.toggleEditor,
@@ -260,6 +260,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
         isPlaying, isRecording, canRecord, bpm,
         minBpm: MIN_BPM, maxBpm: MAX_BPM, isMetronomeEnabled,
         timeSignature, masterVolumeDb, masterPan, fxRefreshKey,
+        timelineRulerHeight: timelineHeaderHeight,
         copilotTargets: copilotGuidance.copilotTargets,
       }}
       data={{
@@ -270,7 +271,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
         onSidebarWidthChange: handleSidebarWidthChange, onRowHeightChange: setTimelineRowHeight,
         onBpmChange: handleBpmChange, onTimeSignatureChange: setTimeSignature,
         onToggleMetronome: () => setMetronomeEnabled(!isMetronomeEnabled),
-        onTogglePlay: handleTogglePlay, onReturnToZero: handleReturnToZero, onRecordPress: handleRecordPress,
+        onTogglePlay: toggleTransportPlayback, onReturnToZero: handleReturnToZero, onRecordPress: handleRecordPress,
         onFocusWorkspace: focusWorkspace, onSelectTrack: handleSelectTrack,
         onAddVirtualInstrument: (instrumentId, presetId) =>
           addTrackFromTemplate('virtual_instrument', {instrumentId, presetId}),

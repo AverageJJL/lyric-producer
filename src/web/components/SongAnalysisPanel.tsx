@@ -29,6 +29,7 @@ type SongAnalysisPanelProps = {
   referenceStatus: string | null;
   referenceSource: ReferenceMoodSource | null;
   referenceCacheStatus: SongSeedReferenceCacheStatus | null;
+  canFastForward: boolean;
   onDraftChange: (draft: SongMetadataDraft) => void;
   onOpenProject: () => void;
   onConfirmReferenceSpend: () => void;
@@ -76,6 +77,7 @@ export function SongAnalysisPanel({
   referenceStatus,
   referenceSource,
   referenceCacheStatus,
+  canFastForward,
   onDraftChange,
   onOpenProject,
   onConfirmReferenceSpend,
@@ -83,7 +85,6 @@ export function SongAnalysisPanel({
 }: SongAnalysisPanelProps) {
   const section = analysis?.sections[Math.min(activeSection, Math.max(0, analysis.sections.length - 1))];
   const isComplete = phase === 'complete';
-  const canOpenProject = Boolean(analysis && draft && referenceState !== 'loading' && referenceState !== 'confirming');
   const chips = referenceAnalysis ? referenceChips(referenceAnalysis) : [];
   const ribbon = referenceAnalysis?.segments.slice(0, 20) ?? [];
   const source = referenceAnalysis?.source ?? referenceSource;
@@ -176,7 +177,7 @@ export function SongAnalysisPanel({
             {referenceState === 'confirming' ? (
               <div className="song-reference-action">
                 <button type="button" className="onboarding-secondary" onClick={onConfirmReferenceSpend}>Use 1 Cyanite analysis</button>
-                <button type="button" className="onboarding-link" onClick={onSkipReference}>Skip Cyanite</button>
+                <button type="button" className="onboarding-secondary" onClick={onSkipReference}>Skip Cyanite</button>
               </div>
             ) : null}
           </section>
@@ -184,9 +185,11 @@ export function SongAnalysisPanel({
       </div>
       <footer className="song-analysis-footer">
         {status ? <p>{status}</p> : <p>{metadataSource ?? 'Metadata will appear here.'}</p>}
-        <button type="button" className="onboarding-secondary" onClick={onOpenProject} disabled={!canOpenProject}>
-          Open DAW with this structure
-        </button>
+        {canFastForward ? (
+          <button type="button" className="onboarding-secondary" onClick={onOpenProject}>
+            Fast Forward
+          </button>
+        ) : null}
       </footer>
     </aside>
   );

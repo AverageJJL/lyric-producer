@@ -1,5 +1,5 @@
 import {normalizeSongIdeaAnalysis, type SongIdeaAnalysis} from '../../onboarding/songIdeaAnalysis';
-import type {SongSeedLyricStructure, SongSeedTrack} from '../../native/songSeedApi';
+import type {SongSeedBpmKeyResponse, SongSeedLyricStructure, SongSeedSyncedLyricLine, SongSeedTrack} from '../../native/songSeedApi';
 import type {ReferenceMoodAnalysis} from '../../store/referenceMoodAnalysis';
 
 export type SearchState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
@@ -16,6 +16,7 @@ const ROOT_ALIASES: Record<string, string> = {
   A: 'A', 'A#': 'Bb', A_SHARP: 'Bb', BB: 'Bb', B_FLAT: 'Bb',
   B: 'B', CB: 'B', C_FLAT: 'B',
 };
+const TRUSTED_BPM_KEY_SOURCES = new Set(['cyanite', 'getsongbpm', 'openrouter-web', 'public-context']);
 
 export function trackLabel(track: SongSeedTrack): string {
   return [track.title, track.artist].filter(Boolean).join(' - ');
@@ -47,13 +48,45 @@ function structureSignature(structure: SongSeedLyricStructure | undefined): stri
     .join(';') || 'empty-structure';
 }
 
+function syncedLyricsSignature(lines: SongSeedSyncedLyricLine[] | undefined): string {
+  if (!lines?.length) return 'no-synced-lyrics';
+  const anchors = [lines[0], lines[Math.floor(lines.length / 2)], lines[lines.length - 1]]
+    .filter((line): line is SongSeedSyncedLyricLine => Boolean(line))
+    .map(line => `${line.startSeconds}:${line.text.slice(0, 36)}`)
+    .join(';');
+  return `${lines.length}:${anchors}`;
+}
+
 export function analysisKey(
   track: SongSeedTrack,
   lyrics: string,
   structure?: SongSeedLyricStructure,
   structureStatus = '',
+  syncedLyrics?: SongSeedSyncedLyricLine[],
 ): string {
-  return `${trackKey(track)}|${lyrics.length}|${lyrics.slice(0, 180)}|${structureSignature(structure)}|${structureStatus}`;
+  return `${trackKey(track)}|${lyrics.length}|${lyrics.slice(0, 180)}|${structureSignature(structure)}|${structureStatus}|${syncedLyricsSignature(syncedLyrics)}`;
+}
+
+export function metadataFailureStatus(response: SongSeedBpmKeyResponse | null | undefined): string | null {
+  if (!response) return null;
+  if ('error' in response) return `Online BPM/key unavailable: ${response.error}`;
+  return response.note?.startsWith('GetSongBPM API call failed:') ? response.note : null;
+}
+
+export function hasReliableBpmKey(analysis: SongIdeaAnalysis | null, reference: ReferenceMoodAnalysis | null): boolean {
+  if (reference?.bpm || reference?.key) return true;
+  return Boolean(analysis && TRUSTED_BPM_KEY_SOURCES.has(analysis.bpmKey.source) && analysis.bpmKey.confidence >= 0.6);
+}
+
+export function canContinueSongIdea(
+  analysis: SongIdeaAnalysis | null,
+  draft: MetadataDraft | null,
+  referenceSettled: boolean,
+  reference: ReferenceMoodAnalysis | null,
+  status: string | null,
+): boolean {
+  if (!analysis || !draft || !referenceSettled) return false;
+  return hasReliableBpmKey(analysis, reference) || Boolean(status?.startsWith('Online BPM/key unavailable:'));
 }
 
 export function mergeMetadata(base: SongIdeaAnalysis, metadata: SongIdeaAnalysis, locks: MetadataFieldState = {}): SongIdeaAnalysis {
@@ -102,7 +135,17 @@ export function mergeSectionEnrichment(base: SongIdeaAnalysis, enriched: SongIde
     || section.sectionSource === 'repetition'
   ));
   if (!protectsLyricRanges && enriched.sections.length >= base.sections.length) {
-    return normalizeSongIdeaAnalysis({...base, sections: enriched.sections});
+    const sections = enriched.sections.map((section, index) => {
+      const baseSection = base.sections[index];
+      return baseSection?.lyricTimings?.length ? {
+        ...section,
+        lyricRange: {...baseSection.lyricRange},
+        lyrics: [...baseSection.lyrics],
+        lyricPreview: [...baseSection.lyricPreview],
+        lyricTimings: baseSection.lyricTimings.map(timing => ({...timing})),
+      } : section;
+    });
+    return normalizeSongIdeaAnalysis({...base, sections});
   }
   return normalizeSongIdeaAnalysis({
     ...base,

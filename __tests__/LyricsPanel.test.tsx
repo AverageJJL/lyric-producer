@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 import {checkSongSeedLyricsSimilarity} from '../src/native/songSeedApi';
 import {applySongIdeaAnalysis, createSongIdeaAnalysis} from '../src/onboarding/songIdeaAnalysis';
@@ -104,26 +104,17 @@ describe('LyricsPanel', () => {
       .toHaveAttribute('title', 'Set the selected lyric line to the current playhead time.');
     expect(screen.getByRole('button', {name: 'Sync lyric timings'}))
       .toHaveAttribute('title', 'Auto-fill section ends and line start times from lyric length.');
+    const toolbarButtons = [...screen.getByRole('group', {name: 'Lyrics tools'}).querySelectorAll('button')];
+    expect(toolbarButtons.map(button => button.getAttribute('aria-label')))
+      .toEqual(['Stamp selected line', 'Sync lyric timings', 'Remove lyric analysis', 'Check Similarity']);
+    expect(screen.getByRole('button', {name: 'Remove lyric analysis'}).querySelector('svg')).not.toBeNull();
     const similarityButton = screen.getByRole('button', {name: 'Check Similarity'});
     expect(similarityButton)
       .toHaveAttribute('title', 'Compare your lyrics against candidate songs and show similarity risk.');
     expect(similarityButton.querySelector('svg')).toBeNull();
     expect(screen.queryByRole('button', {name: 'Stamp section start'})).toBeNull();
     expect(screen.queryByRole('button', {name: 'Estimate section timing'})).toBeNull();
-  });
-
-  it('toggles coloured section visibility from the notebook panel', () => {
-    const onColoredSectionsHiddenChange = jest.fn();
-    render(
-      <LyricsPanel
-        areColoredSectionsHidden={false}
-        onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
-      />,
-    );
-
-    fireEvent.click(screen.getByLabelText('Hide coloured sections'));
-
-    expect(onColoredSectionsHiddenChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByLabelText('Hide coloured sections')).not.toBeInTheDocument();
   });
 
   it('removes lyric analysis without clearing song metadata or arrangement state', () => {
@@ -133,14 +124,20 @@ describe('LyricsPanel', () => {
     });
     applySongIdeaAnalysis(analysis);
     const {bpm, scale} = useDAWStore.getState();
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(<LyricsPanel />);
 
     fireEvent.click(screen.getByRole('button', {name: 'Remove lyric analysis'}));
+    expect(useDAWStore.getState().sections).not.toEqual([]);
 
+    fireEvent.click(screen.getByRole('button', {name: 'Remove lyric analysis'}));
+
+    expect(confirm).toHaveBeenCalledWith('Remove lyric analysis, section markers, and authored lyrics? Undo can restore them.');
     expect(useDAWStore.getState().sections).toEqual([]);
     expect(useDAWStore.getState().lyrics).toEqual(defaultLyricDocument());
     expect(useDAWStore.getState().bpm).toBe(bpm);
     expect(useDAWStore.getState().scale).toEqual(scale);
+    confirm.mockRestore();
   });
 
   it('shows a loading spinner while checking lyric similarity', () => {
@@ -211,6 +208,45 @@ describe('LyricsPanel', () => {
     expect([...active!.querySelectorAll('.lyrics-word.is-lit')].map(word => word.textContent))
       .toEqual(['first', 'bright']);
     expect(container.querySelectorAll('.lyrics-line-row.is-active')).toHaveLength(1);
+  });
+
+  it('auto-follows the current lyric line until the user scrolls manually', async () => {
+    const lyrics = defaultLyricDocument();
+    lyrics.sections[0] = {
+      ...lyrics.sections[0]!,
+      endBeat: 12,
+      lines: [
+        {id: 'line-a', text: 'first bright line', startBeat: 0, timingSource: 'estimated'},
+        {id: 'line-b', text: 'second lyric line', startBeat: 4, timingSource: 'estimated'},
+        {id: 'line-c', text: 'third lyric line', startBeat: 8, timingSource: 'estimated'},
+      ],
+    };
+    useDAWStore.setState({isPlaying: false, playheadBeat: 0, lyrics});
+    const {container} = render(<LyricsPanel />);
+    const stack = container.querySelector('.lyrics-editor-stack') as HTMLDivElement;
+    const rows = [...container.querySelectorAll('.lyrics-line-row')] as HTMLDivElement[];
+    let scrollTop = 0;
+    const scrollTo = jest.fn((options: ScrollToOptions) => {
+      scrollTop = Number(options.top ?? 0);
+    });
+    Object.defineProperties(stack, {
+      clientHeight: {value: 100, configurable: true},
+      scrollHeight: {value: 600, configurable: true},
+      scrollTop: {get: () => scrollTop, set: value => { scrollTop = value; }, configurable: true},
+      scrollTo: {value: scrollTo, configurable: true},
+      getBoundingClientRect: {value: () => ({top: 0, height: 100}), configurable: true},
+    });
+    Object.defineProperty(rows[2], 'getBoundingClientRect', {value: () => ({top: 260, height: 40}), configurable: true});
+
+    act(() => useDAWStore.setState({isPlaying: true, playheadBeat: 8.1}));
+
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({top: 230})));
+    scrollTo.mockClear();
+    fireEvent.wheel(stack);
+    act(() => useDAWStore.setState({playheadBeat: 4.1}));
+
+    await waitFor(() => expect(container.querySelector('.lyrics-line-row.is-active textarea')).toHaveValue('second lyric line'));
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it('toggles the lyrics right dock from the notebook nav button', () => {

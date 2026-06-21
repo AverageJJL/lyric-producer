@@ -226,4 +226,13 @@ describe('Cyanite song seed provider', () => {
       {pollIntervalMs: 0, timeoutMs: 1000},
     )).resolves.toMatchObject({ok: false, code: expected});
   });
+
+  it('maps HTTP payment-required responses to Cyanite credit exhaustion', async () => {
+    await expect(analyzeCyaniteYouTubeReference(
+      youtubeSource,
+      {CYANITE_ACCESS_TOKEN: 'token'},
+      jest.fn(() => response({}, 402)) as typeof fetch,
+      {pollIntervalMs: 0, timeoutMs: 1000},
+    )).resolves.toMatchObject({ok: false, code: 'limit_exceeded'});
+  });
 });

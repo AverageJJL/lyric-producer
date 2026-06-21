@@ -4,7 +4,6 @@ import type {AutomationTargetType} from '../../automation/trackAutomation';
 import type {DAWTrack} from '../../store/useDAWStore';
 import {
   BLOCK_VERTICAL_PADDING,
-  RULER_HEIGHT,
 } from '../../ui/timelineLayout';
 import type {TimelineTrackLaneLayout} from '../../ui/timelineTrackLanes';
 import {
@@ -16,6 +15,7 @@ type TimelineAutomationLanesProps = {
   tracks: DAWTrack[];
   visibleTimelineBeats: number;
   pixelsPerBeat: number;
+  rulerHeight: number;
   trackLaneLayout: TimelineTrackLaneLayout;
   onPointSet?: (
     trackId: string,
@@ -43,6 +43,7 @@ export function TimelineAutomationLanes({
   tracks,
   visibleTimelineBeats,
   pixelsPerBeat,
+  rulerHeight,
   trackLaneLayout,
   onPointSet,
   onPointRemove,
@@ -96,7 +97,7 @@ export function TimelineAutomationLanes({
           return null;
         }
         const top =
-          RULER_HEIGHT + trackLane.offsetTop + trackLane.height
+          rulerHeight + trackLane.offsetTop + trackLane.height
           - BLOCK_VERTICAL_PADDING - (lane.laneIndex + 1) * (LANE_HEIGHT + LANE_GAP);
         return (
           <div

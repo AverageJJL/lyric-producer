@@ -9,7 +9,8 @@ export type ProjectFileLifecycle = {
   recentProjects: string[];
   statusMessage: string;
   errorMessage: string | null;
-  newProject: () => Promise<void>;
+  newProject: () => Promise<boolean>;
+  requestNewProject?: () => Promise<boolean>;
   openProject: () => Promise<void>;
   openRecentProject: (path: string) => Promise<void>;
   importDawProject: () => Promise<void>;

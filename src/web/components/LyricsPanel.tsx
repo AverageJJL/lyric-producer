@@ -16,11 +16,7 @@ import {
   RefreshGuideIcon,
 } from './icons/WorkspaceIcons';
 import {LyricsPanelAnalysisControls} from './LyricsPanelAnalysisControls';
-
-type LyricsPanelProps = {
-  areColoredSectionsHidden?: boolean;
-  onColoredSectionsHiddenChange?: (hidden: boolean) => void;
-};
+import {useLyricsAutoFollow} from './useLyricsAutoFollow';
 
 type TimestampInputProps = {
   label: string;
@@ -90,10 +86,7 @@ function LyricWordPreview({text, activeWordIndex}: {text: string; activeWordInde
   );
 }
 
-export function LyricsPanel({
-  areColoredSectionsHidden = false,
-  onColoredSectionsHiddenChange,
-}: LyricsPanelProps) {
+export function LyricsPanel() {
   const lyrics = useDAWStore(state => state.lyrics);
   const bpm = useDAWStore(state => state.bpm);
   const tempoMap = useDAWStore(state => state.tempoMap);
@@ -122,6 +115,8 @@ export function LyricsPanel({
     ?? lyrics.sections[0];
   const selectedLine = selectedSection?.lines.find(line => line.id === selected.lineId)
     ?? selectedSection?.lines[0];
+  const activeLineId = isPlaying ? highlight?.lineId ?? null : null;
+  const lyricsFollow = useLyricsAutoFollow(activeLineId, isPlaying);
 
   useEffect(() => {
     lineRefs.current.forEach(resizeLineInput);
@@ -183,6 +178,7 @@ export function LyricsPanel({
           onClick={syncTimings}>
           <RefreshGuideIcon className="lyrics-tool-icon" />
         </button>
+        <LyricsPanelAnalysisControls onRemoveLyricAnalysis={removeLyricAnalysis} />
         <button
           type="button"
           className="lyrics-similarity-button"
@@ -194,13 +190,13 @@ export function LyricsPanel({
           <span>Check Similarity</span>
           <span className="lyrics-similarity-spinner" aria-hidden="true" />
         </button>
-        <LyricsPanelAnalysisControls
-          areColoredSectionsHidden={areColoredSectionsHidden}
-          onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
-          onRemoveLyricAnalysis={removeLyricAnalysis}
-        />
       </div>
-      <div className="lyrics-editor-stack">
+      <div
+        className="lyrics-editor-stack"
+        ref={lyricsFollow.scrollContainerRef}
+        onScroll={lyricsFollow.handleScroll}
+        onTouchMove={lyricsFollow.disableAutoFollow}
+        onWheel={lyricsFollow.disableAutoFollow}>
         {lyrics.sections.map(section => {
           const playbackActive = isPlaying && highlight?.sectionId === section.id;
           return (
@@ -229,7 +225,10 @@ export function LyricsPanel({
                 {section.lines.map(line => {
                   const lineActive = isPlaying && highlight?.lineId === line.id;
                   return (
-                    <div key={line.id} className={`lyrics-line-row ${lineActive ? 'is-active' : ''}`}>
+                    <div
+                      key={line.id}
+                      ref={node => lyricsFollow.registerLineRow(line.id, node)}
+                      className={`lyrics-line-row ${lineActive ? 'is-active' : ''}`}>
                       <TimestampInput label={`${section.name} line time`} beat={line.startBeat} bpm={bpm} tempoMap={tempoMap} onCommit={beat => setLineTiming(section.id, line.id, beat)} />
                       <div className="lyrics-line-input-wrap">
                         <textarea

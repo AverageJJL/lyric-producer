@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import React from 'react';
 import {act, fireEvent, render, screen} from '@testing-library/react';
 
@@ -50,6 +52,17 @@ describe('SongLyricWheel', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('keeps lyric edges scrollable with enough focus gutter for first and final sections', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'web', 'styles', 'song-analyser.css'), 'utf8');
+
+    expect(css).toContain('overflow-y: auto;');
+    expect(css).toContain('scrollbar-width: none;');
+    expect(css).toContain('--lyrics-focus-gutter: clamp(260px, 47dvh, 430px);');
+    expect(css).toContain('--lyrics-focus-gutter: clamp(180px, 28vh, 260px);');
+    expect(css).toMatch(/\.lyrics-wheel-edge \{[\s\S]*height: 30%;/);
+    expect(css).toMatch(/\.lyrics-wheel-edge\.bottom \{[\s\S]*height: 34%;/);
   });
 
   it('removes reference DNA mini charts and highlights active lyrics word by word', () => {

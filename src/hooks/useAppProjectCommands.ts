@@ -3,7 +3,7 @@ import {useEffect} from 'react';
 import {getAppLifecycleBridge, type AppLifecycleProjectCommand} from '../native/appLifecycleApi';
 
 type ProjectCommandHandlers = {
-  newProject: () => Promise<void>;
+  newProject: () => Promise<unknown>;
   openProject: () => Promise<void>;
   openRecentProject: (path: string) => Promise<void>;
   importDawProject: () => Promise<void>;
@@ -20,7 +20,7 @@ type ProjectCommandHandlers = {
 function runAppCommand(
   command: AppLifecycleProjectCommand,
   handlers: ProjectCommandHandlers,
-): Promise<void> {
+): Promise<unknown> {
   switch (command.command) {
     case 'newProject':
       return handlers.newProject();

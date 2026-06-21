@@ -1,8 +1,15 @@
 import {DEFAULT_TIMELINE_BEATS, PIXELS_PER_BEAT, clamp} from './timelineLayout';
 
+export const PLAYHEAD_BAR_SNAP_RADIUS_PX = 8;
+
 export type PlayheadScrubSession = {
   pointerId: number;
   grabOffsetBeats: number;
+};
+
+export type PlayheadBarSnapConfig = {
+  beatsPerBar: number;
+  snapRadiusPx?: number;
 };
 
 export type PlayheadScrubConfig = {
@@ -10,6 +17,7 @@ export type PlayheadScrubConfig = {
   getPlayheadBeat: () => number;
   getMaxTimelineBeat?: () => number;
   pixelsPerBeat?: number;
+  barSnap?: PlayheadBarSnapConfig;
   sessionRef: {current: PlayheadScrubSession | null};
   onScrubBeat: (beat: number, options: {syncTransport: boolean}) => void;
   onScrubStart: () => void;
@@ -41,20 +49,69 @@ export function clientXToBeat(
   );
 }
 
+export function snapPlayheadBeatToBar(
+  beat: number,
+  beatsPerBar: number,
+  pixelsPerBeat = PIXELS_PER_BEAT,
+  snapRadiusPx = PLAYHEAD_BAR_SNAP_RADIUS_PX,
+): number {
+  if (!Number.isFinite(beat) || !Number.isFinite(beatsPerBar) || beatsPerBar <= 0) {
+    return beat;
+  }
+
+  const safePixelsPerBeat = Number.isFinite(pixelsPerBeat) && pixelsPerBeat > 0
+    ? pixelsPerBeat
+    : PIXELS_PER_BEAT;
+  const safeRadiusPx = Number.isFinite(snapRadiusPx) && snapRadiusPx > 0
+    ? snapRadiusPx
+    : PLAYHEAD_BAR_SNAP_RADIUS_PX;
+  const radiusBeats = safeRadiusPx / safePixelsPerBeat;
+  const nearestBarBeat = Math.round(beat / beatsPerBar) * beatsPerBar;
+
+  return Math.abs(nearestBarBeat - beat) <= radiusBeats
+    ? nearestBarBeat
+    : beat;
+}
+
+function maybeSnapScrubBeat(
+  beat: number,
+  config: PlayheadScrubConfig,
+  pixelsPerBeat: number,
+): number {
+  if (!config.barSnap) {
+    return beat;
+  }
+
+  // Users judge "close to a bar" by screen distance while dragging, so the
+  // magnet uses pixels instead of the active musical snap grid.
+  return snapPlayheadBeatToBar(
+    beat,
+    config.barSnap.beatsPerBar,
+    pixelsPerBeat,
+    config.barSnap.snapRadiusPx,
+  );
+}
+
 function scrubBeatFromClientX(
   config: PlayheadScrubConfig,
   clientX: number,
   grabOffsetBeats: number,
 ): number {
   const maxTimelineBeat = config.getMaxTimelineBeat?.() ?? DEFAULT_TIMELINE_BEATS;
+  const pixelsPerBeat = config.pixelsPerBeat ?? PIXELS_PER_BEAT;
   const beat = clientXToBeat(
     clientX,
     config.getTimelineClientX(),
     maxTimelineBeat,
-    config.pixelsPerBeat ?? PIXELS_PER_BEAT,
+    pixelsPerBeat,
   ) + grabOffsetBeats;
-  return clamp(
+  const clampedBeat = clamp(
     beat,
+    0,
+    Math.max(0, maxTimelineBeat),
+  );
+  return clamp(
+    maybeSnapScrubBeat(clampedBeat, config, pixelsPerBeat),
     0,
     Math.max(0, maxTimelineBeat),
   );

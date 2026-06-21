@@ -62,8 +62,8 @@ export function ProjectFileControls({
       ? projectFiles.statusMessage
       : `${projectFiles.displayName}${projectFiles.isDirty ? ' *' : ''}`);
 
-  const run = (action: () => void) => {
-    action();
+  const run = (action: () => void | Promise<unknown>) => {
+    void action();
     setIsMenuOpen(false);
   };
 
@@ -107,7 +107,7 @@ export function ProjectFileControls({
           <div className="project-menu-status" title={projectFiles.statusMessage}>
             {statusText}
           </div>
-          <button type="button" role="menuitem" data-copilot-id="project-menu:new" disabled={projectFiles.isBusy} onClick={() => run(projectFiles.newProject)}>
+          <button type="button" role="menuitem" data-copilot-id="project-menu:new" disabled={projectFiles.isBusy} onClick={() => run(projectFiles.requestNewProject ?? projectFiles.newProject)}>
             New
           </button>
           <button type="button" role="menuitem" data-copilot-id="project-menu:open" disabled={projectFiles.isBusy} onClick={() => run(projectFiles.openProject)}>

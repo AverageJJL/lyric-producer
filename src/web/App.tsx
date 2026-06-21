@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 
 import {useProjectFileLifecycle} from '../hooks/useProjectFileLifecycle';
 import {applySongIdeaAnalysis, type SongIdeaAnalysis} from '../onboarding/songIdeaAnalysis';
@@ -7,7 +7,10 @@ import {DawWorkspaceApp} from './DawWorkspaceApp';
 
 export function App() {
   const [hasEnteredWorkspace, setHasEnteredWorkspace] = useState(false);
-  const projectFiles = useProjectFileLifecycle();
+  const requestNewProject = useCallback(() => {
+    setHasEnteredWorkspace(false);
+  }, []);
+  const projectFiles = useProjectFileLifecycle({onRequestNewProject: requestNewProject});
 
   useEffect(() => {
     document.documentElement.dataset.onboarding = hasEnteredWorkspace ? 'complete' : 'active';
@@ -22,14 +25,19 @@ export function App() {
     }
   }, [projectFiles.currentPath]);
 
-  const openEmptyProject = () => {
-    setHasEnteredWorkspace(true);
-  };
+  const openEmptyProject = useCallback(() => {
+    void projectFiles.newProject().then(opened => {
+      if (opened) setHasEnteredWorkspace(true);
+    });
+  }, [projectFiles.newProject]);
 
-  const openSongIdeaProject = (analysis: SongIdeaAnalysis) => {
-    applySongIdeaAnalysis(analysis);
-    setHasEnteredWorkspace(true);
-  };
+  const openSongIdeaProject = useCallback((analysis: SongIdeaAnalysis) => {
+    void projectFiles.newProject().then(opened => {
+      if (!opened) return;
+      applySongIdeaAnalysis(analysis);
+      setHasEnteredWorkspace(true);
+    });
+  }, [projectFiles.newProject]);
 
   return (
     <>

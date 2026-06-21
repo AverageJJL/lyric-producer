@@ -1,35 +1,30 @@
 import React from 'react';
 
+import {TrashBinIcon} from './icons/WorkspaceIcons';
+
 type LyricsPanelAnalysisControlsProps = {
-  areColoredSectionsHidden: boolean;
-  onColoredSectionsHiddenChange?: (hidden: boolean) => void;
   onRemoveLyricAnalysis: () => void;
 };
 
 export function LyricsPanelAnalysisControls({
-  areColoredSectionsHidden,
-  onColoredSectionsHiddenChange,
   onRemoveLyricAnalysis,
 }: LyricsPanelAnalysisControlsProps) {
+  const removeAnalysis = () => {
+    const confirmed = window.confirm('Remove lyric analysis, section markers, and authored lyrics? Undo can restore them.');
+    if (confirmed) {
+      onRemoveLyricAnalysis();
+    }
+  };
+
   return (
-    <>
-      <label className="lyrics-panel-toggle">
-        <input
-          type="checkbox"
-          checked={areColoredSectionsHidden}
-          onChange={event => onColoredSectionsHiddenChange?.(event.target.checked)}
-        />
-        <span>Hide coloured sections</span>
-      </label>
-      <button
-        type="button"
-        className="lyrics-remove-analysis-button"
-        aria-label="Remove lyric analysis"
-        title="Clear lyrics, lyric analysis, and section markers. Undo restores them."
-        data-tooltip="Clear lyrics and markers"
-        onClick={onRemoveLyricAnalysis}>
-        <span>Remove lyric analysis</span>
-      </button>
-    </>
+    <button
+      type="button"
+      className="lyrics-remove-analysis-button"
+      aria-label="Remove lyric analysis"
+      title="Clear lyrics, lyric analysis, and section markers. Undo restores them."
+      data-tooltip="Clear lyrics and markers"
+      onClick={removeAnalysis}>
+      <TrashBinIcon className="lyrics-tool-icon" />
+    </button>
   );
 }

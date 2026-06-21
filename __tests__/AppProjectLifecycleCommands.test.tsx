@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, cleanup, render, screen, waitFor} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 // <App /> mounts the Copilot panel, which imports react-markdown (ESM) — stub the
 // markdown/highlighter deps jest can't transform, as the other App-render tests do.
@@ -119,4 +119,64 @@ test('handles Electron open-file project commands through the project lifecycle'
   await waitFor(() => {
     expect(screen.getByTitle('Project opened')).toBeInTheDocument();
   });
+});
+
+test('routes Electron New Project commands back to the onboarding home', async () => {
+  render(<App />);
+
+  await act(async () => {
+    fireEvent.click(screen.getByText('Empty project'));
+    await Promise.resolve();
+  });
+  await waitFor(() => {
+    expect(screen.queryByText('I have an idea already')).not.toBeInTheDocument();
+  });
+
+  await act(async () => {
+    projectCommandHandler?.({command: 'newProject'});
+    await Promise.resolve();
+  });
+
+  expect(screen.getByText('Empty project')).toBeInTheDocument();
+  expect(screen.getByText('I have an idea already')).toBeInTheDocument();
+});
+
+test('asks before showing new-project choices for dirty projects', async () => {
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<App />);
+
+  await act(async () => {
+    fireEvent.click(screen.getByText('Empty project'));
+    await Promise.resolve();
+  });
+  await waitFor(() => {
+    expect(screen.queryByText('I have an idea already')).not.toBeInTheDocument();
+  });
+
+  act(() => {
+    useDAWStore.getState().addTrackFromTemplate('virtual_instrument');
+  });
+  await waitFor(() => expect(setProjectDirty).toHaveBeenLastCalledWith(true));
+
+  await act(async () => {
+    projectCommandHandler?.({command: 'newProject'});
+    await Promise.resolve();
+  });
+  expect(confirmSpy).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('I have an idea already')).not.toBeInTheDocument();
+
+  confirmSpy.mockReturnValue(true);
+  await act(async () => {
+    projectCommandHandler?.({command: 'newProject'});
+    await Promise.resolve();
+  });
+  expect(screen.getByText('Empty project')).toBeInTheDocument();
+  expect(screen.getByText('I have an idea already')).toBeInTheDocument();
+
+  confirmSpy.mockClear();
+  await act(async () => {
+    fireEvent.click(screen.getByText('Empty project'));
+    await Promise.resolve();
+  });
+  expect(confirmSpy).not.toHaveBeenCalled();
 });

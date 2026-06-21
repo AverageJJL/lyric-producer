@@ -17,6 +17,10 @@ type SongSearchFormProps = {
   onSelectTrack: (track: SongSeedTrack) => void;
 };
 
+function coverInitial(track: SongSeedTrack): string {
+  return track.title.trim().charAt(0).toUpperCase() || 'A';
+}
+
 export function SongSearchForm({
   songInput,
   results,
@@ -57,8 +61,21 @@ export function SongSearchForm({
                 className={index === highlightedIndex ? 'active' : ''}
                 onMouseDown={event => event.preventDefault()}
                 onClick={() => onSelectTrack(track)}>
-                <span>{track.title}</span>
-                <small>{[track.artist, track.album, track.releaseYear].filter(Boolean).join(' / ')}</small>
+                {track.albumCoverUrl ? (
+                  <img
+                    className="song-search-cover"
+                    src={track.albumCoverUrl}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="song-search-cover fallback" aria-hidden="true">{coverInitial(track)}</span>
+                )}
+                <span className="song-search-copy">
+                  <span>{track.title}</span>
+                  <small>{[track.artist, track.album, track.releaseYear].filter(Boolean).join(' / ')}</small>
+                </span>
               </button>
             )) : null}
           </div>

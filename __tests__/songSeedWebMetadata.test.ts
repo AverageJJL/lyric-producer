@@ -46,6 +46,10 @@ describe('OpenRouter web metadata fallback', () => {
         sources: [{title: 'SongBPM', url: 'https://songbpm.com/blank-space'}],
       }),
     });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages[0].content).toContain('You can only return valid JSON.');
+    expect(body.messages[0].content).toContain('Do not include prose, Markdown, code fences');
+    expect(body.messages[0].content).toContain('Example output: {"title":"Umbrella","artist":"Rihanna","bpm":87,"key":"Bb minor"');
   });
 
   it('uses OpenRouter annotations as citations when JSON omits sources', async () => {
@@ -72,6 +76,109 @@ describe('OpenRouter web metadata fallback', () => {
         key: 'A minor',
         sources: [{title: 'Metadata page', url: 'https://example.com/dreams'}],
       }),
+    });
+  });
+
+  it('accepts unicode key symbols and URL string sources', async () => {
+    await expect(lookupOpenRouterWebBpmKey(
+      {title: 'Umbrella', artist: 'Rihanna'},
+      {OPENROUTER_API_KEY: 'openrouter'},
+      jest.fn(() => okJson({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              title: 'Umbrella',
+              artist: 'Rihanna',
+              bpm: 87,
+              key: 'C♯ major',
+              confidence: 0.95,
+              sources: ['https://songbpm.com/@rihanna/umbrella'],
+            }),
+          },
+        }],
+      })) as typeof fetch,
+    )).resolves.toEqual({
+      ok: true,
+      candidate: expect.objectContaining({
+        bpm: 87,
+        key: 'C# major',
+        sources: [{url: 'https://songbpm.com/@rihanna/umbrella'}],
+      }),
+    });
+  });
+
+  it('accepts BPM text and spelled accidentals', async () => {
+    await expect(lookupOpenRouterWebBpmKey(
+      {title: 'Umbrella', artist: 'Rihanna'},
+      {OPENROUTER_API_KEY: 'openrouter'},
+      jest.fn(() => okJson({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              title: 'Umbrella',
+              artist: 'Rihanna',
+              bpm: '87 BPM',
+              key: 'C-sharp major',
+              confidence: 0.91,
+              sources: [{url: 'https://tunebat.com/Info/Umbrella-Rihanna-JAY-Z'}],
+            }),
+          },
+        }],
+      })) as typeof fetch,
+    )).resolves.toEqual({
+      ok: true,
+      candidate: expect.objectContaining({
+        bpm: 87,
+        key: 'C# major',
+        sources: [{url: 'https://tunebat.com/Info/Umbrella-Rihanna-JAY-Z'}],
+      }),
+    });
+  });
+
+  it('uses the requested song object from a fenced JSON array', async () => {
+    await expect(lookupOpenRouterWebBpmKey(
+      {title: 'Umbrella', artist: 'Rihanna'},
+      {OPENROUTER_API_KEY: 'openrouter'},
+      jest.fn(() => okJson({
+        choices: [{
+          message: {
+            content: [
+              'Here is the data:',
+              '```json',
+              '[',
+              `${JSON.stringify({title: "Don't Stop The Music", artist: 'Rihanna', bpm: 123, key: 'F# minor', confidence: 0.95, sources: [{url: 'https://example.com/wrong'}]})},`,
+              '{"title":"Umbrella","artist":"Rihanna","bpm":87,"key":"C# major","confidence":0.9,"sources":[{"url":"https://example.com/umbrella"}]}',
+              ']',
+              '```',
+            ].join('\n'),
+          },
+        }],
+      })) as typeof fetch,
+    )).resolves.toEqual({
+      ok: true,
+      candidate: expect.objectContaining({
+        title: 'Umbrella',
+        bpm: 87,
+        key: 'C# major',
+        sources: [{url: 'https://example.com/umbrella'}],
+      }),
+    });
+  });
+
+  it('rejects a valid-looking object for the wrong song', async () => {
+    await expect(lookupOpenRouterWebBpmKey(
+      {title: 'Umbrella', artist: 'Rihanna'},
+      {OPENROUTER_API_KEY: 'openrouter'},
+      jest.fn(() => okJson({
+        choices: [{
+          message: {
+            content: JSON.stringify({title: "Don't Stop The Music", artist: 'Rihanna', bpm: 123, key: 'F# minor', confidence: 0.95, sources: [{url: 'https://example.com/wrong'}]}),
+          },
+        }],
+      })) as typeof fetch,
+    )).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('response did not match requested song'),
     });
   });
 
@@ -104,7 +211,10 @@ describe('OpenRouter web metadata fallback', () => {
           },
         }],
       })) as typeof fetch,
-    )).resolves.toMatchObject({ok: false});
+    )).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Raw OpenRouter output:'),
+    });
   });
 
   it('returns false on network failures', async () => {

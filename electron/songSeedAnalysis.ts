@@ -1,4 +1,3 @@
-import {DEFAULT_MODEL} from './copilotRequest';
 import {knownPublicSongContext} from './songSeedMetadata';
 import {
   buildProducerInsight,
@@ -54,7 +53,8 @@ export type SongSeedAnalyzeResponse =
   | {ok: false; error: string};
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const OPENROUTER_ANALYSIS_TIMEOUT_MS = 2800;
+const DEFAULT_ANALYSIS_MODEL = 'openai/gpt-4o-mini';
+const OPENROUTER_ANALYSIS_TIMEOUT_MS = 9000;
 const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 function cleanString(value: unknown): string | undefined {
@@ -192,7 +192,7 @@ function requestBody(request: SongSeedAnalyzeRequest, lines: string[], model: st
         role: 'system',
         content: [
           'Analyze song lyrics for a DAW arrangement.',
-          'Return JSON only: {"sections":[...]}',
+          'You can only return valid JSON. Return exactly one JSON object like {"sections":[...]} with no Markdown or prose outside the JSON.',
           'Prefer a full pop structure with intro, repeated verses, pre-choruses, choruses, bridge, final chorus, and outro.',
           'If sectionHints are supplied, preserve their lyric ranges and roles unless the hint is impossible.',
           'Repeated hook lines such as "baby, baby" must be chorus, not verse or pre-chorus.',
@@ -250,7 +250,7 @@ export async function analyzeSongSeed(
   if (!apiKey || lines.length === 0) {
     return {ok: true, source: 'fallback', analysis: fallback(), warning: 'OpenRouter analysis was unavailable.'};
   }
-  const model = text(env.AI_PRODUCER_MODEL) ?? DEFAULT_MODEL;
+  const model = text(env.OPENROUTER_ANALYSIS_MODEL) ?? DEFAULT_ANALYSIS_MODEL;
   const baseUrl = text(env.AI_PRODUCER_API_BASE_URL) ?? DEFAULT_BASE_URL;
   try {
     const response = await withTimeout(fetchImpl(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -261,10 +261,15 @@ export async function analyzeSongSeed(
     if (!response.ok) {
       return {ok: true, source: 'fallback', analysis: fallback(), warning: `OpenRouter returned ${response.status}.`};
     }
-    const content = ((await response.json()) as {choices?: Array<{message?: {content?: unknown}}>})
-      .choices?.[0]?.message?.content;
+    const choice = ((await response.json()) as {choices?: Array<{finish_reason?: unknown; message?: {content?: unknown}}>})
+      .choices?.[0];
+    const content = text(choice?.message?.content);
+    if (!content) {
+      const finishReason = text(choice?.finish_reason);
+      return {ok: true, source: 'fallback', analysis: fallback(), warning: `OpenRouter analysis returned no JSON content${finishReason ? ` (${finishReason})` : ''}.`};
+    }
     const sections = validateSongSeedModelSections(
-      extractJson(String(content ?? '')),
+      extractJson(content),
       lines,
       request.publicContext ?? publicContext?.productionContext,
     );
@@ -283,7 +288,8 @@ export async function analyzeSongSeed(
       return {ok: true, source: 'openrouter', analysis: {...fallback(), sections: mergeIntoFullSongSections(fallback().sections, sections)}};
     }
     return {ok: true, source: 'openrouter', analysis: {...fallback(), sections}};
-  } catch {
-    return {ok: true, source: 'fallback', analysis: fallback(), warning: 'OpenRouter analysis failed.'};
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error';
+    return {ok: true, source: 'fallback', analysis: fallback(), warning: `OpenRouter analysis failed: ${message}`};
   }
 }

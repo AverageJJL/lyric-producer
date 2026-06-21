@@ -38,8 +38,13 @@ import {nextTimelineScrollLeft} from '../../ui/timelineFollowScroll';
 import {
   BLOCK_VERTICAL_PADDING,
   PIXELS_PER_BEAT,
-  RULER_HEIGHT,
+  RULER_LANE_TOP,
 } from '../../ui/timelineLayout';
+import {
+  timelineHeaderVisibility,
+  timelineMarkerLaneTop,
+  timelineRulerHeight,
+} from '../../ui/timelineHeaderLayout';
 import {
   clampTimelinePixelsPerBeat,
   clampTimelineRowHeight,
@@ -77,6 +82,7 @@ type TimelineGridProps = {
   onTimelineMediaDropHandled: () => void;
   isLyricsPanelOpen?: boolean;
   areColoredSectionsHidden?: boolean;
+  rulerHeight?: number;
 };
 
 export function TimelineGrid({
@@ -99,6 +105,7 @@ export function TimelineGrid({
   onTimelineMediaDropHandled,
   isLyricsPanelOpen = false,
   areColoredSectionsHidden = false,
+  rulerHeight,
 }: TimelineGridProps) {
   const [isDraggingBlock, setIsDraggingBlock] = useState(false);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT);
@@ -126,6 +133,16 @@ export function TimelineGrid({
   const sections = useDAWStore(state => state.sections);
   const lyrics = useDAWStore(state => state.lyrics);
   const showAuthoredLyricsLane = isLyricsPanelOpen || hasWrittenLyricText(lyrics);
+  const headerVisibility = useMemo(
+    () => timelineHeaderVisibility({
+      sections,
+      authoredLyrics: lyrics,
+      showAuthoredLyrics: showAuthoredLyricsLane,
+    }),
+    [lyrics, sections, showAuthoredLyricsLane],
+  );
+  const timelineHeaderHeight = rulerHeight ?? timelineRulerHeight(headerVisibility);
+  const markerLaneTop = timelineMarkerLaneTop(headerVisibility);
   const scale = useDAWStore(state => state.scale);
   const chord = useDAWStore(state => state.chord);
   const setSections = useDAWStore(state => state.setSections);
@@ -151,12 +168,19 @@ export function TimelineGrid({
 
   const timelineWidth = timelineWidthPx(visibleTimelineBeats, pixelsPerBeat);
   const displayLaneLayout = useMemo(
-    () => buildTimelineDisplayLaneLayout(tracks, blocks, expandedTakeGroups, rowHeight),
-    [blocks, expandedTakeGroups, rowHeight, tracks],
+    () => buildTimelineDisplayLaneLayout(tracks, blocks, expandedTakeGroups, rowHeight, timelineHeaderHeight),
+    [blocks, expandedTakeGroups, rowHeight, timelineHeaderHeight, tracks],
   );
   const trackLaneLayout = displayLaneLayout.realTrackLaneLayout;
   const surfaceHeight = useTimelineSurfaceHeight(verticalScrollRef, displayLaneLayout.contentHeight);
-  const sectionBandHeight = Math.max(0, surfaceHeight - RULER_HEIGHT);
+  const sectionBandHeight = Math.max(0, surfaceHeight - timelineHeaderHeight);
+  const timelineSurfaceStyle = useMemo(() => ({
+    width: timelineWidth,
+    height: surfaceHeight,
+    '--timeline-ruler-height': `${timelineHeaderHeight}px`,
+    '--timeline-lyrics-lane-top': `${RULER_LANE_TOP}px`,
+    '--timeline-marker-lane-top': `${markerLaneTop}px`,
+  }) as React.CSSProperties, [markerLaneTop, surfaceHeight, timelineHeaderHeight, timelineWidth]);
   const trackLaneMap = useMemo(
     () => new Map(trackLaneLayout.lanes.map(lane => [lane.trackId, lane])),
     [trackLaneLayout],
@@ -235,7 +259,7 @@ export function TimelineGrid({
       return;
     }
     const rect = timelineSurfaceRef.current?.getBoundingClientRect();
-    if (!rect || event.clientY - rect.top > RULER_HEIGHT) {
+    if (!rect || event.clientY - rect.top > timelineHeaderHeight) {
       return;
     }
     event.stopPropagation();
@@ -250,7 +274,7 @@ export function TimelineGrid({
     if (!rect) {
       return null;
     }
-    const laneY = clientY - rect.top - RULER_HEIGHT;
+    const laneY = clientY - rect.top - timelineHeaderHeight;
     const lane = trackLaneLayout.lanes.find(item =>
       laneY >= item.offsetTop && laneY <= item.offsetTop + item.height,
     );
@@ -545,7 +569,7 @@ export function TimelineGrid({
             onDragOver={handleTimelineDragOver}
             onDrop={handleTimelineDrop}
             onPointerDownCapture={handleTimelineSurfacePointerDownCapture}
-            style={{width: timelineWidth, height: surfaceHeight}}>
+            style={timelineSurfaceStyle}>
             <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} authoredLyrics={lyrics} showAuthoredLyricsLane={showAuthoredLyricsLane} scale={scale} chord={chord} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
             <div className="timeline-display-rows" aria-hidden="true">
               {displayLaneLayout.lanes.map(lane => (
@@ -553,7 +577,7 @@ export function TimelineGrid({
                   key={lane.key}
                   className={`timeline-display-row ${lane.kind}`}
                   style={{
-                    top: RULER_HEIGHT + lane.offsetTop,
+                    top: timelineHeaderHeight + lane.offsetTop,
                     width: timelineWidth,
                     height: lane.height,
                   }}
@@ -567,9 +591,10 @@ export function TimelineGrid({
                 strongHeight={displayLaneLayout.rowAreaHeight}
                 visibleTimelineBeats={visibleTimelineBeats}
                 pixelsPerBeat={pixelsPerBeat}
+                rulerHeight={timelineHeaderHeight}
               />
             ) : null}
-            <TimelineMarqueeLayer blocks={blocks} trackIds={trackIds} trackLaneLayout={trackLaneLayout} timelineWidth={timelineWidth} pixelsPerBeat={pixelsPerBeat} disabled={isDraggingBlock} onClearSelection={() => onSelectBlock(null)} />
+            <TimelineMarqueeLayer blocks={blocks} trackIds={trackIds} trackLaneLayout={trackLaneLayout} timelineWidth={timelineWidth} pixelsPerBeat={pixelsPerBeat} rulerHeight={timelineHeaderHeight} disabled={isDraggingBlock} onClearSelection={() => onSelectBlock(null)} />
             {gridLineBeats.map(beat => (
               <span
                 key={`grid-line-${beat.beat}`}
@@ -577,7 +602,7 @@ export function TimelineGrid({
                 style={{left: beat.beat * pixelsPerBeat}}
               />
             ))}
-            <TimelineAutomationLanes tracks={tracks} visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} trackLaneLayout={trackLaneLayout} onPointSet={setTrackAutomationPoint} onPointRemove={removeTrackAutomationPoint} />
+            <TimelineAutomationLanes tracks={tracks} visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} rulerHeight={timelineHeaderHeight} trackLaneLayout={trackLaneLayout} onPointSet={setTrackAutomationPoint} onPointRemove={removeTrackAutomationPoint} />
             <div className="clips-layer">
               {compRenderError ? (
                 <div className="timeline-comp-error" role="status">
@@ -610,7 +635,7 @@ export function TimelineGrid({
                     key={block.id}
                     block={block}
                     blocks={blocks}
-                    top={RULER_HEIGHT + displayLane.offsetTop + BLOCK_VERTICAL_PADDING}
+                    top={timelineHeaderHeight + displayLane.offsetTop + BLOCK_VERTICAL_PADDING}
                     isSelected={
                       !isGhost &&
                       (

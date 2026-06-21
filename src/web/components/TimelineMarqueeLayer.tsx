@@ -5,7 +5,6 @@ import {
   commitMarqueeClipSelection,
 } from '../../arrangement/clipMarqueeSelection';
 import type {DAWBlock} from '../../store/useDAWStore';
-import {RULER_HEIGHT} from '../../ui/timelineLayout';
 import {
   trackIndexAtY,
   timelineTrackHitRows,
@@ -18,6 +17,7 @@ type TimelineMarqueeLayerProps = {
   trackLaneLayout: TimelineTrackLaneLayout;
   timelineWidth: number;
   pixelsPerBeat: number;
+  rulerHeight: number;
   disabled: boolean;
   onClearSelection: () => void;
 };
@@ -51,6 +51,7 @@ export function TimelineMarqueeLayer({
   trackLaneLayout,
   timelineWidth,
   pixelsPerBeat,
+  rulerHeight,
   disabled,
   onClearSelection,
 }: TimelineMarqueeLayerProps) {
@@ -117,7 +118,7 @@ export function TimelineMarqueeLayer({
       ref={layerRef}
       className="timeline-marquee-layer"
       aria-label="Marquee selection area"
-      style={{top: RULER_HEIGHT, width: timelineWidth, height: rowAreaHeight}}>
+      style={{top: rulerHeight, width: timelineWidth, height: rowAreaHeight}}>
       {timelineTrackHitRows(trackLaneLayout).map(row => (
         <button
           key={row.key}

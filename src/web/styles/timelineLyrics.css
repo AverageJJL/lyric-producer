@@ -1,15 +1,7 @@
-.ruler-row {
-  height: 82px;
-}
-
-.grid-line {
-  top: 82px;
-}
-
 .lyrics-lane {
   position: absolute;
   z-index: 1100;
-  top: 30px;
+  top: var(--timeline-lyrics-lane-top, 30px);
   right: 0;
   left: 0;
   height: 23px;
@@ -268,7 +260,7 @@
 }
 
 .marker-lane {
-  top: 56px;
+  top: var(--timeline-marker-lane-top, 56px);
 }
 
 @media (prefers-reduced-motion: reduce) {

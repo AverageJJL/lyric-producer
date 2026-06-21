@@ -103,7 +103,8 @@ describe('TimelineLyricsLane', () => {
 
     expect(chip).toHaveTextContent('Nice to meet you');
     expect(chip).not.toHaveAttribute('title');
-    expect(tooltip).toHaveTextContent('Song seed');
+    expect(tooltip).toHaveTextContent('Bars 1-4');
+    expect(tooltip).not.toHaveTextContent('Song seed');
     expect(tooltip).toHaveTextContent('Nice to meet you');
     expect(tooltip).toHaveTextContent('1 line');
     expect(tooltip).toHaveTextContent('4 syllables');
@@ -119,7 +120,7 @@ describe('TimelineLyricsLane', () => {
     expect(tooltip).not.toHaveTextContent('Use clipped drums and muted guitar responses');
   });
 
-  it('surfaces unavailable Musixmatch structure status in the popup source label', () => {
+  it('omits structure source status from the popup header', () => {
     const fallback = section('intro', 'Intro', 0, 16);
     fallback.analysis!.sectionSource = 'repetition';
     fallback.analysis!.sectionConfidence = 0.86;
@@ -129,8 +130,9 @@ describe('TimelineLyricsLane', () => {
     fireEvent.pointerEnter(screen.getByRole('button', {name: 'Intro lyric analysis'}), {clientX: 80});
     const tooltip = screen.getByRole('tooltip');
 
-    expect(tooltip).toHaveTextContent('detected from repetition');
-    expect(tooltip).toHaveTextContent('Musixmatch structure unavailable');
+    expect(tooltip).toHaveTextContent('Bars 1-4');
+    expect(tooltip).not.toHaveTextContent('detected from repetition');
+    expect(tooltip).not.toHaveTextContent('Musixmatch structure unavailable');
   });
 
   it('keeps full song sections visible when lyrics are partial', () => {
@@ -169,9 +171,9 @@ describe('TimelineLyricsLane', () => {
     expect(screen.getByLabelText('Cyanite instrument graph')).toHaveTextContent('electronic drums');
     expect(screen.getByLabelText('Cyanite instrument graph').querySelector('.lyrics-graph-legend-row')).toBeInTheDocument();
     expect(screen.getByLabelText('Cyanite instrument graph')).not.toHaveTextContent('flute');
-    expect(screen.getByLabelText('Instrument presence graph for Verse 1')).toHaveAttribute('viewBox', '0 0 240 124');
-    expect(highlight).toHaveAttribute('x', '72');
-    expect(highlight).toHaveAttribute('width', '54');
+    expect(screen.getByLabelText('Instrument presence graph for Verse 1')).toHaveAttribute('viewBox', '0 0 684 124');
+    expect(highlight).toHaveAttribute('x', '183');
+    expect(highlight).toHaveAttribute('width', '165');
     expect(tooltip.querySelectorAll('.lyrics-graph-line')).toHaveLength(4);
     expect(tooltip.querySelector('.lyrics-graph-line')).toHaveAttribute('d', expect.stringContaining('C'));
   });
@@ -197,19 +199,19 @@ describe('TimelineLyricsLane', () => {
     expect(tooltip).toHaveTextContent('energetic');
   });
 
-  it('uses section-width popups for wide sections and cursor popups for narrow sections', () => {
-    renderLane([section('wide', 'Wide', 0, 32, reference()), section('narrow', 'Narrow', 40, 8, reference())], 10);
+  it('uses fixed pointer popups and clamps them inside the visible timeline', () => {
+    renderLane([section('wide', 'Wide', 0, 32, reference()), section('edge', 'Edge', 56, 8, reference())], 14);
 
-    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Wide lyric analysis'}), {clientX: 120});
+    const wide = screen.getByRole('button', {name: 'Wide lyric analysis'});
+    fireEvent.pointerEnter(wide, {clientX: 120});
     let tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveStyle({width: '320px'});
+    expect(tooltip).toHaveStyle({width: '720px', left: '8px'});
     expect(tooltip).not.toHaveClass('is-cursor');
 
-    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Narrow lyric analysis'}), {clientX: 430});
+    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Edge lyric analysis'}), {clientX: 630});
     tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveStyle({width: '260px'});
-    expect(tooltip).toHaveStyle({left: '380px'});
-    expect(tooltip).toHaveClass('is-cursor');
+    expect(tooltip).toHaveStyle({width: '720px', left: '168px'});
+    expect(tooltip).not.toHaveClass('is-cursor');
   });
 
   it('keeps the popup visible when the pointer moves from the chip into the popup', () => {
