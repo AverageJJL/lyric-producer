@@ -19,6 +19,7 @@ type TimelineLyricsLaneProps = {
   beatsPerBar?: number;
   onJumpToBeat: (beat: number) => void;
   authoredLyrics?: LyricDocument;
+  showAuthoredLyrics?: boolean;
   scale?: ScaleMetadata | null;
   chord?: ChordMetadata | null;
 };
@@ -62,6 +63,10 @@ function authoredPreview(section: LyricSection): string {
   return section.lines.find(line => line.text.trim().length > 0)?.text.trim() ?? 'Untimed lyrics';
 }
 
+function hasAuthoredText(section: LyricSection): boolean {
+  return section.lines.some(line => line.text.trim().length > 0);
+}
+
 function authoredContext(list: LyricSection[], index: number) {
   return [list[index - 1], list[index + 1]]
     .filter((section): section is LyricSection => Boolean(section))
@@ -71,6 +76,7 @@ function authoredContext(list: LyricSection[], index: number) {
 export function TimelineLyricsLane({
   sections,
   authoredLyrics,
+  showAuthoredLyrics = true,
   visibleTimelineBeats,
   pixelsPerBeat,
   beatsPerBar = 4,
@@ -82,29 +88,6 @@ export function TimelineLyricsLane({
   const [activeHover, setActiveHover] = useState<ActivePopup | null>(null);
   const [pinnedPopup, setPinnedPopup] = useState<ActivePopup | null>(null);
   const timelineWidth = Math.max(CURSOR_POPOVER_WIDTH, visibleTimelineBeats * pixelsPerBeat);
-  const authoredLayouts = useMemo(
-    (): TimelineLyricLayout[] => {
-      const layouts: TimelineLyricLayout[] = [];
-      (authoredLyrics?.sections ?? []).forEach((section, index, list) => {
-        if (section.startBeat === undefined) return;
-        const startBeat = Math.max(0, section.startBeat);
-        const endBeat = Math.min(visibleTimelineBeats, lyricSectionEnd(section, list, index, visibleTimelineBeats));
-        layouts.push({
-          id: `authored-${section.id}`,
-          name: section.name,
-          startBeat,
-          startPx: startBeat * pixelsPerBeat,
-          width: Math.max(54, Math.max(1, endBeat - startBeat) * pixelsPerBeat),
-          preview: authoredPreview(section),
-          ariaLabel: `${section.name} authored lyrics`,
-          className: 'authored',
-          evidence: buildAuthoredLyricEvidenceModel(section, endBeat, beatsPerBar, {scale, chord}, authoredContext(list, index)),
-        });
-      });
-      return layouts;
-    },
-    [authoredLyrics, beatsPerBar, chord, pixelsPerBeat, scale, visibleTimelineBeats],
-  );
   const lyricLayouts = useMemo(
     (): TimelineLyricLayout[] => sections
       .filter(hasAnalysis)
@@ -124,6 +107,31 @@ export function TimelineLyricsLane({
         };
       }),
     [beatsPerBar, chord, pixelsPerBeat, scale, sections, visibleTimelineBeats],
+  );
+  const analysisSectionIds = useMemo(() => new Set(lyricLayouts.map(layout => layout.id)), [lyricLayouts]);
+  const authoredLayouts = useMemo(
+    (): TimelineLyricLayout[] => {
+      if (!showAuthoredLyrics) return [];
+      const layouts: TimelineLyricLayout[] = [];
+      (authoredLyrics?.sections ?? []).forEach((section, index, list) => {
+        if (section.startBeat === undefined || analysisSectionIds.has(section.id) || !hasAuthoredText(section)) return;
+        const startBeat = Math.max(0, section.startBeat);
+        const endBeat = Math.min(visibleTimelineBeats, lyricSectionEnd(section, list, index, visibleTimelineBeats));
+        layouts.push({
+          id: `authored-${section.id}`,
+          name: section.name,
+          startBeat,
+          startPx: startBeat * pixelsPerBeat,
+          width: Math.max(54, Math.max(1, endBeat - startBeat) * pixelsPerBeat),
+          preview: authoredPreview(section),
+          ariaLabel: `${section.name} authored lyrics`,
+          className: 'authored',
+          evidence: buildAuthoredLyricEvidenceModel(section, endBeat, beatsPerBar, {scale, chord}, authoredContext(list, index)),
+        });
+      });
+      return layouts;
+    },
+    [analysisSectionIds, authoredLyrics, beatsPerBar, chord, pixelsPerBeat, scale, showAuthoredLyrics, visibleTimelineBeats],
   );
   const allLayouts = useMemo(() => [...authoredLayouts, ...lyricLayouts], [authoredLayouts, lyricLayouts]);
 

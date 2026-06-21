@@ -20,6 +20,7 @@ import {
 import {stopCopilotMidiOptionPreview} from '../../assistant/copilotMidiPreview';
 import {getMediaImportBridge} from '../../native/mediaImportApi';
 import {beatsPerBarForTimeSignature} from '../../store/projectMetadata';
+import {hasWrittenLyricText} from '../../store/lyrics';
 import type {DAWBlock, DAWTrack} from '../../store/useDAWStore';
 import {useDAWStore} from '../../store/useDAWStore';
 import {upsertRecordingCompGroup} from '../../store/useDAWNativeBridge';
@@ -52,6 +53,7 @@ import {TimelineAutomationLanes} from './TimelineAutomationLanes';
 import {TimelineBlock} from './TimelineBlock';
 import {TimelineMarqueeLayer} from './TimelineMarqueeLayer';
 import {TimelineRulerLayer} from './TimelineRulerLayer';
+import {TimelineSectionBands} from './TimelineSectionBands';
 import {TimelineToolbar} from './TimelineToolbar';
 import {displayTimelineBlocks} from './timelineDisplayBlocks';
 
@@ -73,6 +75,8 @@ type TimelineGridProps = {
   onDeleteBlock: (blockId: string) => void;
   importAudioFile: ReturnType<typeof useAudioImport>['importAudioFile'];
   onTimelineMediaDropHandled: () => void;
+  isLyricsPanelOpen?: boolean;
+  areColoredSectionsHidden?: boolean;
 };
 
 export function TimelineGrid({
@@ -93,6 +97,8 @@ export function TimelineGrid({
   onDeleteBlock,
   importAudioFile,
   onTimelineMediaDropHandled,
+  isLyricsPanelOpen = false,
+  areColoredSectionsHidden = false,
 }: TimelineGridProps) {
   const [isDraggingBlock, setIsDraggingBlock] = useState(false);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(PIXELS_PER_BEAT);
@@ -119,6 +125,7 @@ export function TimelineGrid({
   const tempoMap = useDAWStore(state => state.tempoMap);
   const sections = useDAWStore(state => state.sections);
   const lyrics = useDAWStore(state => state.lyrics);
+  const showAuthoredLyricsLane = isLyricsPanelOpen || hasWrittenLyricText(lyrics);
   const scale = useDAWStore(state => state.scale);
   const chord = useDAWStore(state => state.chord);
   const setSections = useDAWStore(state => state.setSections);
@@ -135,11 +142,11 @@ export function TimelineGrid({
       computeVisibleTimelineBeats({
         blocks,
         sections,
-        lyrics,
+        lyrics: showAuthoredLyricsLane ? lyrics : undefined,
         playheadBeat,
         recordingBlockId,
       }),
-    [blocks, lyrics, playheadBeat, recordingBlockId, sections],
+    [blocks, lyrics, playheadBeat, recordingBlockId, sections, showAuthoredLyricsLane],
   );
 
   const timelineWidth = timelineWidthPx(visibleTimelineBeats, pixelsPerBeat);
@@ -149,6 +156,7 @@ export function TimelineGrid({
   );
   const trackLaneLayout = displayLaneLayout.realTrackLaneLayout;
   const surfaceHeight = useTimelineSurfaceHeight(verticalScrollRef, displayLaneLayout.contentHeight);
+  const sectionBandHeight = Math.max(0, surfaceHeight - RULER_HEIGHT);
   const trackLaneMap = useMemo(
     () => new Map(trackLaneLayout.lanes.map(lane => [lane.trackId, lane])),
     [trackLaneLayout],
@@ -538,7 +546,7 @@ export function TimelineGrid({
             onDrop={handleTimelineDrop}
             onPointerDownCapture={handleTimelineSurfacePointerDownCapture}
             style={{width: timelineWidth, height: surfaceHeight}}>
-            <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} authoredLyrics={lyrics} scale={scale} chord={chord} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
+            <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} authoredLyrics={lyrics} showAuthoredLyricsLane={showAuthoredLyricsLane} scale={scale} chord={chord} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
             <div className="timeline-display-rows" aria-hidden="true">
               {displayLaneLayout.lanes.map(lane => (
                 <span
@@ -552,6 +560,15 @@ export function TimelineGrid({
                 />
               ))}
             </div>
+            {!areColoredSectionsHidden ? (
+              <TimelineSectionBands
+                sections={sections}
+                arrangementHeight={sectionBandHeight}
+                strongHeight={displayLaneLayout.rowAreaHeight}
+                visibleTimelineBeats={visibleTimelineBeats}
+                pixelsPerBeat={pixelsPerBeat}
+              />
+            ) : null}
             <TimelineMarqueeLayer blocks={blocks} trackIds={trackIds} trackLaneLayout={trackLaneLayout} timelineWidth={timelineWidth} pixelsPerBeat={pixelsPerBeat} disabled={isDraggingBlock} onClearSelection={() => onSelectBlock(null)} />
             {gridLineBeats.map(beat => (
               <span

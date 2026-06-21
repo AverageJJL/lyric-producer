@@ -2,6 +2,8 @@ import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 import {checkSongSeedLyricsSimilarity} from '../src/native/songSeedApi';
+import {applySongIdeaAnalysis, createSongIdeaAnalysis} from '../src/onboarding/songIdeaAnalysis';
+import {resetArrangementHistoryForTests} from '../src/store/history';
 import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -22,6 +24,7 @@ jest.mock('../src/native/songSeedApi', () => ({
 }));
 
 function resetStore(): void {
+  resetArrangementHistoryForTests();
   useDAWStore.setState({
     isPlaying: false,
     bpm: 120,
@@ -34,6 +37,9 @@ function resetStore(): void {
     playheadSeconds: 4,
     timeSignature: {...DEFAULT_TIME_SIGNATURE},
     snapGrid: DEFAULT_SNAP_GRID,
+    scale: null,
+    chord: null,
+    sections: [],
     lyrics: defaultLyricDocument(),
   });
 }
@@ -106,6 +112,37 @@ describe('LyricsPanel', () => {
     expect(screen.queryByRole('button', {name: 'Estimate section timing'})).toBeNull();
   });
 
+  it('toggles coloured section visibility from the notebook panel', () => {
+    const onColoredSectionsHiddenChange = jest.fn();
+    render(
+      <LyricsPanel
+        areColoredSectionsHidden={false}
+        onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Hide coloured sections'));
+
+    expect(onColoredSectionsHiddenChange).toHaveBeenCalledWith(true);
+  });
+
+  it('removes lyric analysis without clearing song metadata or arrangement state', () => {
+    const analysis = createSongIdeaAnalysis({
+      track: {id: 'mxm-baby', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch'},
+      lyrics: '[Verse 1]\nYou know you love me\n[Chorus]\nBaby, baby, baby, oh',
+    });
+    applySongIdeaAnalysis(analysis);
+    const {bpm, scale} = useDAWStore.getState();
+    render(<LyricsPanel />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Remove lyric analysis'}));
+
+    expect(useDAWStore.getState().sections).toEqual([]);
+    expect(useDAWStore.getState().lyrics).toEqual(defaultLyricDocument());
+    expect(useDAWStore.getState().bpm).toBe(bpm);
+    expect(useDAWStore.getState().scale).toEqual(scale);
+  });
+
   it('shows a loading spinner while checking lyric similarity', () => {
     (checkSongSeedLyricsSimilarity as jest.Mock).mockImplementationOnce(() => new Promise(() => undefined));
     render(<LyricsPanel />);
@@ -115,6 +152,22 @@ describe('LyricsPanel', () => {
 
     expect(similarityButton).toBeDisabled();
     expect(similarityButton.querySelector('.lyrics-similarity-spinner')).not.toBeNull();
+  });
+
+  it('checks similarity against lyrics imported from a song idea', async () => {
+    const analysis = createSongIdeaAnalysis({
+      track: {id: 'mxm-baby', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch'},
+      lyrics: '[Verse 1]\nYou know you love me\n[Chorus]\nBaby, baby, baby, oh',
+    });
+    applySongIdeaAnalysis(analysis);
+    render(<LyricsPanel />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Check Similarity'}));
+
+    await waitFor(() => expect(checkSongSeedLyricsSimilarity).toHaveBeenCalledWith({
+      lyrics: 'You know you love me\nBaby, baby, baby, oh',
+      lineIds: expect.arrayContaining(['song-idea-0-line-1', 'song-idea-1-line-1']),
+    }));
   });
 
   it('labels the focused section start and end timestamps', () => {

@@ -15,6 +15,12 @@ import {
   PlusIcon,
   RefreshGuideIcon,
 } from './icons/WorkspaceIcons';
+import {LyricsPanelAnalysisControls} from './LyricsPanelAnalysisControls';
+
+type LyricsPanelProps = {
+  areColoredSectionsHidden?: boolean;
+  onColoredSectionsHiddenChange?: (hidden: boolean) => void;
+};
 
 type TimestampInputProps = {
   label: string;
@@ -84,7 +90,10 @@ function LyricWordPreview({text, activeWordIndex}: {text: string; activeWordInde
   );
 }
 
-export function LyricsPanel() {
+export function LyricsPanel({
+  areColoredSectionsHidden = false,
+  onColoredSectionsHiddenChange,
+}: LyricsPanelProps) {
   const lyrics = useDAWStore(state => state.lyrics);
   const bpm = useDAWStore(state => state.bpm);
   const tempoMap = useDAWStore(state => state.tempoMap);
@@ -101,6 +110,7 @@ export function LyricsPanel() {
   const stampLine = useDAWStore(state => state.stampLyricLine);
   const syncTimings = useDAWStore(state => state.syncLyricTimings);
   const setSimilarityReport = useDAWStore(state => state.setLyricSimilarityReport);
+  const removeLyricAnalysis = useDAWStore(state => state.removeLyricAnalysis);
   const lineRefs = useRef(new Map<string, HTMLTextAreaElement>());
   const [pendingFocusLineId, setPendingFocusLineId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{sectionId: string; lineId?: string}>(() => ({
@@ -184,6 +194,11 @@ export function LyricsPanel() {
           <span>Check Similarity</span>
           <span className="lyrics-similarity-spinner" aria-hidden="true" />
         </button>
+        <LyricsPanelAnalysisControls
+          areColoredSectionsHidden={areColoredSectionsHidden}
+          onColoredSectionsHiddenChange={onColoredSectionsHiddenChange}
+          onRemoveLyricAnalysis={removeLyricAnalysis}
+        />
       </div>
       <div className="lyrics-editor-stack">
         {lyrics.sections.map(section => {

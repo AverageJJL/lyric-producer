@@ -139,6 +139,11 @@ export function cloneLyricDocument(document: LyricDocument): LyricDocument {
   };
 }
 
+export function hasWrittenLyricText(document: LyricDocument | undefined): boolean {
+  return normalizeLyricDocument(document).sections
+    .some(section => section.lines.some(line => line.text.trim().length > 0));
+}
+
 export function splitLyricWords(text: string): string[] {
   return text.trim().split(/\s+/).filter(Boolean);
 }

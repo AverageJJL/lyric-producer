@@ -227,6 +227,8 @@ export function AppWorkspaceView({
             onDeleteBlock={handlers.onDeleteBlock}
             importAudioFile={audioImport.importAudioFile}
             onTimelineMediaDropHandled={mediaDrop.clearMediaDragState}
+            isLyricsPanelOpen={workspacePanels.rightPanel === 'lyrics'}
+            areColoredSectionsHidden={workspacePanels.areColoredSectionsHidden}
           />
         </section>
         {workspacePanels.isMixerOpen ? (
@@ -269,6 +271,8 @@ export function AppWorkspaceView({
             onCompLooperLayer={handlers.onCompLooperLayer}
             onCompRecordingTake={handlers.onCompRecordingTake}
             audioDeviceSetup={audioDeviceSetup}
+            areColoredSectionsHidden={workspacePanels.areColoredSectionsHidden}
+            onColoredSectionsHiddenChange={workspacePanels.setColoredSectionsHidden}
           />
         ) : null}
       </div>

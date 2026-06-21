@@ -25,6 +25,7 @@ type TimelineRulerLayerProps = {
   tempoMap: TempoMapEvent[];
   sections: SectionMarker[];
   authoredLyrics?: LyricDocument;
+  showAuthoredLyricsLane?: boolean;
   scale?: ScaleMetadata | null;
   chord?: ChordMetadata | null;
   onRulerPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -49,6 +50,7 @@ export function TimelineRulerLayer({
   tempoMap,
   sections,
   authoredLyrics,
+  showAuthoredLyricsLane = true,
   scale,
   chord,
   onRulerPointerDown,
@@ -97,6 +99,7 @@ export function TimelineRulerLayer({
       <TimelineLyricsLane
         sections={sections}
         authoredLyrics={authoredLyrics}
+        showAuthoredLyrics={showAuthoredLyricsLane}
         scale={scale}
         chord={chord}
         visibleTimelineBeats={visibleTimelineBeats}

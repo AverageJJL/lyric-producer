@@ -1,19 +1,13 @@
 import type {TempoMapEvent} from '../transport/tempoMap';
 import {emptyTimedLyricLine, lyricBeatSecondsAfter, lyricLineStartAfterInsert, lyricSectionStartAfterPrevious} from './lyricTimingDefaults';
 import {
-  cloneLyricDocument,
-  defaultLyricDocument,
-  emptyLyricLine,
-  estimateSectionLineTimings,
-  lyricEntityId,
-  normalizeLyricDocument,
-  normalizeLyricSimilarityReport,
-  splitLyricWords,
-  type LyricDocument,
-  type LyricSimilarityReport,
+  cloneLyricDocument, defaultLyricDocument, emptyLyricLine, estimateSectionLineTimings,
+  lyricEntityId, normalizeLyricDocument, normalizeLyricSimilarityReport, splitLyricWords,
+  type LyricDocument, type LyricSimilarityReport,
 } from './lyrics';
+import type {SectionMarker} from './projectMetadata';
 
-type LyricActionState = {lyrics: LyricDocument; bpm: number; tempoMap: TempoMapEvent[]; playheadBeat: number};
+type LyricActionState = {lyrics: LyricDocument; sections: SectionMarker[]; bpm: number; tempoMap: TempoMapEvent[]; playheadBeat: number};
 
 type LyricSet = (partial: Partial<LyricActionState> | ((state: LyricActionState) => Partial<LyricActionState>)) => void;
 
@@ -21,6 +15,7 @@ type LyricGet<T extends LyricActionState> = () => T;
 
 export type LyricActions = {
   setLyrics: (lyrics: LyricDocument) => void;
+  removeLyricAnalysis: () => void;
   addLyricSection: (afterSectionId?: string) => string;
   removeLyricSection: (sectionId: string) => void;
   renameLyricSection: (sectionId: string, name: string) => void;
@@ -134,6 +129,14 @@ export function createLyricActions<T extends LyricActionState>(
 ): LyricActions {
   return {
     setLyrics: lyrics => withLyrics(get, set, recordHistory, () => normalizeLyricDocument(lyrics)),
+
+    removeLyricAnalysis: () => {
+      const current = get();
+      const emptyLyrics = defaultLyricDocument();
+      if (current.sections.length === 0 && sameDocument(current.lyrics, emptyLyrics)) return;
+      recordHistory();
+      set({sections: [], lyrics: emptyLyrics});
+    },
 
     addLyricSection: afterSectionId => {
       const id = lyricEntityId('lyric-section');

@@ -290,11 +290,6 @@ input:focus-visible {
   pointer-events: none;
 }
 
-.timeline-marquee-layer .timeline-track-row {
-  top: 0;
-  pointer-events: auto;
-}
-
 .timeline-marquee-rect {
   position: absolute;
   z-index: 2;

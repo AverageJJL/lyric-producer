@@ -8,6 +8,8 @@
 
 .lyrics-panel-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 5px;
   justify-content: flex-end;
   padding: 4px 2px 10px;
@@ -41,6 +43,33 @@
 .lyrics-panel-toolbar button:disabled {
   cursor: default;
   opacity: 0.46;
+}
+
+.lyrics-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 8px;
+  color: rgba(238, 240, 244, 0.66);
+  font-size: 10px;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.lyrics-panel-toggle input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--accent-primary);
+}
+
+.lyrics-panel-toolbar .lyrics-remove-analysis-button {
+  width: auto;
+  padding: 0 9px;
+  color: #f27e7e;
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .lyrics-tool-icon {

@@ -82,6 +82,56 @@
     #242528;
 }
 
+.timeline-section-bands {
+  position: absolute;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.timeline-section-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  border-right: 1px solid;
+  border-left: 1px solid;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -1px rgba(0, 0, 0, 0.12);
+}
+
+.timeline-section-band::before {
+  position: absolute;
+  inset: 0;
+  background: var(--section-band-background);
+  content: "";
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 var(--section-band-solid-height),
+    rgba(0, 0, 0, 0.52) calc(var(--section-band-solid-height) + 96px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 var(--section-band-solid-height),
+    rgba(0, 0, 0, 0.52) calc(var(--section-band-solid-height) + 96px),
+    transparent 100%
+  );
+}
+
+.timeline-marquee-hit-row {
+  position: absolute;
+  left: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: default;
+  pointer-events: auto;
+}
+
 .grid-line {
   position: absolute;
   top: 28px;

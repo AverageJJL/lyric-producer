@@ -1,4 +1,5 @@
 import {resetArrangementHistoryForTests} from '../src/store/history';
+import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 
@@ -43,6 +44,7 @@ function resetStore(): void {
     scale: null,
     chord: null,
     sections: [],
+    lyrics: defaultLyricDocument(),
     midiAudition: null,
     liveMidiPreviewByTrack: {},
     liveAudioPreviewByClip: {},
@@ -178,6 +180,37 @@ describe('arrangement undo/redo', () => {
     expect(useDAWStore.getState().scale).toEqual({root: 'D', mode: 'minor'});
     useDAWStore.getState().undo();
     expect(useDAWStore.getState().scale).toBeNull();
+  });
+
+  it('clears lyric analysis and restores it in one undo step', () => {
+    const lyrics = defaultLyricDocument();
+    lyrics.sections[0] = {
+      id: 'song-idea-0',
+      name: 'Verse 1',
+      startBeat: 0,
+      endBeat: 16,
+      lines: [
+        {id: 'song-idea-0-line-1', text: 'You know you love me', startBeat: 0, timingSource: 'estimated'},
+      ],
+    };
+    useDAWStore.setState({
+      bpm: 96,
+      scale: {root: 'D', mode: 'minor'},
+      sections: [{id: 'song-idea-0', name: 'Verse 1', startBeat: 0, lengthBeats: 16}],
+      lyrics,
+    });
+
+    useDAWStore.getState().removeLyricAnalysis();
+
+    expect(useDAWStore.getState().sections).toEqual([]);
+    expect(useDAWStore.getState().lyrics).toEqual(defaultLyricDocument());
+    expect(useDAWStore.getState()).toMatchObject({bpm: 96, scale: {root: 'D', mode: 'minor'}});
+
+    useDAWStore.getState().undo();
+    expect(useDAWStore.getState().sections).toEqual([
+      {id: 'song-idea-0', name: 'Verse 1', startBeat: 0, lengthBeats: 16},
+    ]);
+    expect(useDAWStore.getState().lyrics.sections[0]?.lines[0]?.text).toBe('You know you love me');
   });
 
   it('undoes cycle locator changes', () => {

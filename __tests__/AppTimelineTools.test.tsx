@@ -1,14 +1,29 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+import {defaultLyricDocument} from '../src/store/lyrics';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
-import {PIXELS_PER_BEAT, ROW_HEIGHT} from '../src/ui/timelineLayout';
+import {PIXELS_PER_BEAT, ROW_HEIGHT, RULER_HEIGHT, TRACK_SIDEBAR_FOOTER_HEIGHT} from '../src/ui/timelineLayout';
 import {TimelineGrid} from '../src/web/components/TimelineGrid';
 
 const noop = () => undefined;
 const noopImportAudio = async () => null;
+
+function track(id: string, name: string): DAWTrack {
+  return {
+    id,
+    name,
+    isMuted: false,
+    isSolo: false,
+    type: 'software_instrument',
+    instrumentId: 'synth_lead',
+    presetId: 'default',
+    isRecordArmed: false,
+    isLocked: false,
+  };
+}
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -39,6 +54,7 @@ function resetStore(): void {
     scale: null,
     chord: null,
     sections: [],
+    lyrics: defaultLyricDocument(),
     midiAudition: null,
     liveMidiPreviewByTrack: {},
     liveAudioPreviewByClip: {},
@@ -67,6 +83,7 @@ function renderTimelineGrid(options: {
   tracks?: DAWTrack[];
   blocks?: DAWBlock[];
   selectedBlockIds?: string[];
+  areColoredSectionsHidden?: boolean;
 } = {}) {
   const tracks = options.tracks ?? [];
   const blocks = options.blocks ?? [];
@@ -92,6 +109,7 @@ function renderTimelineGrid(options: {
       onDeleteBlock={noop}
       importAudioFile={noopImportAudio}
       onTimelineMediaDropHandled={noop}
+      areColoredSectionsHidden={options.areColoredSectionsHidden}
     />,
   );
 }
@@ -169,6 +187,57 @@ test('adds a visible marker at the playhead from the timeline toolbar', () => {
     useDAWStore.getState().undo();
   });
   expect(useDAWStore.getState().sections).toEqual([]);
+});
+
+test('renders coloured section columns through the track area and hides only the bands', () => {
+  const tracks = [track('track-a', 'Track A'), track('track-b', 'Track B')];
+  useDAWStore.setState({
+    sections: [
+      {id: 'verse-1', name: 'Verse 1', startBeat: 0, lengthBeats: 4},
+      {id: 'verse-2', name: 'Verse 2', startBeat: 4, lengthBeats: 8},
+    ],
+  });
+  const {container, unmount} = renderTimelineGrid({tracks});
+
+  const bandLayer = container.querySelector('.timeline-section-bands');
+  expect(bandLayer).toHaveStyle({
+    top: `${RULER_HEIGHT}px`,
+    height: `${ROW_HEIGHT * tracks.length + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
+  });
+  const bands = container.querySelectorAll('.timeline-section-band');
+  expect(bands).toHaveLength(2);
+  expect(bands[0]).toHaveStyle({left: '0px', width: `${4 * PIXELS_PER_BEAT}px`});
+  expect(bands[1]).toHaveStyle({left: `${4 * PIXELS_PER_BEAT}px`, width: `${8 * PIXELS_PER_BEAT}px`});
+  expect(bands[0].getAttribute('data-section-tone')).not.toBe(bands[1].getAttribute('data-section-tone'));
+  expect(bands[0].getAttribute('style')).toContain('linear-gradient');
+  expect(bands[0].getAttribute('style')).toContain(`--section-band-solid-height: ${ROW_HEIGHT * tracks.length}px`);
+  expect(container.querySelector('.timeline-marquee-hit-row')).toBeInTheDocument();
+  expect(container.querySelector('.timeline-marquee-layer .timeline-track-row')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Marker lane')).toBeInTheDocument();
+
+  unmount();
+  renderTimelineGrid({tracks, areColoredSectionsHidden: true});
+
+  expect(document.querySelectorAll('.timeline-section-band')).toHaveLength(0);
+  expect(screen.getByLabelText('Marker lane')).toBeInTheDocument();
+});
+
+test('extends coloured section columns through the empty arrange body before tracks exist', () => {
+  useDAWStore.setState({
+    sections: [
+      {id: 'intro', name: 'Intro', startBeat: 0, lengthBeats: 4},
+      {id: 'verse-1', name: 'Verse 1', startBeat: 4, lengthBeats: 8},
+    ],
+  });
+  const {container} = renderTimelineGrid();
+
+  expect(container.querySelector('.timeline-section-bands')).toHaveStyle({
+    top: `${RULER_HEIGHT}px`,
+    height: `${ROW_HEIGHT + TRACK_SIDEBAR_FOOTER_HEIGHT}px`,
+  });
+  const bands = container.querySelectorAll('.timeline-section-band');
+  expect(bands).toHaveLength(2);
+  expect(bands[0].getAttribute('style')).toContain(`--section-band-solid-height: ${ROW_HEIGHT}px`);
 });
 
 test('clicking the ruler moves the playhead and pauses playback', () => {

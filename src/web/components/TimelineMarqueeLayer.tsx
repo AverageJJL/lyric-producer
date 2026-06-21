@@ -122,7 +122,7 @@ export function TimelineMarqueeLayer({
         <button
           key={row.key}
           type="button"
-          className="timeline-track-row"
+          className="timeline-marquee-hit-row"
           aria-label={`Timeline row ${row.index + 1}`}
           onPointerDown={startDrag}
           onPointerMove={updateDrag}

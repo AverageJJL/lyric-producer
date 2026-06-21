@@ -73,6 +73,7 @@ function renderLane(
   pixelsPerBeat = 8,
   authoredLyrics?: LyricDocument,
   harmony: {scale?: {root: string; mode: string}; chord?: {symbol: string}} = {},
+  showAuthoredLyrics = true,
 ) {
   render(
     <TimelineLyricsLane
@@ -82,6 +83,7 @@ function renderLane(
       onJumpToBeat={jest.fn()}
       sections={sections}
       authoredLyrics={authoredLyrics}
+      showAuthoredLyrics={showAuthoredLyrics}
       scale={harmony.scale}
       chord={harmony.chord}
     />,
@@ -226,16 +228,10 @@ describe('TimelineLyricsLane', () => {
 
   it('shows authored lyric text, counts, rhyme, and suggested chords in the shared popup', () => {
     const lyrics = defaultLyricDocument();
-    lyrics.sections[0] = {
-      id: 'hook',
-      name: 'Hook',
-      startBeat: 0,
-      endBeat: 8,
-      lines: [
-        {id: 'line-a', text: 'come back tonight', startBeat: 0, timingSource: 'manual'},
-        {id: 'line-b', text: 'meet me in the light', startBeat: 4, timingSource: 'manual'},
-      ],
-    };
+    lyrics.sections[0] = {id: 'hook', name: 'Hook', startBeat: 0, endBeat: 8, lines: [
+      {id: 'line-a', text: 'come back tonight', startBeat: 0, timingSource: 'manual'},
+      {id: 'line-b', text: 'meet me in the light', startBeat: 4, timingSource: 'manual'},
+    ]};
     renderLane([], 10, lyrics, {scale: {root: 'C', mode: 'major'}});
 
     fireEvent.pointerEnter(screen.getByRole('button', {name: 'Hook authored lyrics'}), {clientX: 80});
@@ -249,6 +245,25 @@ describe('TimelineLyricsLane', () => {
     expect(tooltip).toHaveTextContent('come back tonight');
     expect(tooltip).toHaveTextContent('Suggested progression');
     expect(tooltip).toHaveTextContent('C - G - Am - F');
+  });
+
+  it('does not render blank default authored lyrics as a timeline chip', () => {
+    const lyrics = defaultLyricDocument();
+    renderLane([], 10, lyrics, {}, true);
+
+    expect(screen.queryByLabelText('Lyrics lane')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '[Section 1] authored lyrics'})).not.toBeInTheDocument();
+  });
+
+  it('dedupes imported authored lyric sections against matching song analysis sections', () => {
+    const lyrics = defaultLyricDocument();
+    lyrics.sections[0] = {id: 'song-idea-0', name: 'Verse', startBeat: 0, endBeat: 16, lines: [
+      {id: 'song-idea-0-line-1', text: 'Nice to meet you', startBeat: 0, timingSource: 'estimated'},
+    ]};
+    renderLane([section('song-idea-0', 'Verse', 0, 16)], 10, lyrics);
+
+    expect(screen.getByRole('button', {name: 'Verse lyric analysis'})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Verse authored lyrics'})).not.toBeInTheDocument();
   });
 
   it('keeps a pinned popup open until closed', () => {

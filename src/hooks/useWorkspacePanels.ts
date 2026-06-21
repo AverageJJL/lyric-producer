@@ -11,6 +11,7 @@ export function useWorkspacePanels() {
   const [rightPanelWidth, setRightPanelWidth] = useState(RIGHT_DOCK_DEFAULT_WIDTH);
   const [isMixerOpen, setIsMixerOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
+  const [areColoredSectionsHidden, setColoredSectionsHidden] = useState(false);
 
   const toggleRightPanel = useCallback((panel: RightPanelId) => {
     setRightPanel(current => (current === panel ? null : panel));
@@ -33,7 +34,9 @@ export function useWorkspacePanels() {
     rightPanelWidth,
     isMixerOpen,
     isEditorOpen,
+    areColoredSectionsHidden,
     setRightPanelWidth,
+    setColoredSectionsHidden,
     toggleRightPanel,
     openRightPanel,
     toggleMixer,
