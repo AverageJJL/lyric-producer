@@ -178,10 +178,20 @@ Any future sidecar proposal must first update this plan and `AGENTS.md` with a n
 
 **Guardrail:** Execution schema excludes stereo width, pan, spatial imaging parameters (mono downmix LLM ingestion).
 
----
+### 3.7 Authored lyrics workspace
+The DAW workspace may include a right-dock Lyrics panel opened from a notebook nav
+button. Authored lyrics are project metadata: editable `[Section N]` sections, line
+text, optional beat timestamps, estimated line timing from section bounds, and
+playback word-lighting interpolated from line timing. This does not process audio in
+JS; future audio-derived alignment must be C++ or separately approved.
+
+A user-triggered similarity check may send authored lyric text to Electron main, where
+provider API keys stay hidden. It returns normalized match-risk metadata only
+(`low`/`medium`/`high`/`unavailable`, candidate metadata, scores, matched user line
+ids, and short user-authored overlap phrases). It is informational, not a legal
+copyright judgment, and full provider lyrics must not be persisted or displayed.
 
 ## 4. Arrangement & Command Contracts (For Agents)
-
 ### 4.1 `applyArrangementOperations` (existing)
 
 Location: `src/arrangement/operations.ts`

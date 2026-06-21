@@ -1,12 +1,20 @@
 import React from 'react';
 import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {openSamplesDock} from './helpers/workspacePanels';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const browseSamples = jest.fn();
 const sampleLibraryStatus = jest.fn();
@@ -92,6 +100,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   sampleLibraryStatus.mockResolvedValue(libraryStatus('missing'));
   downloadSampleLibrary.mockResolvedValue(libraryStatus('installed'));
   deleteSampleLibraryPack.mockResolvedValue(libraryStatus('missing'));
@@ -121,7 +132,7 @@ beforeEach(() => {
     relativePath: 'imports/kick.wav',
     name: 'Kick',
   });
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.mediaImport = {
     importAudio,
     browseSamples,
@@ -134,6 +145,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   browseSamples.mockReset();
   sampleLibraryStatus.mockReset();

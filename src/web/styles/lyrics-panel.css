@@ -1,0 +1,292 @@
+.lyrics-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  height: 100%;
+  color: rgba(238, 240, 244, 0.9);
+}
+
+.lyrics-panel-toolbar {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  padding: 4px 2px 10px;
+}
+
+.lyrics-panel-toolbar button,
+.lyrics-delete-section,
+.lyrics-delete-line,
+.lyrics-add-section {
+  display: grid;
+  place-items: center;
+  color: rgba(238, 240, 244, 0.68);
+  background: rgba(255, 255, 255, 0.055);
+  border: 0;
+  border-radius: 6px;
+}
+
+.lyrics-panel-toolbar button {
+  width: 28px;
+  height: 26px;
+}
+
+.lyrics-panel-toolbar button:hover,
+.lyrics-delete-section:hover,
+.lyrics-delete-line:hover,
+.lyrics-add-section:hover {
+  color: var(--text-main);
+  background: rgba(126, 174, 255, 0.16);
+}
+
+.lyrics-panel-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.lyrics-tool-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.lyrics-editor-stack {
+  display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: 42px;
+  min-height: 0;
+  overflow: auto;
+  padding: 54px 28px 180px 38px;
+  background: #151820;
+}
+
+.lyrics-editor-section {
+  position: relative;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-self: start;
+  gap: 14px;
+  min-height: 0;
+  padding: 12px;
+  overflow: visible;
+  color: rgba(238, 240, 244, 0.42);
+  background: transparent;
+  border-radius: 8px;
+  filter: blur(1px);
+  opacity: 0.42;
+  transition:
+    color 220ms ease,
+    filter 220ms ease,
+    opacity 220ms ease,
+    background 180ms ease;
+}
+
+.lyrics-editor-section:hover,
+.lyrics-editor-section:focus-within {
+  color: rgba(238, 240, 244, 0.9);
+  background: rgba(255, 255, 255, 0.045);
+  filter: none;
+  opacity: 1;
+}
+
+.lyrics-section-head {
+  display: grid;
+  grid-template-areas:
+    "name delete"
+    "times delete";
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: start;
+  gap: 8px;
+}
+
+.lyrics-section-name,
+.lyrics-line-input,
+.lyrics-time-input {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.lyrics-section-name {
+  grid-area: name;
+  min-width: 0;
+  height: 26px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.lyrics-section-times {
+  grid-area: times;
+  display: none;
+  gap: 8px;
+}
+
+.lyrics-editor-section:focus-within .lyrics-section-times {
+  display: flex;
+}
+
+.lyrics-time-input {
+  width: 58px;
+  padding: 4px 3px;
+  color: rgba(188, 207, 238, 0.76);
+  font-size: 10px;
+  font-weight: 760;
+  text-align: right;
+}
+
+.lyrics-section-time-field {
+  display: grid;
+  gap: 2px;
+  min-width: 58px;
+}
+
+.lyrics-section-time-field span {
+  color: rgba(188, 207, 238, 0.5);
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.lyrics-time-input:focus {
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+}
+
+.lyrics-delete-section,
+.lyrics-delete-line {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.lyrics-delete-section,
+.lyrics-delete-line {
+  grid-area: delete;
+}
+
+.lyrics-editor-section:hover .lyrics-delete-section,
+.lyrics-editor-section:focus-within .lyrics-delete-section,
+.lyrics-line-row:hover .lyrics-delete-line,
+.lyrics-line-row:focus-within .lyrics-delete-line {
+  opacity: 1;
+}
+
+.lyrics-line-list {
+  display: grid;
+  grid-auto-rows: max-content;
+  gap: 8px;
+}
+
+.lyrics-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  grid-template-areas: "input delete";
+  align-items: start;
+  column-gap: 8px;
+  min-width: 0;
+  padding: 6px 0;
+}
+
+.lyrics-line-row .lyrics-time-input {
+  grid-area: time;
+  display: none;
+}
+
+.lyrics-editor-section:focus-within .lyrics-line-row {
+  grid-template-columns: 58px minmax(0, 1fr) 24px;
+  grid-template-areas: "time input delete";
+}
+
+.lyrics-editor-section:focus-within .lyrics-line-row .lyrics-time-input {
+  display: block;
+}
+
+.lyrics-line-input-wrap {
+  grid-area: input;
+  position: relative;
+  min-width: 0;
+}
+
+.lyrics-line-input {
+  display: block;
+  box-sizing: border-box;
+  min-height: 34px;
+  padding: 2px 0 6px;
+  resize: none;
+  overflow: hidden;
+  color: rgba(238, 240, 244, 0.82);
+  font-size: 18px;
+  font-weight: 820;
+  line-height: 1.32;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lyrics-line-input::placeholder,
+.lyrics-panel-placeholder {
+  color: rgba(238, 240, 244, 0.22);
+  width: 100%;
+}
+
+.lyrics-add-section {
+  justify-self: center;
+  width: 86px;
+  height: 28px;
+  margin-top: 22px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.lyrics-panel:hover .lyrics-add-section,
+.lyrics-add-section:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lyrics-similarity-report {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.055);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lyrics-similarity-report strong {
+  color: #a9d8c2;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.lyrics-similarity-report.medium strong {
+  color: #f3d174;
+}
+
+.lyrics-similarity-report.high strong,
+.lyrics-similarity-report.unavailable strong {
+  color: #f27e7e;
+}
+
+.lyrics-similarity-report p,
+.lyrics-similarity-report small {
+  margin: 0;
+  color: rgba(238, 240, 244, 0.68);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyrics-editor-section,
+  .lyrics-delete-section,
+  .lyrics-delete-line,
+  .lyrics-add-section {
+    transition: none;
+  }
+}

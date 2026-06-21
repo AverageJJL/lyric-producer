@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-
 type UndoPolicy = 'history' | 'delegates-history' | 'no-history';
 
 const repoRoot = path.resolve(__dirname, '..');
 const storeSource = fs.readFileSync(path.join(repoRoot, 'src/store/useDAWStore.ts'), 'utf8');
 const storeImplementation = storeSource.slice(storeSource.indexOf('export const useDAWStore'));
+const lyricActionsSource = fs.readFileSync(path.join(repoRoot, 'src/store/lyricActions.ts'), 'utf8');
+const lyricActionsImplementation = lyricActionsSource.slice(lyricActionsSource.indexOf('export function createLyricActions'));
 const srcRoot = path.join(repoRoot, 'src');
 
 const actionPolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
@@ -68,6 +69,15 @@ const actionPolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
   setScale: {policy: 'history', reason: 'project music metadata'},
   setChord: {policy: 'history', reason: 'project music metadata'},
   setSections: {policy: 'history', reason: 'arranger sections'},
+  setLyrics: {policy: 'history', reason: 'authored lyrics document'},
+  addLyricSection: {policy: 'history', reason: 'authored lyrics section creation'}, removeLyricSection: {policy: 'history', reason: 'authored lyrics section deletion'},
+  renameLyricSection: {policy: 'history', reason: 'authored lyrics section metadata'}, setLyricSectionTiming: {policy: 'history', reason: 'authored lyrics section timing'},
+  addLyricLine: {policy: 'history', reason: 'authored lyrics line creation'}, removeLyricLine: {policy: 'history', reason: 'authored lyrics line deletion'},
+  updateLyricLineText: {policy: 'history', reason: 'authored lyrics line text'}, setLyricLineTiming: {policy: 'history', reason: 'authored lyrics line timing'},
+  stampLyricSectionStart: {policy: 'history', reason: 'authored lyrics playhead stamp'},
+  stampLyricLine: {policy: 'history', reason: 'authored lyrics playhead stamp'},
+  estimateLyricSectionTimings: {policy: 'history', reason: 'authored lyrics timing estimate'}, syncLyricTimings: {policy: 'history', reason: 'authored lyrics timing sync'},
+  setLyricSimilarityReport: {policy: 'history', reason: 'authored lyrics similarity metadata'},
   toggleTrackRecordArm: {policy: 'history', reason: 'track record-arm state'},
   selectTrack: {policy: 'no-history', reason: 'selection state'},
   setIsRecording: {policy: 'no-history', reason: 'recording runtime state'},
@@ -76,6 +86,7 @@ const actionPolicy: Record<string, {policy: UndoPolicy; reason: string}> = {
   abortRecordingSession: {policy: 'no-history', reason: 'recording cleanup'},
   clearRecordingError: {policy: 'no-history', reason: 'recording error UI'},
   finalizeRecordingSession: {policy: 'no-history', reason: 'recording transaction commit'},
+  addTrackWithBlock: {policy: 'history', reason: 'atomic track and clip creation'},
   addBlock: {policy: 'history', reason: 'clip creation'},
   createMidiClipAtBeat: {policy: 'history', reason: 'MIDI clip creation'},
   moveBlock: {policy: 'history', reason: 'clip timing'},
@@ -187,25 +198,43 @@ const directSetStatePolicy: Record<string, {policy: UndoPolicy; reason: string}>
   },
 };
 
-function declaredActionNames(): string[] {
-  const block = /type DAWActions = \{([\s\S]*?)\n\};/.exec(storeSource)?.[1];
+function actionNamesFromType(source: string, typeName: string): string[] {
+  const block = new RegExp(`(?:export\\s+)?type ${typeName} = [^{]*\\{([\\s\\S]*?)\\n\\};`)
+    .exec(source)?.[1];
   if (!block) {
-    throw new Error('Could not locate DAWActions declaration.');
+    throw new Error(`Could not locate ${typeName} declaration.`);
   }
   return [...block.matchAll(/^\s{2}([A-Za-z]\w*):/gm)].map(match => match[1]!);
 }
 
-function actionBody(actionName: string): string {
-  const match = new RegExp(`\\n\\s{2}${actionName}:`).exec(storeImplementation);
+function declaredActionNames(): string[] {
+  return [
+    ...actionNamesFromType(lyricActionsSource, 'LyricActions'),
+    ...actionNamesFromType(storeSource, 'DAWActions'),
+  ];
+}
+
+function actionBodyFrom(source: string, actionName: string, spaces: number): string | null {
+  const match = new RegExp(`\\n\\s{${spaces}}${actionName}:`).exec(source);
   if (!match) {
-    throw new Error(`Could not locate implementation for ${actionName}.`);
+    return null;
   }
   const bodyStart = match.index + match[0].length;
-  const next = /\n\s{2}[A-Za-z]\w*:\s/.exec(storeImplementation.slice(bodyStart));
-  return storeImplementation.slice(
+  const next = new RegExp(`\\n\\s{${spaces}}[A-Za-z]\\w*:\\s`)
+    .exec(source.slice(bodyStart));
+  return source.slice(
     bodyStart,
-    next ? bodyStart + next.index : storeImplementation.length,
+    next ? bodyStart + next.index : source.length,
   );
+}
+
+function actionBody(actionName: string): string {
+  const body = actionBodyFrom(storeImplementation, actionName, 2)
+    ?? actionBodyFrom(lyricActionsImplementation, actionName, 4);
+  if (!body) {
+    throw new Error(`Could not locate implementation for ${actionName}.`);
+  }
+  return body;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -239,7 +268,11 @@ describe('DAW store undo coverage policy', () => {
     const missingHistory = Object.entries(actionPolicy)
       .filter(([, entry]) => entry.policy === 'history')
       .map(([name]) => name)
-      .filter(name => !actionBody(name).includes('recordHistoryBeforeMutation(get)'));
+      .filter(name => {
+        const body = actionBody(name);
+        return !body.includes('recordHistoryBeforeMutation(get)') &&
+          !body.includes('recordHistory');
+      });
 
     expect(missingHistory).toEqual([]);
   });

@@ -6,6 +6,7 @@ import {
   AudioSpeakerIcon,
   BrowserFolderIcon,
   CopilotSparkIcon,
+  NotebookIcon,
   MixerSlidersIcon,
   SamplesWaveformIcon,
 } from './icons/WorkspaceIcons';
@@ -64,6 +65,14 @@ export function WorkspaceNavButtons({
         </button>
       </div>
       <div className="workspace-nav-group" role="group" aria-label="Copilot">
+        <button
+          type="button"
+          className={`workspace-nav-button ${rightPanel === 'lyrics' ? 'active' : ''}`}
+          aria-label="Lyrics"
+          aria-pressed={rightPanel === 'lyrics'}
+          onClick={() => onToggleRightPanel('lyrics')}>
+          <NotebookIcon className="workspace-nav-icon" />
+        </button>
         <button
           type="button"
           className={`workspace-nav-button ${rightPanel === 'copilot' ? 'active' : ''}`}

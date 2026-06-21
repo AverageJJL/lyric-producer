@@ -26,6 +26,7 @@ import {
 import {normalizeTrackOrganizationLabel, storedTrackHeightScale} from '../music/trackOrganization';
 import {storedTrackRoutingRole} from '../music/trackRouting';
 import {normalizeSectionMarker, normalizeTimeSignature, type SectionMarker} from '../store/projectMetadata';
+import {normalizeLyricDocument} from '../store/lyrics';
 import {
   emptyCopilotChatProjectState,
   normalizeCopilotChatProjectState,
@@ -122,6 +123,7 @@ export function normalizeSnapshot(snapshot: ProjectSnapshot): ProjectSnapshot {
     tempoMap: normalizeTempoMap(snapshot.tempoMap),
     meterMap: normalizeMeterMap(snapshot.meterMap),
     sections: normalizeSections(snapshot),
+    lyrics: normalizeLyricDocument(snapshot.lyrics),
     tracks: normalizeTracks(snapshot),
     blocks: normalizeBlocks(snapshot),
     snapGrid: normalizeSnapGrid(snapshot.snapGrid),

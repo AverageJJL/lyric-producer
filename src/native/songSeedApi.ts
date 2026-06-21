@@ -6,7 +6,10 @@ export type SongSeedTrack = {
   artist?: string;
   album?: string;
   releaseYear?: string;
+  isrc?: string;
+  commontrackId?: string;
   hasLyrics: boolean;
+  hasTrackStructure?: boolean;
   source: 'musixmatch';
 };
 
@@ -33,8 +36,50 @@ export type SongSeedSearchResponse =
   | {ok: false; code: ProviderErrorCode; error: string};
 
 export type SongSeedLyricsResponse =
-  | {ok: true; trackId: string; lyrics: string; copyright?: string}
+  | {
+      ok: true;
+      trackId: string;
+      lyrics: string;
+      copyright?: string;
+      structure?: SongSeedLyricStructure;
+      structureSource?: 'catalog-feed' | 'unavailable';
+      structureUnavailableReason?: string;
+    }
   | {ok: false; code: ProviderErrorCode | 'no_lyrics'; error: string};
+
+export type SongSeedLyricStructureRole =
+  | 'intro'
+  | 'verse'
+  | 'pre-chorus'
+  | 'chorus'
+  | 'hook'
+  | 'bridge'
+  | 'outro';
+
+export type SongSeedLyricStructure = Partial<Record<SongSeedLyricStructureRole, number[]>>;
+
+export type SongSeedLyricsSimilarityReport = {
+  checkedAt: string;
+  risk: 'low' | 'medium' | 'high' | 'unavailable';
+  matches: Array<{
+    candidateId: string;
+    title: string;
+    artist?: string;
+    score: number;
+    rhymeScore?: number;
+    longestOverlap: string;
+    matchedEndWords?: string[];
+    matchedLineIds: string[];
+    rhymeMatchedLineIds?: string[];
+  }>;
+  note?: string;
+};
+
+export type SongSeedLyricsSimilarityResponse =
+  | {ok: true; report: SongSeedLyricsSimilarityReport}
+  | {ok: false; code: ProviderErrorCode; error: string};
+
+export type LyricSectionSource = 'musixmatch-structure' | 'lyric-headers' | 'repetition' | 'model' | 'fallback-template';
 
 export type SongSeedBpmKeyResponse =
   | {
@@ -86,6 +131,8 @@ export type SongSeedAnalyzedSection = {
     risk: string;
   };
   confidence: number;
+  sectionSource?: LyricSectionSource;
+  sectionConfidence?: number;
 };
 
 export type SongSeedAnalysisResponse =
@@ -106,11 +153,22 @@ export type SongSeedAnalysisResponse =
 
 export type SongSeedBridge = {
   search: (request: {query?: string; limit?: number}) => Promise<SongSeedSearchResponse>;
-  getLyrics: (request: {trackId?: string}) => Promise<SongSeedLyricsResponse>;
+  getLyrics: (request: {
+    trackId?: string;
+    trackIsrc?: string;
+    commontrackId?: string;
+    hasTrackStructure?: boolean;
+    debugLog?: boolean;
+  }) => Promise<SongSeedLyricsResponse>;
+  checkLyricsSimilarity: (request: {
+    lyrics?: string;
+    lineIds?: string[];
+  }) => Promise<SongSeedLyricsSimilarityResponse>;
   lookupBpmKey: (request: {title?: string; artist?: string}) => Promise<SongSeedBpmKeyResponse>;
   analyze: (request: {
     track?: SongSeedTrack;
     lyrics?: string;
+    lyricStructure?: SongSeedLyricStructure;
     bpmKeyCandidates?: SongSeedBpmKeyCandidate[];
     publicContext?: string;
   }) => Promise<SongSeedAnalysisResponse>;
@@ -134,8 +192,24 @@ export function searchSongSeed(query: string, limit = 8): Promise<SongSeedSearch
   return globalThis.window?.songSeed?.search({query, limit}) ?? Promise.resolve(null);
 }
 
-export function getSongSeedLyrics(trackId: string): Promise<SongSeedLyricsResponse | null> {
-  return globalThis.window?.songSeed?.getLyrics({trackId}) ?? Promise.resolve(null);
+export function getSongSeedLyrics(track: SongSeedTrack | string): Promise<SongSeedLyricsResponse | null> {
+  const request = typeof track === 'string'
+    ? {trackId: track, debugLog: true}
+    : {
+        trackId: track.id,
+        trackIsrc: track.isrc,
+        commontrackId: track.commontrackId,
+        hasTrackStructure: track.hasTrackStructure,
+        debugLog: true,
+      };
+  return globalThis.window?.songSeed?.getLyrics(request) ?? Promise.resolve(null);
+}
+
+export function checkSongSeedLyricsSimilarity(input: {
+  lyrics?: string;
+  lineIds?: string[];
+}): Promise<SongSeedLyricsSimilarityResponse | null> {
+  return globalThis.window?.songSeed?.checkLyricsSimilarity(input) ?? Promise.resolve(null);
 }
 
 export function lookupSongSeedBpmKey(input: {
@@ -150,6 +224,7 @@ export function lookupSongSeedBpmKey(input: {
 export function analyzeSongSeed(input: {
   track?: SongSeedTrack;
   lyrics?: string;
+  lyricStructure?: SongSeedLyricStructure;
   bpmKeyCandidates?: SongSeedBpmKeyCandidate[];
   publicContext?: string;
 }): Promise<SongSeedAnalysisResponse | null> {

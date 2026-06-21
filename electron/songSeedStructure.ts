@@ -1,6 +1,7 @@
 import {knownPublicSongContext} from './songSeedMetadata';
 import {buildProducerInsight} from './songSeedProducerInsight';
 import type {SongSeedAnalyzeRequest, SongSeedAnalyzedSection} from './songSeedAnalysis';
+import {parseLyricSections} from './songSeedLyricSections';
 import {normalizeSongText} from './songSeedUtils';
 
 const SECTION_PLAN = [
@@ -41,8 +42,14 @@ export function buildFallbackSongSections(
     title: request.track.title,
     artist: request.track.artist,
   }) : null;
-  return SECTION_PLAN.map((plan, index) => {
-    const range = sectionRange(lines, index);
+  const detected = parseLyricSections(request.lyrics, request.lyricStructure).sections;
+  const planSections = detected.length ? detected : SECTION_PLAN.map((plan, index) => ({
+    ...plan,
+    ...sectionRange(lines, index),
+    sectionSource: 'fallback-template' as const,
+    sectionConfidence: publicContext ? 0.78 : 0.52,
+  }));
+  return planSections.map((plan, index) => {
     const productionDrivers = publicContext
       ? ['programmed drums', 'synths', 'percussion guitar', 'layered vocals']
       : plan.hook ? ['full drums', 'wide chords', 'vocal doubles'] : ['tight rhythm', 'filtered harmony', 'dry lead vocal'];
@@ -50,8 +57,8 @@ export function buildFallbackSongSections(
       id: `song-idea-${index}`,
       name: plan.name,
       bars: plan.bars,
-      lyricRange: {startLine: range.startLine, endLine: range.endLine},
-      lyrics: range.lyrics,
+      lyricRange: {startLine: plan.startLine, endLine: plan.endLine},
+      lyrics: plan.lyrics,
       mood: plan.hook ? 'bright, controlled, and hook-forward' : 'focused, intimate, and building',
       meaning: plan.hook
         ? 'The emotional thesis lands in a repeated phrase that can anchor the arrangement.'
@@ -60,11 +67,13 @@ export function buildFallbackSongSections(
       productionCue: productionDrivers.join(', '),
       producerInsight: buildProducerInsight({
         sectionName: plan.name,
-        lyrics: range.lyrics,
+        lyrics: plan.lyrics,
         hook: plan.hook,
         publicContext: publicContext?.productionContext,
       }),
-      confidence: publicContext ? 0.78 : 0.52,
+      confidence: plan.sectionConfidence,
+      sectionSource: plan.sectionSource,
+      sectionConfidence: plan.sectionConfidence,
     };
   });
 }

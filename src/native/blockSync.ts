@@ -4,7 +4,16 @@ import {patternStepsPayload} from '../music/drumPatterns';
 import type {DrumSampleKey} from '../assets/drumKit';
 import {useDAWStore, type DAWBlock} from '../store/useDAWStore';
 import {recordingTakeIsActive} from '../transport/recordingTakes';
-import {sendNativeAudioCommand} from './NativeAudioEngine';
+import {audioPathIsPlaybackReady} from './audioPlaybackPreparation';
+import * as NativeAudioEngine from './NativeAudioEngine';
+
+function sendNativeAudioCommand(command: string, payload: Record<string, unknown>): string | null {
+  return NativeAudioEngine.sendNativeAudioCommand(command, payload);
+}
+
+function sendFileAudioUpsertAsync(payload: Record<string, unknown>): void {
+  void NativeAudioEngine.sendNativeAudioCommandAsync('upsert_audio_clip', payload);
+}
 
 function blockIsMutedForPlayback(block: DAWBlock): boolean {
   const state = useDAWStore.getState();
@@ -64,6 +73,11 @@ export function shouldSyncFileAudioClip(block: DAWBlock): boolean {
     && trackIsPlayable(tracks, block.trackId);
 }
 
+function fileAudioIsPreparedForNativePlayback(block: DAWBlock): boolean {
+  return audioPathIsPlaybackReady(block.audioFilePath) ||
+    audioPathIsPlaybackReady(block.absoluteAudioFilePath);
+}
+
 function shouldRemoveNativeAudioClip(block: DAWBlock): boolean {
   return block.type === 'audio'
     && !isDrumPatternBlock(block)
@@ -71,6 +85,17 @@ function shouldRemoveNativeAudioClip(block: DAWBlock): boolean {
 }
 
 export function upsertBlockToEngine(block: DAWBlock): void {
+  upsertBlockToEngineWithOptions(block, {asyncFileAudio: false});
+}
+
+export function upsertBlockToEngineAsync(block: DAWBlock): void {
+  upsertBlockToEngineWithOptions(block, {asyncFileAudio: true});
+}
+
+function upsertBlockToEngineWithOptions(
+  block: DAWBlock,
+  options: {asyncFileAudio: boolean},
+): void {
   const tracks = useDAWStore.getState().tracks;
   if (!trackIsPlayable(tracks, block.trackId)) {
     sendNativeAudioCommand('delete_clip', {clipId: block.id});
@@ -121,6 +146,11 @@ export function upsertBlockToEngine(block: DAWBlock): void {
   }
 
   const shouldSyncFileAudio = shouldSyncFileAudioClip(block);
+  if (shouldSyncFileAudio && !fileAudioIsPreparedForNativePlayback(block)) {
+    sendNativeAudioCommand('delete_clip', {clipId: block.id});
+    return;
+  }
+
   if (shouldSyncFileAudio) {
     payload.audioFilePath = block.audioFilePath;
     if (block.absoluteAudioFilePath) {
@@ -128,6 +158,10 @@ export function upsertBlockToEngine(block: DAWBlock): void {
     }
   }
 
+  if (options.asyncFileAudio && shouldSyncFileAudio) {
+    sendFileAudioUpsertAsync(payload);
+    return;
+  }
   sendNativeAudioCommand('upsert_audio_clip', payload);
 }
 

@@ -59,6 +59,7 @@ export function compileApcSourceToSnapshot(source: ApcSourceProject): ApcCompile
     ...emptyProjectSnapshot(),
     ...source.project,
     ...source.timeline,
+    lyrics: source.lyrics,
     tracks,
     blocks,
     patterns,

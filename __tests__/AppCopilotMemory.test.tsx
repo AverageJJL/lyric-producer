@@ -75,8 +75,7 @@ afterEach(() => {
 
 async function sendCopilotMessage(text: string, expectedAnswer: string): Promise<void> {
   const input = screen.getByRole('textbox', {name: 'Message Copilot'});
-  input.replaceChildren(document.createTextNode(text));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: text}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
   await screen.findByText(expectedAnswer);
 }

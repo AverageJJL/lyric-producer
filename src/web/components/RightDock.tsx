@@ -11,6 +11,7 @@ import {
 import type {DAWBlock, DAWTrack} from '../../store/useDAWStore';
 import {AudioDevicePanel} from './AudioDevicePanel';
 import {LooperCompPanel} from './LooperCompPanel';
+import {LyricsPanel} from './LyricsPanel';
 import {MediaBinPanel} from './MediaBinPanel';
 import {RecordingTakesPanel} from './RecordingTakesPanel';
 import {SampleProviderPanel} from './SampleProviderPanel';
@@ -44,6 +45,7 @@ const PANEL_TITLES: Record<RightPanelId, string> = {
   samples: 'Samples',
   browser: 'Browser',
   audio: 'Audio',
+  lyrics: 'Lyrics',
   copilot: 'Copilot',
 };
 
@@ -175,6 +177,7 @@ export function RightDock({
             onSettingsChange={audioDeviceSetup.setDeviceSettings}
           />
         ) : null}
+        {panel === 'lyrics' ? <LyricsPanel /> : null}
         {panel === 'copilot' ? copilotPanel : null}
       </div>
     </aside>

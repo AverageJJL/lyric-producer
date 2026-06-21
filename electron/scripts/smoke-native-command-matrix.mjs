@@ -264,6 +264,7 @@ try {
   expectError(send('cancel_render_mixdown', {}), 'invalid_payload');
   expectError(send('get_render_mixdown_status', {}), 'invalid_payload');
   expectError(send('analyze_audio_file', {}), 'invalid_payload');
+  expectError(send('prepare_audio_file_for_playback', {}), 'invalid_payload');
   expectError(send('detect_audio_transients', {}), 'invalid_payload');
   expectError(send('start_audio_recording', {trackId: 'track-2'}), 'invalid_payload');
   expectError(send('render_spectrogram', {}), 'invalid_payload');
@@ -283,7 +284,7 @@ try {
     'start_midi_phrase_preview', 'stop_midi_phrase_preview', 'stop_pattern_preview',
     'render_mixdown', 'render_mixdown_async',
     'cancel_render_mixdown', 'get_render_mixdown_status', 'analyze_audio_file',
-    'detect_audio_transients', 'render_spectrogram', 'unknown_native_command',
+    'prepare_audio_file_for_playback', 'detect_audio_transients', 'render_spectrogram', 'unknown_native_command',
   ];
   for (const command of required) {
     assert.ok(observed.has(command), command + ' was not exercised');

@@ -1,6 +1,9 @@
 import {create} from 'zustand';
 
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import {refreshPlaybackAndInstruments} from '../native/refreshPlayback';
 import {
   createDefaultDrumPatternBlock,
@@ -143,12 +146,14 @@ import {
 function maxTimelineBeatForState(state: {
   blocks: DAWBlock[];
   sections: SectionMarker[];
+  lyrics: LyricDocument;
   playheadBeat: number;
   recordingBlockId: string | null;
 }): number {
   return computeVisibleTimelineBeats({
     blocks: state.blocks,
     sections: state.sections,
+    lyrics: state.lyrics,
     playheadBeat: state.playheadBeat,
     recordingBlockId: state.recordingBlockId,
   });
@@ -172,6 +177,8 @@ import {
 } from './projectMetadata';
 import type {LiveAudioPreview, LiveMidiPreview} from './livePreview';
 import {createLivePreviewActions} from './livePreviewActions';
+import {createLyricActions, type LyricActions} from './lyricActions';
+import {defaultLyricDocument, type LyricDocument} from './lyrics';
 import {
   buildRecordedWavSpectrogramRequest,
   dispatchRenderSpectrogram,
@@ -435,6 +442,7 @@ type DAWState = {
   scale: ScaleMetadata | null;
   chord: ChordMetadata | null;
   sections: SectionMarker[];
+  lyrics: LyricDocument;
   /** When set, sound is from explicit audition (keyboard/clip), not transport crossing clips. */
   midiAudition: MidiAuditionState | null;
   /** Transient MIDI input visualization, not in undo/snapshots. */
@@ -445,7 +453,7 @@ type DAWState = {
   auditionedRecordingTakeId: string | null;
 };
 
-type DAWActions = {
+type DAWActions = LyricActions & {
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -539,6 +547,7 @@ type DAWActions = {
   abortRecordingSession: (message: string) => void;
   clearRecordingError: () => void;
   finalizeRecordingSession: (payload?: DAWNote[] | RecordingFinalizePayload) => void;
+  addTrackWithBlock: (track: DAWTrack, block: DAWBlock) => void;
   addBlock: (block: DAWBlock) => void;
   createMidiClipAtBeat: (trackId: string, beat: number, lengthBeats?: number) => string | null;
   moveBlock: (blockId: string, startBeat: number, trackId?: string) => void;
@@ -976,11 +985,13 @@ export const useDAWStore = create<DAWStore>((set, get) => ({
   scale: null,
   chord: null,
   sections: [],
+  lyrics: defaultLyricDocument(),
   midiAudition: null,
   liveMidiPreviewByTrack: {},
   liveAudioPreviewByClip: {},
   auditionedRecordingTakeId: null,
   ...createLivePreviewActions(get, set),
+  ...createLyricActions(get, set, () => recordHistoryBeforeMutation(get)),
   undo: () => {
     undoArrangement(historyContext(get, set));
   },
@@ -1031,10 +1042,8 @@ export const useDAWStore = create<DAWStore>((set, get) => ({
 
     if (options?.syncTransport !== false) {
       const {isPlaying} = get();
-      sendNativeAudioCommand(
-        'transport_play',
-        buildNativeTransportPayload(isPlaying, clamped, positionSeconds),
-      );
+      const payload = buildNativeTransportPayload(isPlaying, clamped, positionSeconds);
+      void sendNativeAudioCommandAsync('transport_play', payload);
     }
   },
   setBpm: bpm => {
@@ -2171,6 +2180,17 @@ export const useDAWStore = create<DAWStore>((set, get) => ({
     recordHistoryBeforeMutation(get);
     set(state => ({
       blocks: [...state.blocks, block],
+      syncSource: 'ui',
+    }));
+  },
+  addTrackWithBlock: (track, block) => {
+    recordHistoryBeforeMutation(get);
+    set(state => ({
+      tracks: [...state.tracks, track],
+      blocks: [...state.blocks, block],
+      selectedTrackId: block.trackId,
+      selectedBlockId: block.id,
+      selectedBlockIds: [block.id],
       syncSource: 'ui',
     }));
   },

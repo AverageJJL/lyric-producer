@@ -107,8 +107,10 @@ class ProjectState {
  public:
   void setAssetRoot(std::string root);
   void setWritableAssetRoot(std::string root);
+  void setSampleLibraryRoot(std::string root);
   const std::string& assetRoot() const { return assetRoot_; }
   const std::string& writableAssetRoot() const { return writableAssetRoot_; }
+  const std::string& sampleLibraryRoot() const { return sampleLibraryRoot_; }
 
   std::string resolveAssetPath(const std::string& relativePath) const;
 
@@ -149,6 +151,7 @@ class ProjectState {
  private:
   std::string assetRoot_;
   std::string writableAssetRoot_;
+  std::string sampleLibraryRoot_;
   std::vector<UiTrackRecord> uiTracks_;
   std::unordered_map<std::string, int> trackIndexById_;
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>> drumKitByTrack_;

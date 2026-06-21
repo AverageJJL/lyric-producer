@@ -20,7 +20,10 @@ import {
   createNativeSurfaceWindowOptions,
   installNativeSurfaceWebContents,
 } from './nativeSurfaceWindow';
-import {runNativeIpcWithTrace} from './nativeIpcTrace';
+import {
+  runNativeIpcWithTrace,
+  runNativeIpcWithTraceAsync,
+} from './nativeIpcTrace';
 import {
   DEFAULT_MAIN_WINDOW_BOUNDS,
   installMainWindowStatePersistence,
@@ -30,8 +33,9 @@ import {
 import {focusExistingWindow, projectCommandFromArgv} from './singleInstance';
 
 type NativeAudioAddon = {
-  initEngine: (readRoot: string, writableRoot: string) => string;
+  initEngine: (readRoot: string, writableRoot: string, sampleLibraryRoot?: string) => string;
   sendCommand: (command: string, payloadJson: string) => string;
+  sendCommandAsync?: (command: string, payloadJson: string) => Promise<string>;
   setEventCallback: (
     callback: (eventName: string, payloadJson: string) => void,
   ) => void;
@@ -165,7 +169,8 @@ function initializeAudioEngine() {
   });
 
   const {readRoot, writableRoot} = assetRoots();
-  addon.initEngine(readRoot, writableRoot);
+  const {writableRoot: sampleLibraryRoot} = appWideRoots();
+  addon.initEngine(readRoot, writableRoot, sampleLibraryRoot);
 }
 
 function createWindow() {
@@ -226,6 +231,28 @@ ipcMain.on('audio-engine:send-command', (event, command: string, payloadJson: st
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown native bridge error';
     event.returnValue = JSON.stringify({ok: false, error: message});
+  }
+});
+
+ipcMain.handle('audio-engine:send-command-async', async (_event, command: string, payloadJson: string) => {
+  try {
+    const addon = resolveNativeAddon();
+    if (!addon.sendCommandAsync) {
+      return JSON.stringify({
+        ok: false,
+        code: 'async_unavailable',
+        error: 'Native async command bridge is unavailable. Rebuild the native addon.',
+      });
+    }
+    return await runNativeIpcWithTraceAsync({
+      command,
+      payloadJson,
+      isPackaged: app.isPackaged,
+      invoke: () => addon.sendCommandAsync!(command, payloadJson),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown native bridge error';
+    return JSON.stringify({ok: false, error: message});
   }
 });
 

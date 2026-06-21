@@ -228,6 +228,7 @@ test('opens a recent project folder through the bridge', async () => {
     JSON.stringify(['/tmp/recent.apc']),
   );
   openProjectFolder.mockResolvedValue({ok: true, path: '/tmp/recent.apc', files});
+  sendCommand.mockClear();
 
   render(<App />);
   openProjectMenu();
@@ -237,7 +238,71 @@ test('opens a recent project folder through the bridge', async () => {
   });
 
   expect(openProjectFolder).toHaveBeenCalledWith({path: '/tmp/recent.apc'});
+  expect(sendCommand.mock.calls.map(([command]) => command)).not.toContain(
+    'refresh_audio_device',
+  );
   expect(useDAWStore.getState().tracks[0]?.type).toBe('drum_machine');
+});
+
+test('opens recent projects with external audio clips without native audio upserts', async () => {
+  jest.useFakeTimers();
+  try {
+    const stems = ['bass', 'drums', 'guitar', 'other', 'piano'];
+    useDAWStore.setState({
+      tracks: stems.map((stem, index) => ({
+        id: `track-frozen-${index}`,
+        name: `Frozen Hearts ${stem}`,
+        isMuted: false,
+        isSolo: false,
+        type: 'voice_audio' as const,
+        instrumentId: 'voice_audio',
+        presetId: 'voice_audio',
+        isRecordArmed: false,
+        isLocked: false,
+      })),
+      blocks: stems.map((stem, index) => ({
+        id: `clip-frozen-${index}`,
+        trackId: `track-frozen-${index}`,
+        name: `Frozen Hearts_${stem}`,
+        startBeat: 0,
+        lengthBeats: 248.163,
+        type: 'audio' as const,
+        color: '#5a8cff',
+        audioFilePath: `imports/Frozen Hearts_${stem}-3.mp3`,
+        absoluteAudioFilePath:
+          `/Users/jlang/Library/Application Support/MusicApp/assets/imports/Frozen Hearts_${stem}-3.mp3`,
+        sourceLengthBeats: 248.163,
+        sourceOffsetBeats: 0,
+      })),
+    });
+    const files = apcFiles();
+    resetStore();
+    window.localStorage.setItem(
+      'aiProducerCore.recentProjects',
+      JSON.stringify(['/tmp/frozen-hearts.apc']),
+    );
+    openProjectFolder.mockResolvedValue({ok: true, path: '/tmp/frozen-hearts.apc', files});
+
+    render(<App />);
+    sendCommand.mockClear();
+    openProjectMenu();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', {name: 'frozen-hearts.apc'}));
+    });
+    act(() => {
+      jest.advanceTimersByTime(250);
+    });
+
+    const commandNames = sendCommand.mock.calls.map(([command]) => command);
+    expect(openProjectFolder).toHaveBeenCalledWith({path: '/tmp/frozen-hearts.apc'});
+    expect(commandNames).not.toContain('refresh_audio_device');
+    expect(commandNames).not.toContain('upsert_audio_clip');
+    expect(useDAWStore.getState().blocks).toHaveLength(5);
+  } finally {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  }
 });
 
 test('marks missing audio media when opening a project', async () => {
@@ -293,6 +358,62 @@ test('marks missing audio media when opening a project', async () => {
   expect(useDAWStore.getState().blocks[0]?.isMissingMedia).toBe(true);
   openProjectMenu();
   expect(screen.getByTitle('Project opened (1 missing media)')).toBeInTheDocument();
+});
+
+test('startup audio-device heal does not re-upsert restored project media', () => {
+  jest.useFakeTimers();
+  try {
+    useDAWStore.setState({
+      tracks: [{
+        id: 'track-audio',
+        name: 'Audio',
+        isMuted: false,
+        isSolo: false,
+        type: 'voice_audio',
+        instrumentId: 'voice_audio',
+        presetId: 'voice_audio',
+        isRecordArmed: false,
+        isLocked: false,
+      }],
+      blocks: [{
+        id: 'clip-audio',
+        trackId: 'track-audio',
+        name: 'Frozen Hearts',
+        startBeat: 0,
+        lengthBeats: 248,
+        type: 'audio',
+        color: '#5a8cff',
+        audioFilePath: 'imports/Frozen Hearts_bass-3.mp3',
+        absoluteAudioFilePath:
+          '/Users/jlang/Library/Application Support/MusicApp/assets/imports/Frozen Hearts_bass-3.mp3',
+        sourceLengthBeats: 248,
+        sourceOffsetBeats: 0,
+      }],
+    });
+
+    render(<App />);
+    sendCommand.mockClear();
+
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    const commandNames = sendCommand.mock.calls.map(([command]) => command);
+    expect(commandNames).toContain('refresh_audio_device');
+    expect(sendCommand).toHaveBeenCalledWith(
+      'refresh_audio_device',
+      JSON.stringify({
+        useSystemDefault: true,
+        forceReopen: false,
+        restoreStereoPlayback: false,
+      }),
+    );
+    expect(commandNames).not.toContain('upsert_audio_clip');
+    expect(commandNames).not.toContain('setTracks');
+  } finally {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  }
 });
 
 test('recovers an autosave draft into dirty project state', async () => {

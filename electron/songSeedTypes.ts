@@ -4,9 +4,25 @@ export type SongSeedTrack = {
   artist?: string;
   album?: string;
   releaseYear?: string;
+  isrc?: string;
+  commontrackId?: string;
   hasLyrics: boolean;
+  hasTrackStructure?: boolean;
   source: 'musixmatch';
 };
+
+export type SongSeedLyricStructureRole =
+  | 'intro'
+  | 'verse'
+  | 'pre-chorus'
+  | 'chorus'
+  | 'hook'
+  | 'bridge'
+  | 'outro';
+
+export type SongSeedLyricStructure = Partial<Record<SongSeedLyricStructureRole, number[]>>;
+
+export type SongSeedLyricStructureSource = 'catalog-feed' | 'unavailable';
 
 export type SongSeedSearchRequest = {
   query?: string;
@@ -15,6 +31,15 @@ export type SongSeedSearchRequest = {
 
 export type SongSeedLyricsRequest = {
   trackId?: string;
+  trackIsrc?: string;
+  commontrackId?: string;
+  hasTrackStructure?: boolean;
+  debugLog?: boolean;
+};
+
+export type SongSeedLyricsSimilarityRequest = {
+  lyrics?: string;
+  lineIds?: string[];
 };
 
 export type SongSeedBpmKeyRequest = {
@@ -45,8 +70,39 @@ export type SongSeedSearchResponse =
   | {ok: false; code: ProviderErrorCode; error: string};
 
 export type SongSeedLyricsResponse =
-  | {ok: true; trackId: string; lyrics: string; copyright?: string}
+  | {
+      ok: true;
+      trackId: string;
+      lyrics: string;
+      copyright?: string;
+      structure?: SongSeedLyricStructure;
+      structureSource?: SongSeedLyricStructureSource;
+      structureUnavailableReason?: string;
+    }
   | {ok: false; code: ProviderErrorCode | 'no_lyrics'; error: string};
+
+export type SongSeedLyricsSimilarityMatch = {
+  candidateId: string;
+  title: string;
+  artist?: string;
+  score: number;
+  rhymeScore?: number;
+  longestOverlap: string;
+  matchedEndWords?: string[];
+  matchedLineIds: string[];
+  rhymeMatchedLineIds?: string[];
+};
+
+export type SongSeedLyricsSimilarityReport = {
+  checkedAt: string;
+  risk: 'low' | 'medium' | 'high' | 'unavailable';
+  matches: SongSeedLyricsSimilarityMatch[];
+  note?: string;
+};
+
+export type SongSeedLyricsSimilarityResponse =
+  | {ok: true; report: SongSeedLyricsSimilarityReport}
+  | {ok: false; code: ProviderErrorCode; error: string};
 
 export type SongSeedBpmKeyCandidate = {
   title: string;

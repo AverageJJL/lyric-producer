@@ -1,7 +1,8 @@
 import type {ProducerInsight, ScaleMetadata, SectionMarker} from '../store/projectMetadata';
 import {cloneReferenceMoodAnalysis, type ReferenceMoodAnalysis} from '../store/referenceMoodAnalysis';
-import type {SongSeedBpmKeyResponse, SongSeedTrack} from '../native/songSeedApi';
+import type {SongSeedBpmKeyResponse, SongSeedLyricStructure, SongSeedTrack} from '../native/songSeedApi';
 import {useDAWStore} from '../store/useDAWStore';
+import {parseLyricSections, type LyricSectionSource} from './lyricSectioning';
 import {createProducerInsight} from './producerInsight';
 
 export type SongIdeaSectionAnalysis = {
@@ -17,6 +18,9 @@ export type SongIdeaSectionAnalysis = {
   productionCue: string;
   producerInsight?: ProducerInsight;
   confidence: number;
+  sectionSource?: LyricSectionSource;
+  sectionConfidence?: number;
+  structureNote?: string;
 };
 
 export type SongIdeaAnalysis = {
@@ -40,6 +44,8 @@ type SongIdeaAnalysisInput = Omit<SongIdeaAnalysis, 'sections'> & {
 export type SongIdeaAnalysisSeed = {
   track: SongSeedTrack;
   lyrics?: string;
+  lyricStructure?: SongSeedLyricStructure;
+  structureNote?: string;
   bpmKey?: SongSeedBpmKeyResponse | null;
 };
 
@@ -69,13 +75,6 @@ function hashText(value: string): number {
 function scaleFromKey(value: string | undefined, fallback: ScaleMetadata): ScaleMetadata {
   const root = value?.match(/[A-G](?:#|b)?/)?.[0];
   return root ? {root, mode: /min|minor|m\b/i.test(value ?? '') ? 'minor' : 'major'} : fallback;
-}
-
-function lyricLines(value: string | undefined): string[] {
-  return (value ?? '')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.startsWith('*******'));
 }
 
 function rangeFor(lines: string[], index: number) {
@@ -112,7 +111,8 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
   const artist = seed.track.artist ?? matched?.artist;
   const hash = hashText(`${title} ${artist ?? ''}`.toLowerCase());
   const fallbackScale = {root: ROOTS[hash % ROOTS.length], mode: hash % 3 === 0 ? 'minor' : 'major'};
-  const lines = lyricLines(seed.lyrics);
+  const parsedLyrics = parseLyricSections(seed.lyrics, seed.lyricStructure);
+  const lines = parsedLyrics.lines;
   const best = matched?.candidates?.[0] ?? null;
   const bpm = matched?.bpm ?? best?.bpm ?? 84 + (hash % 54);
   const scale = scaleFromKey(matched?.key ?? best?.key, fallbackScale);
@@ -128,8 +128,17 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
       confidence: matched?.confidence ?? 0.34,
       note: matched?.note,
     },
-    sections: SECTION_PLAN.map((plan, index) => {
+    sections: (parsedLyrics.sections.length ? parsedLyrics.sections : SECTION_PLAN.map((plan, index) => {
       const range = rangeFor(lines, index);
+      return {
+        ...plan,
+        startLine: range.startLine,
+        endLine: range.endLine,
+        lyrics: range.lyrics,
+        sectionSource: 'fallback-template' as const,
+        sectionConfidence: matched ? matched.confidence : 0.52,
+      };
+    })).map((plan, index) => {
       const productionDrivers = plan.hook
         ? ['full drums', 'wide harmony', 'vocal doubles']
         : ['tight rhythm', 'filtered harmony', 'dry lead vocal'];
@@ -137,9 +146,9 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
         id: `song-idea-${index}`,
         name: plan.name,
         bars: plan.bars,
-        lyricRange: {startLine: range.startLine, endLine: range.endLine},
-        lyrics: range.lyrics,
-        lyricPreview: range.lyrics,
+        lyricRange: {startLine: plan.startLine, endLine: plan.endLine},
+        lyrics: plan.lyrics,
+        lyricPreview: plan.lyrics,
         mood: plan.hook ? 'open, memorable, and hook-forward' : 'focused, intimate, and building',
         meaning: plan.hook
           ? 'The central emotional idea resolves into a repeatable hook.'
@@ -148,12 +157,15 @@ export function createSongIdeaAnalysis(seed: SongIdeaAnalysisSeed): SongIdeaAnal
         productionCue: productionDrivers.join(', '),
         producerInsight: createProducerInsight({
           sectionName: plan.name,
-          lyrics: range.lyrics,
+          lyrics: plan.lyrics,
           hook: plan.hook,
           title,
           artist,
         }),
-        confidence: matched ? matched.confidence : 0.52,
+        confidence: plan.sectionConfidence,
+        sectionSource: plan.sectionSource,
+        sectionConfidence: plan.sectionConfidence,
+        structureNote: seed.structureNote,
       };
     }),
   });
@@ -189,6 +201,9 @@ export function sectionsFromSongIdea(analysis: SongIdeaAnalysis): SectionMarker[
         bpmSource: analysis.bpmKey.source,
         bpmConfidence: analysis.bpmKey.confidence,
         confidence: section.confidence,
+        sectionSource: section.sectionSource,
+        sectionConfidence: section.sectionConfidence,
+        structureNote: section.structureNote,
         reference: analysis.reference ? cloneReferenceMoodAnalysis(analysis.reference) : undefined,
         lyricRange: {...section.lyricRange},
         lyrics: [...section.lyrics],

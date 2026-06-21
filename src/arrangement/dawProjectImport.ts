@@ -5,13 +5,14 @@ import {createTrackFromTemplate, type TrackTemplateId} from '../music/trackTempl
 import {DEFAULT_TRACK_VOLUME_DB} from '../music/trackMix';
 import type {DAWBlock, DAWNote, DAWTrack, TrackType} from '../store/useDAWStore';
 import {normalizeSectionMarker, type SectionMarker} from '../store/projectMetadata';
+import {normalizeLyricDocument} from '../store/lyrics';
 import {BLOCK_COLORS} from '../ui/timelineLayout';
 import {emptyProjectSnapshot} from './projectSnapshot';
 import type {DawProjectAudioAnalyzer, DawProjectImportPackage, DawProjectImportResult, DawProjectImportedMedia} from './dawProjectTypes';
 import {attrBoolean, attrNumber, attrString, directChild, directChildren, parseXml} from './dawProjectXml';
 
 type ExtensionTrack = {dawTrackId?: string; type?: TrackType; color?: string};
-type ExtensionData = {tracks: ExtensionTrack[]; sections: unknown[]};
+type ExtensionData = {tracks: ExtensionTrack[]; sections: unknown[]; lyrics?: unknown};
 type ImportTrack = {dawId: string; local: DAWTrack; color: string};
 
 function parseExtension(raw: string | undefined): ExtensionData {
@@ -19,8 +20,12 @@ function parseExtension(raw: string | undefined): ExtensionData {
     return {tracks: [], sections: []};
   }
   try {
-    const parsed = JSON.parse(raw) as {tracks?: ExtensionTrack[]; sections?: unknown[]};
-    return {sections: Array.isArray(parsed.sections) ? parsed.sections : [], tracks: Array.isArray(parsed.tracks) ? parsed.tracks : []};
+    const parsed = JSON.parse(raw) as {tracks?: ExtensionTrack[]; sections?: unknown[]; lyrics?: unknown};
+    return {
+      sections: Array.isArray(parsed.sections) ? parsed.sections : [],
+      tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
+      lyrics: parsed.lyrics,
+    };
   } catch {
     return {tracks: [], sections: []};
   }
@@ -282,6 +287,7 @@ export function dawProjectSnapshotFromPackage(
     numerator: attrNumber(signature, 'numerator', snapshot.timeSignature.numerator),
   };
   snapshot.sections = extension.sections.map(normalizeSectionMarker).filter((section): section is SectionMarker => section !== null);
+  snapshot.lyrics = normalizeLyricDocument(extension.lyrics);
   snapshot.tracks = tracks.map(track => track.local);
   snapshot.blocks = blocks;
   snapshot.patterns = patterns;

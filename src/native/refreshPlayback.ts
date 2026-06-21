@@ -7,7 +7,7 @@ import {buildNativeLoopRangePayload} from './loopRangePayload';
 import {buildNativeTempoMapPayload} from './tempoMapPayload';
 import type {DAWBlock, DAWTrack} from '../store/useDAWStore';
 import {useDAWStore} from '../store/useDAWStore';
-import {shouldSyncFileAudioClip, upsertBlockToEngine} from './blockSync';
+import {shouldSyncFileAudioClip, upsertBlockToEngineAsync} from './blockSync';
 
 function parseCommandData(response: string | null): Record<string, unknown> | null {
   if (!response) {
@@ -88,7 +88,7 @@ export function syncMasterMixToEngine(): void {
 }
 
 export function upsertBlockForEngine(block: DAWBlock): void {
-  upsertBlockToEngine(block);
+  upsertBlockToEngineAsync(block);
 }
 
 function syncFileBackedAudioClips(blocks: DAWBlock[]): void {
@@ -103,20 +103,27 @@ export type RefreshPlaybackOptions = {
   useSystemDefault?: boolean;
   outputDeviceName?: string;
   restoreStereoPlayback?: boolean;
+  forceReopen?: boolean;
+  syncArrangement?: boolean;
 };
 
 function runRefreshPlayback(options: RefreshPlaybackOptions): boolean {
   const useSystemDefault = options.useSystemDefault ?? false;
   const outputDeviceName = options.outputDeviceName;
   const restoreStereoPlayback = options.restoreStereoPlayback ?? false;
+  const forceReopen = options.forceReopen ?? true;
   const response = sendNativeAudioCommand('refresh_audio_device', {
     useSystemDefault: outputDeviceName ? false : useSystemDefault,
-    forceReopen: true,
+    forceReopen,
     restoreStereoPlayback,
     ...(outputDeviceName ? {outputDeviceName} : {}),
   });
   if (!response?.includes('"ok":true')) {
     return false;
+  }
+
+  if (options.syncArrangement === false) {
+    return true;
   }
 
   const {tracks, blocks} = useDAWStore.getState();
@@ -135,6 +142,11 @@ function runRefreshPlayback(options: RefreshPlaybackOptions): boolean {
 /** Reopen output and re-bind clips/instruments. */
 export function refreshPlaybackAndInstruments(options?: RefreshPlaybackOptions): void {
   runRefreshPlayback(options ?? {});
+}
+
+/** Startup/visibility heal: check the device without rebuilding every saved clip. */
+export function refreshPlaybackDeviceOnly(options?: RefreshPlaybackOptions): void {
+  runRefreshPlayback({...options, syncArrangement: false});
 }
 
 /**

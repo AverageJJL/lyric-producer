@@ -11,10 +11,13 @@ import {TrackSidebarRow} from '../src/web/components/TrackSidebarRow';
 type RecordingLaunch = ReturnType<typeof useRecordingLaunch>;
 
 const mockSendNativeAudioCommand = jest.fn();
+const mockSendNativeAudioCommandAsync = jest.fn();
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: (command: string, payload: unknown) =>
     mockSendNativeAudioCommand(command, payload),
+  sendNativeAudioCommandAsync: (command: string, payload: unknown) =>
+    mockSendNativeAudioCommandAsync(command, payload),
 }));
 
 const track: DAWTrack = {
@@ -105,10 +108,16 @@ describe('AudioClipEditorPanel render errors', () => {
     resetStore();
     installRenderBridge();
     mockSendNativeAudioCommand.mockReset();
+    mockSendNativeAudioCommandAsync.mockReset();
+    mockSendNativeAudioCommandAsync.mockImplementation(async (command: string, payload: unknown) =>
+      mockSendNativeAudioCommand(command, payload),
+    );
   });
 
   afterEach(() => {
     delete window.mediaImport;
+    mockSendNativeAudioCommand.mockReset();
+    mockSendNativeAudioCommandAsync.mockReset();
   });
 
   it('shows track row mute as active when the track is muted', () => {

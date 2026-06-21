@@ -111,6 +111,7 @@ add_library(MusicAppEngine STATIC
   AskMeasurementCommands.cpp
   AskMeasurementDsp.cpp
   MediaAnalysisCommands.cpp
+  MediaPreparationCommands.cpp
   MeterSnapshot.cpp
   MixdownRenderManager.cpp
   SpectrogramRenderer.cpp

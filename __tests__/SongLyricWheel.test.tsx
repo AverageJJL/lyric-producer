@@ -96,6 +96,24 @@ describe('SongLyricWheel', () => {
     expect(words[1]).not.toHaveClass('is-lit');
   });
 
+  it('does not render raw unstructured lyrics before the section model is ready', () => {
+    render(
+      <SongLyricWheel
+        analysis={null}
+        activeSection={0}
+        analysisPhase="checking-metadata"
+        lyricsText={'Oh, woah\nOh, woah\nYou know you love me'}
+        lyricsState="ready"
+        selectedTitle="Baby"
+        copyright={null}
+        onActiveSectionChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Structuring lyrics.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('You know you love me')).not.toBeInTheDocument();
+  });
+
   it('prefers the next visible lyric section when the active analysis section has no lyrics', () => {
     const nextAnalysis = analysis();
     nextAnalysis.sections = [

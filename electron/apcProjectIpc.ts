@@ -10,6 +10,7 @@ type ApcSourceFile = {relativePath: string; content: string};
 type ApcProjectIpcConfig = {
   getMainWindow: () => BrowserWindow | null;
   assetRoots: () => {readRoot: string; writableRoot: string};
+  appWideRoots: () => {readRoot: string; writableRoot: string};
   /** Record which project folder is active (for asset re-homing / diagnostics). */
   recordActiveProjectFolder: (folderPath: string | null) => void;
   sendNativeCommand: (command: string, payloadJson: string) => string;
@@ -185,8 +186,12 @@ export function registerApcProjectIpc(config: ApcProjectIpcConfig): void {
       // with the active project. (Per-project media re-homing under Song.apc/assets
       // builds on this call path and is finalized during runtime verification.)
       const {readRoot, writableRoot} = config.assetRoots();
-      config.sendNativeCommand('set_asset_root', JSON.stringify({root: readRoot, writableRoot}));
-      return {ok: true, writableRoot};
+      const {writableRoot: sampleLibraryRoot} = config.appWideRoots();
+      config.sendNativeCommand(
+        'set_asset_root',
+        JSON.stringify({root: readRoot, writableRoot, sampleLibraryRoot}),
+      );
+      return {ok: true, writableRoot, sampleLibraryRoot};
     } catch (error) {
       return {ok: false, error: messageFrom(error, 'Could not set project asset root.')};
     }

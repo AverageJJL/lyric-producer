@@ -37,6 +37,7 @@ export function registerMainIpc(options: MainIpcOptions): void {
   registerApcProjectIpc({
     getMainWindow: options.getMainWindow,
     assetRoots: options.assetRoots,
+    appWideRoots: options.appWideRoots,
     recordActiveProjectFolder: options.recordActiveProjectFolder,
     sendNativeCommand: options.sendNativeCommand,
   });

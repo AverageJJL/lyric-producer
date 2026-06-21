@@ -4,6 +4,7 @@ import type {DrumPattern} from '../../music/drumPatterns';
 import type {TrackFxState} from '../../native/fxContract';
 import type {TrackAmpSimState} from '../../native/ampSimContract';
 import type {CopilotChatProjectState} from '../../assistant/copilotChatHistory';
+import type {LyricDocument} from '../../store/lyrics';
 
 /**
  * Types and path conventions for the folder-based `.apc` source format.
@@ -25,6 +26,7 @@ export const APC_FILE = {
   manifest: 'manifest.json',
   project: 'project.json',
   timeline: 'timeline.json',
+  lyrics: 'lyrics.json',
   copilot: 'copilot.json',
 } as const;
 
@@ -50,6 +52,7 @@ export const APC_PATHS = {
   manifest: APC_FILE.manifest,
   project: APC_FILE.project,
   timeline: APC_FILE.timeline,
+  lyrics: APC_FILE.lyrics,
   copilot: APC_FILE.copilot,
   track: (id: string) => `${APC_DIR.tracks}/${fileSegment(id)}.json`,
   clip: (id: string) => `${APC_DIR.clips}/${fileSegment(id)}.json`,
@@ -108,6 +111,8 @@ export type ApcTimelineFile = Pick<
   'tempoMap' | 'meterMap' | 'timeSignature' | 'sections'
 >;
 
+export type ApcLyricsFile = LyricDocument;
+
 /** Per-track FX + optional amp-sim, stored together in fx/<trackId>.json. */
 export type ApcTrackFxFile = {
   fx: TrackFxState;
@@ -121,6 +126,7 @@ export type ApcSourceProject = {
   manifest: ApcProjectManifest;
   project: ApcProjectFile;
   timeline: ApcTimelineFile;
+  lyrics: ApcLyricsFile;
   copilot: ApcCopilotFile;
   tracks: Record<string, DAWTrack>;
   clips: Record<string, DAWBlock>;

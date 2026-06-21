@@ -95,6 +95,28 @@ export function CopilotSparkIcon({className}: IconProps) {
   );
 }
 
+export function NotebookIcon({className}: IconProps) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" aria-hidden="true">
+      <rect x="42" y="58" width="24" height="16" rx="8" fill="currentColor" opacity="0.55" />
+      <rect x="42" y="92" width="24" height="16" rx="8" fill="currentColor" opacity="0.55" />
+      <rect x="42" y="126" width="24" height="16" rx="8" fill="currentColor" opacity="0.55" />
+      <rect x="58" y="40" width="100" height="120" rx="18" fill="currentColor" opacity="0.68" />
+      <path d="M 88 52 L 88 148 L 76 148 A 6 6 0 0 1 70 142 L 70 58 A 6 6 0 0 1 76 52 Z" fill="currentColor" />
+      <path d="M 100 52 L 140 52 A 6 6 0 0 1 146 58 L 146 142 A 6 6 0 0 1 140 148 L 100 148 Z" fill="currentColor" opacity="0.34" />
+    </svg>
+  );
+}
+
+export function DeleteLeftIcon({className}: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 5H9l-6 7 6 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M10 9l6 6m0-6l-6 6" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function SendHorizontalIcon({className}: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true">

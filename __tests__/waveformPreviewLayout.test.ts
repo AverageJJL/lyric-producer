@@ -40,6 +40,7 @@ describe('waveformPreviewLayout', () => {
     const layout = waveformPreviewLayout(peaks, true, 8, 8 * PIXELS_PER_BEAT, 40, 8);
     expect(layout.pathD.endsWith('Z')).toBe(true);
     expect(layout.pathD.startsWith('M')).toBe(true);
+    expect(layout.pathD).toContain(' Q ');
   });
 
   it('keeps live peak X positions stable when more peaks arrive', () => {
@@ -71,6 +72,7 @@ describe('waveformPreviewLayout', () => {
     );
     expect(firstPathVertexX(layoutEarly.pathD)).toBe(LIVE_WAVEFORM_PIXELS_PER_PEAK / 2);
     expect(firstPathVertexX(layoutLater.pathD)).toBe(firstPathVertexX(layoutEarly.pathD));
+    expect(layoutLater.pathD).toContain(' Q ');
   });
 
   it('reverses the visual peak order when source playback is reversed', () => {
@@ -172,8 +174,9 @@ describe('waveformPreviewLayout', () => {
 });
 
 describe('buildBipolarEnvelopePath', () => {
-  it('closes the polygon', () => {
+  it('closes the smoothed envelope path', () => {
     const path = buildBipolarEnvelopePath([0.5, 1, 0.3], 100, 20, 36);
     expect(path.endsWith('Z')).toBe(true);
+    expect(path).toContain(' Q ');
   });
 });

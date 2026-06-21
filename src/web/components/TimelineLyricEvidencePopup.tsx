@@ -18,6 +18,9 @@ type TimelineLyricEvidencePopupProps = {
   width: number;
   arrowLeft: number;
   isCursor: boolean;
+  isPinned: boolean;
+  onPin: () => void;
+  onClose: () => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 };
@@ -28,6 +31,7 @@ const PLOT_LEFT = 18;
 const PLOT_TOP = 12;
 const PLOT_RIGHT_GUTTER = 6;
 const PLOT_HEIGHT = 80;
+const RHYME_HELP = 'A marks a repeated rhyme family. - means no local match. Slant and context matches are approximate.';
 
 type PlotBounds = {x: number; y: number; width: number; height: number};
 
@@ -102,6 +106,70 @@ function InstrumentGraph({model, popupWidth}: {model: InstrumentGraphModel; popu
   );
 }
 
+function ProducerCues({model}: {model: LyricEvidenceModel}) {
+  return (
+    <span className="lyrics-producer-readout">
+      <span className="lyrics-mood-label">Producer cues</span>
+      {model.producer.flags.length > 0 ? (
+        <span className="lyrics-flow-flags">
+          {model.producer.flags.map(flag => <b key={flag}>{flag}</b>)}
+        </span>
+      ) : null}
+      <span className="lyrics-cue-list">
+        {model.producer.cues.map(cue => <small key={cue}>{cue}</small>)}
+      </span>
+    </span>
+  );
+}
+
+function ChordReadout({model}: {model: LyricEvidenceModel}) {
+  return (
+    <span className={`lyrics-chord-readout ${model.chord.kind}`}>
+      <span>{model.chord.label}</span>
+      <strong>{model.chord.detail}</strong>
+    </span>
+  );
+}
+
+function rhymeTitle(line: LyricEvidenceModel['producer']['lines'][number]): string {
+  if (line.rhymeKind === 'context') {
+    return line.contextSectionName
+      ? `Context rhyme with ${line.contextSectionName}`
+      : 'Context rhyme with a neighboring section';
+  }
+  if (line.rhymeKind === 'slant') return 'Slant rhyme';
+  if (line.rhymeKind === 'exact') return 'Exact rhyme family';
+  return 'No local rhyme match';
+}
+
+function LyricReadout({model}: {model: LyricEvidenceModel}) {
+  const producer = model.producer;
+  const lineLabel = `${producer.lineCount} ${producer.lineCount === 1 ? 'line' : 'lines'}`;
+  const syllableLabel = `${producer.totalSyllables} ${producer.totalSyllables === 1 ? 'syllable' : 'syllables'}`;
+  return (
+    <span className="lyrics-section-readout">
+      <span className="lyrics-readout-meta">
+        <b>{lineLabel}</b>
+        <b>{syllableLabel}</b>
+        <b>{producer.averageSyllables} avg/line</b>
+      </span>
+      <span className="lyrics-rhyme-readout">
+        <small title={RHYME_HELP}>Rhyme</small>
+        <strong title={RHYME_HELP}>{producer.rhymeScheme || 'none'}</strong>
+      </span>
+      <span className="lyrics-popup-lines">
+        {producer.lines.length > 0 ? producer.lines.map((line, index) => (
+          <span key={line.id ?? `${line.text}-${index}`}>
+            <small className={`rhyme-${line.rhymeKind}`} title={rhymeTitle(line)}>{line.rhymeLabel}</small>
+            <b>{line.text}</b>
+            <i>{line.syllables}</i>
+          </span>
+        )) : <em>No lyric lines in this section yet.</em>}
+      </span>
+    </span>
+  );
+}
+
 export const TimelineLyricEvidencePopup = React.forwardRef<HTMLSpanElement, TimelineLyricEvidencePopupProps>(
   function TimelineLyricEvidencePopup({
     id,
@@ -110,6 +178,9 @@ export const TimelineLyricEvidencePopup = React.forwardRef<HTMLSpanElement, Time
     width,
     arrowLeft,
     isCursor,
+    isPinned,
+    onPin,
+    onClose,
     onPointerEnter,
     onPointerLeave,
   }, ref) {
@@ -128,21 +199,38 @@ export const TimelineLyricEvidencePopup = React.forwardRef<HTMLSpanElement, Time
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}>
         <span className="lyrics-evidence-head">
-          <strong>{model.sectionName}</strong>
-          <small>{model.barLabel} - {model.timeLabel}</small>
-        </span>
-        <span className="lyrics-mood-group">
-          <span className="lyrics-mood-label">Mood tags</span>
-          <span className="lyrics-mood-strip" aria-label="Section mood evidence">
-            {model.moods.map(mood => (
-              <span key={`${mood.label}-${mood.timeLabel}`} className="lyrics-mood-chip">
-                <b>{mood.label}</b>
-                <small>{mood.timeLabel}</small>
-              </span>
-            ))}
+          <span>
+            <strong>{model.sectionName}</strong>
+            <small>{model.sourceLabel} - {model.barLabel} - {model.timeLabel}</small>
+          </span>
+          <span className="lyrics-popup-actions">
+            <button type="button" aria-label={isPinned ? 'Unpin lyric popup' : 'Pin lyric popup'} onClick={onPin}>
+              {isPinned ? 'Pinned' : 'Pin'}
+            </button>
+            <button type="button" aria-label="Close lyric popup" onClick={onClose}>Close</button>
           </span>
         </span>
-        {model.graph ? <InstrumentGraph model={model.graph} popupWidth={width} /> : null}
+        <span className="lyrics-popup-grid">
+          <span className="lyrics-popup-left">
+            {model.moods.length > 0 ? (
+              <span className="lyrics-mood-group">
+                <span className="lyrics-mood-label">Mood tags</span>
+                <span className="lyrics-mood-strip" aria-label="Section mood evidence">
+                  {model.moods.map(mood => (
+                    <span key={`${mood.label}-${mood.timeLabel}`} className="lyrics-mood-chip">
+                      <b>{mood.label}</b>
+                      <small>{mood.timeLabel}</small>
+                    </span>
+                  ))}
+                </span>
+              </span>
+            ) : null}
+            <ProducerCues model={model} />
+            <ChordReadout model={model} />
+            {model.graph ? <InstrumentGraph model={model.graph} popupWidth={width} /> : null}
+          </span>
+          <LyricReadout model={model} />
+        </span>
       </span>
     );
   },

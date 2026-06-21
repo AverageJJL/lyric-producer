@@ -1,8 +1,13 @@
 import {spawn} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'vite';
 
+const require = createRequire(import.meta.url);
+const {nativeAddonFreshness} = require('./native-dev-build-cache.cjs');
+
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const envPath = fileURLToPath(new URL('../../.env', import.meta.url));
 const localEnvPath = fileURLToPath(new URL('../../.env.local', import.meta.url));
 
@@ -94,8 +99,56 @@ export function rendererUrl(server) {
   return loopbackUrl;
 }
 
-export async function main() {
+export function shouldForceNativeBuild(
+  argv = process.argv,
+  env = process.env,
+) {
+  return argv.includes('--force-native-build') ||
+    env.MUSICAPP_FORCE_NATIVE_BUILD === '1' ||
+    env.FORCE_NATIVE_BUILD === '1';
+}
+
+export function shouldSkipNativeBuild(
+  argv = process.argv,
+  env = process.env,
+) {
+  return argv.includes('--skip-native-build') ||
+    env.MUSICAPP_SKIP_NATIVE_BUILD === '1' ||
+    env.SKIP_NATIVE_BUILD === '1';
+}
+
+export async function buildNativeForDevIfNeeded({
+  force = shouldForceNativeBuild(),
+  skip = shouldSkipNativeBuild(),
+  freshness = nativeAddonFreshness(repoRoot),
+} = {}) {
+  if (skip && !force && freshness.reason !== 'missing') {
+    console.log('Skipping native addon rebuild by request.');
+    return;
+  }
+
+  if (skip && !force) {
+    console.log('Native addon missing; ignoring skip request and running build:engine.');
+  }
+
+  if (!force && freshness.fresh) {
+    console.log('Native addon is up to date; skipping build:engine.');
+    return;
+  }
+
+  if (force) {
+    console.log('Forcing native addon rebuild for dev.');
+  } else if (freshness.reason === 'missing') {
+    console.log('Native addon missing; running build:engine.');
+  } else if (freshness.newestInputPath) {
+    console.log(`Native addon stale after ${freshness.newestInputPath}; running build:engine.`);
+  }
+
   await runBuildStep('npm', ['run', 'build:engine']);
+}
+
+export async function main() {
+  await buildNativeForDevIfNeeded();
   await runBuildStep('npm', ['run', 'build:electron']);
 
   let viteServer;

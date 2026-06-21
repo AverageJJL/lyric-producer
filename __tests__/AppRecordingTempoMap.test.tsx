@@ -1,11 +1,19 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const fetchMock = jest.fn();
 
 function resetStore(): void {
@@ -64,8 +72,12 @@ function installAudioEngineMock(): void {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   window.audioEngine = {
     sendCommand,
+    sendCommandAsync,
     onEvent: () => () => undefined,
   };
 }
@@ -91,6 +103,7 @@ afterEach(() => {
   jest.useRealTimers();
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   fetchMock.mockReset();
 });
 
@@ -125,9 +138,10 @@ test('pre-roll waits for the mapped beat range before starting capture', () => {
   addArmedVoiceTrack();
   fireEvent.change(screen.getByLabelText('Recording pre-roll'), {target: {value: '4'}});
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
-  const preRollPlayCall = sendCommand.mock.calls.find(
+  const preRollPlayCall = sendCommandAsync.mock.calls.find(
     ([command, payload]) =>
       command === 'transport_play' &&
       typeof payload === 'string' &&
@@ -147,7 +161,7 @@ test('pre-roll waits for the mapped beat range before starting capture', () => {
   expect(sendCommand.mock.calls.some(([command]) => command === 'start_audio_recording')).toBe(true);
 });
 
-test('punch-out waits for the mapped cycle duration before stopping capture', () => {
+test('punch-out waits for the mapped cycle duration before stopping capture', async () => {
   useDAWStore.setState({
     tempoMap: [{id: 'tempo-4_000', beat: 4, bpm: 60, ramp: 'jump'}],
   });
@@ -160,6 +174,9 @@ test('punch-out waits for the mapped cycle duration before stopping capture', ()
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
   expect(sendCommand.mock.calls.some(([command]) => command === 'start_audio_recording')).toBe(true);
+  await act(async () => {
+    await Promise.resolve();
+  });
   act(() => {
     jest.advanceTimersByTime(3999);
   });

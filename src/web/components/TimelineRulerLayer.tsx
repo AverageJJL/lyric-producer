@@ -2,9 +2,12 @@ import React, {useMemo} from 'react';
 
 import {
   beatsPerBarForTimeSignature,
+  type ChordMetadata,
+  type ScaleMetadata,
   type SectionMarker,
   type TimeSignature,
 } from '../../store/projectMetadata';
+import type {LyricDocument} from '../../store/lyrics';
 import type {MeterMapEvent, TempoMapEvent} from '../../transport/tempoMap';
 import type {SnapGrid} from '../../ui/snapGrid';
 import {buildTimelineRulerModel} from '../../ui/timelineRulerMap';
@@ -21,6 +24,9 @@ type TimelineRulerLayerProps = {
   meterMap: MeterMapEvent[];
   tempoMap: TempoMapEvent[];
   sections: SectionMarker[];
+  authoredLyrics?: LyricDocument;
+  scale?: ScaleMetadata | null;
+  chord?: ChordMetadata | null;
   onRulerPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   onSectionsChange: (sections: SectionMarker[]) => void;
   onJumpToBeat: (beat: number) => void;
@@ -42,6 +48,9 @@ export function TimelineRulerLayer({
   meterMap,
   tempoMap,
   sections,
+  authoredLyrics,
+  scale,
+  chord,
   onRulerPointerDown,
   onSectionsChange,
   onJumpToBeat,
@@ -87,6 +96,9 @@ export function TimelineRulerLayer({
       />
       <TimelineLyricsLane
         sections={sections}
+        authoredLyrics={authoredLyrics}
+        scale={scale}
+        chord={chord}
         visibleTimelineBeats={visibleTimelineBeats}
         pixelsPerBeat={pixelsPerBeat}
         beatsPerBar={beatsPerBar}

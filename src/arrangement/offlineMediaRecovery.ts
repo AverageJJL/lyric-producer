@@ -1,5 +1,8 @@
 import {audioSampleRateWarning, type AudioAnalysis} from '../music/audioImport';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import type {MediaImportBridge, OfflineAudioRecovery} from '../native/mediaImportApi';
 import {type AudioBlockMediaReplacement, useDAWStore} from '../store/useDAWStore';
 import {collectMediaSourceInventory, type MediaSourceInventoryItem} from './mediaSourceInventory';
@@ -27,8 +30,8 @@ function parseCommandData(response: string | null): Record<string, unknown> | nu
   }
 }
 
-function analyzeAudioFile(absolutePath: string): AudioAnalysis | null {
-  return parseCommandData(sendNativeAudioCommand('analyze_audio_file', {
+async function analyzeAudioFile(absolutePath: string): Promise<AudioAnalysis | null> {
+  return parseCommandData(await sendNativeAudioCommandAsync('analyze_audio_file', {
     absoluteAudioFilePath: absolutePath,
   })) as AudioAnalysis | null;
 }
@@ -125,7 +128,7 @@ export async function recoverOfflineMediaSources(
 
   for (const recovered of response.recovered) {
     const item = bySourceKey.get(recovered.sourceKey);
-    const analysis = analyzeAudioFile(recovered.absolutePath);
+    const analysis = await analyzeAudioFile(recovered.absolutePath);
     if (!item || !analysis) {
       failedSourceCount += 1;
       continue;

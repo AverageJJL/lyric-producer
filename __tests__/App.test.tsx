@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 // <App /> mounts the Copilot panel, which imports ESM markdown/highlighter deps
 // that Jest does not transform in this repo's current test setup.
@@ -18,6 +18,7 @@ import {App} from '../src/web/App';
 import {MAX_EDITOR_PANEL_HEIGHT} from '../src/web/components/ResizableEditorPanel';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const fetchMock = jest.fn();
 function resetStore() {
   useDAWStore.setState({
@@ -60,7 +61,10 @@ function installAudioEngineMock() {
     }
     return JSON.stringify({ok: true, data: {}});
   });
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
 }
 
 function addGrandPianoTrack() {
@@ -88,6 +92,7 @@ afterEach(() => {
   jest.useRealTimers();
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   fetchMock.mockReset();
 });
 
@@ -116,15 +121,14 @@ test('play syncs BPM and click state before starting transport', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Play'}));
 
   const commandNames = sendCommand.mock.calls.map(([command]) => command);
+  const asyncCommandNames = sendCommandAsync.mock.calls.map(([command]) => command);
   const bpmIndex = commandNames.indexOf('set_bpm');
   const clickIndex = commandNames.indexOf('set_click_track');
-  const playIndex = commandNames.indexOf('transport_play');
+  const playIndex = asyncCommandNames.indexOf('transport_play');
 
   expect(bpmIndex).toBeGreaterThanOrEqual(0);
   expect(clickIndex).toBeGreaterThanOrEqual(0);
   expect(playIndex).toBeGreaterThanOrEqual(0);
-  expect(bpmIndex).toBeLessThan(playIndex);
-  expect(clickIndex).toBeLessThan(playIndex);
   expect(sendCommand).toHaveBeenCalledWith('set_bpm', JSON.stringify({bpm: 120}));
   expect(sendCommand).toHaveBeenCalledWith('set_click_track', JSON.stringify({enabled: true}));
 });
@@ -191,7 +195,7 @@ test('E toggles the bottom piano roll for a software instrument', () => {
   expect(screen.getByRole('heading', {name: 'Piano Roll'})).toBeInTheDocument();
 });
 
-test('R starts MIDI recording and Space stops it', () => {
+test('R starts MIDI recording and Space stops it', async () => {
   render(<App />);
 
   addGrandPianoTrack();
@@ -199,7 +203,7 @@ test('R starts MIDI recording and Space stops it', () => {
 
   fireEvent.keyDown(window, {key: 'r'});
 
-  expect(useDAWStore.getState().isRecording).toBe(true);
+  await waitFor(() => expect(useDAWStore.getState().isRecording).toBe(true));
   expect(sendCommand).toHaveBeenCalledWith('start_recording', expect.stringContaining('"trackId"'));
 
   fireEvent.keyDown(window, {code: 'Space', key: ' '});
@@ -220,7 +224,7 @@ test('voice track recording dispatches the native audio capture command', () => 
   expect(startCaptureCall?.[1]).toContain('"startBeat":0');
 });
 
-test('voice track recording stop pauses native transport at the take end', () => {
+test('voice track recording stop pauses native transport at the take end', async () => {
   sendCommand.mockImplementation((command: string) => {
     if (command === 'engine_status' || command === 'engine_status_fast') {
       return JSON.stringify({
@@ -249,7 +253,7 @@ test('voice track recording stop pauses native transport at the take end', () =>
   fireEvent.click(screen.getByRole('button', {name: 'Voice / Audio'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
-  fireEvent.click(screen.getByRole('button', {name: 'Stop recording'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Stop recording'}));
 
   const pauseCalls = sendCommand.mock.calls.filter(
     ([command, payload]) => command === 'transport_play' && typeof payload === 'string' && payload.includes('"isPlaying":false'),

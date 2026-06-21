@@ -10,7 +10,8 @@ import {
   hasCompleteSongArc,
   mergeIntoFullSongSections,
 } from './songSeedStructure';
-import type {SongSeedBpmKeyCandidate, SongSeedTrack} from './songSeedTypes';
+import {lyricContentLines, parseLyricSections, type LyricSectionSource} from './songSeedLyricSections';
+import type {SongSeedBpmKeyCandidate, SongSeedLyricStructure, SongSeedTrack} from './songSeedTypes';
 import {envTimeoutMs, text, type FetchLike, withTimeout} from './songSeedUtils';
 
 type ScaleMetadata = {root: string; mode: string};
@@ -18,6 +19,7 @@ type ScaleMetadata = {root: string; mode: string};
 export type SongSeedAnalyzeRequest = {
   track?: SongSeedTrack;
   lyrics?: string;
+  lyricStructure?: SongSeedLyricStructure;
   bpmKeyCandidates?: SongSeedBpmKeyCandidate[];
   publicContext?: string;
 };
@@ -34,6 +36,8 @@ export type SongSeedAnalyzedSection = {
   productionCue: string;
   producerInsight?: ProducerInsight;
   confidence: number;
+  sectionSource?: LyricSectionSource;
+  sectionConfidence?: number;
 };
 
 export type SongSeedAnalysis = {
@@ -55,13 +59,6 @@ const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 function cleanString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function lyricLines(value: string | undefined): string[] {
-  return (value ?? '')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.startsWith('*******'));
 }
 
 function hashText(value: string): number {
@@ -163,6 +160,8 @@ export function validateSongSeedModelSections(
       productionCue: cleanString(section.productionCue) ?? productionDrivers.join(', '),
       producerInsight,
       confidence: Math.max(0, Math.min(1, Number(section.confidence) || 0.7)),
+      sectionSource: 'model',
+      sectionConfidence: Math.max(0, Math.min(1, Number(section.confidence) || 0.7)),
     });
   }
   return sections;
@@ -195,6 +194,8 @@ function requestBody(request: SongSeedAnalyzeRequest, lines: string[], model: st
           'Analyze song lyrics for a DAW arrangement.',
           'Return JSON only: {"sections":[...]}',
           'Prefer a full pop structure with intro, repeated verses, pre-choruses, choruses, bridge, final chorus, and outro.',
+          'If sectionHints are supplied, preserve their lyric ranges and roles unless the hint is impossible.',
+          'Repeated hook lines such as "baby, baby" must be chorus, not verse or pre-chorus.',
           'Each section needs name, zero-based startLine, endLine, bars, mood, meaning, productionDrivers, productionCue, confidence.',
           'Also include producerInsight with intent, arrangementMove, vocalTreatment, soundPalette, mixFocus, and risk.',
           'Make producerInsight concrete for a producer working in a DAW; avoid generic advice.',
@@ -208,6 +209,13 @@ function requestBody(request: SongSeedAnalyzeRequest, lines: string[], model: st
           bpmKey: metadata,
           publicContext: request.publicContext ?? publicContext?.productionContext,
           lyricLines: lines.map((line, index) => ({index, line})),
+          sectionHints: parseLyricSections(request.lyrics, request.lyricStructure).sections.map(section => ({
+            name: section.name,
+            startLine: section.startLine,
+            endLine: section.endLine,
+            source: section.sectionSource,
+            confidence: section.sectionConfidence,
+          })),
         }),
       },
     ],
@@ -222,7 +230,7 @@ export async function analyzeSongSeed(
   if (!request.track) {
     return {ok: false, error: 'Select a song first.'};
   }
-  const lines = lyricLines(request.lyrics);
+  const lines = lyricContentLines(request.lyrics);
   const metadata = fallbackMetadata(request);
   const publicContext = request.track ? knownPublicSongContext({
     title: request.track.title,
@@ -238,6 +246,7 @@ export async function analyzeSongSeed(
     sections: buildFallbackSongSections(request, lines),
   });
   const apiKey = text(env.OPENROUTER_API_KEY);
+  const hasDetectedSections = fallback().sections.some(section => section.sectionSource !== 'fallback-template');
   if (!apiKey || lines.length === 0) {
     return {ok: true, source: 'fallback', analysis: fallback(), warning: 'OpenRouter analysis was unavailable.'};
   }
@@ -269,6 +278,9 @@ export async function analyzeSongSeed(
         analysis: {...fallback(), sections: mergeIntoFullSongSections(fallback().sections, sections)},
         warning: 'Model returned too few sections; expanded to a full song structure.',
       };
+    }
+    if (hasDetectedSections) {
+      return {ok: true, source: 'openrouter', analysis: {...fallback(), sections: mergeIntoFullSongSections(fallback().sections, sections)}};
     }
     return {ok: true, source: 'openrouter', analysis: {...fallback(), sections}};
   } catch {

@@ -16,6 +16,7 @@ import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {resetCopilotChatHistoryForTests} from '../src/assistant/copilotChatHistory';
+import {refreshPlaybackAndInstruments} from '../src/native/refreshPlayback';
 
 jest.mock('../src/native/refreshPlayback', () => ({
   refreshPlaybackAndInstruments: jest.fn(),
@@ -23,6 +24,7 @@ jest.mock('../src/native/refreshPlayback', () => ({
 }));
 
 const TS = '2026-01-01T00:00:00.000Z';
+const mockedRefreshPlayback = refreshPlaybackAndInstruments as jest.Mock;
 
 function resetStore(): void {
   resetArrangementHistoryForTests();
@@ -64,6 +66,7 @@ describe('apc project actions', () => {
   beforeEach(() => {
     resetStore();
     resetCopilotChatHistoryForTests();
+    mockedRefreshPlayback.mockClear();
   });
 
   it('saves the current project as an .apc folder tree through the bridge', async () => {
@@ -101,6 +104,20 @@ describe('apc project actions', () => {
     }));
     window.audioEngine = {
       sendCommand: jest.fn((command: string) => JSON.stringify({
+        ok: true,
+        data: command === 'engine_status' || command === 'engine_status_fast'
+          ? {sampleRate: 48000}
+          : {
+              durationSeconds: 3,
+              lengthBeats: 6,
+              waveformPeaks: [0.2, 0.4],
+              sampleRate: 48000,
+              channelCount: 2,
+              fileBytes: 300000,
+              peakAmplitude: 0.8,
+            },
+      })),
+      sendCommandAsync: jest.fn(async (command: string) => JSON.stringify({
         ok: true,
         data: command === 'engine_status' || command === 'engine_status_fast'
           ? {sampleRate: 48000}
@@ -161,13 +178,18 @@ describe('apc project actions', () => {
     const saveCalls = saveProjectFolder.mock.calls as unknown as Array<[{
       files: Array<{relativePath: string; content: string}>;
     }]>;
-    const firstSave = saveCalls[0]?.[0];
-    const files = firstSave?.files ?? [];
-    const clipPaths = files
+    const finalSave = saveCalls[saveCalls.length - 1]?.[0];
+    const files = finalSave?.files ?? [];
+    const savedClips = files
       .filter((file: {relativePath: string}) => file.relativePath.startsWith('clips/'))
-      .map((file: {content: string}) => JSON.parse(file.content).absoluteAudioFilePath);
-    expect(clipPaths).toHaveLength(2);
-    expect(clipPaths.every((p: string) => p === '/tmp/assets/imports/shared.wav')).toBe(true);
+      .map((file: {content: string}) => JSON.parse(file.content));
+    expect(savedClips).toHaveLength(2);
+    expect(savedClips.every((clip: {audioFilePath?: string}) =>
+      clip.audioFilePath === 'imports/shared.wav',
+    )).toBe(true);
+    expect(savedClips.every((clip: {absoluteAudioFilePath?: string}) =>
+      clip.absoluteAudioFilePath === undefined,
+    )).toBe(true);
   });
 
   it('opens an .apc folder and replaces stale state', async () => {
@@ -185,10 +207,12 @@ describe('apc project actions', () => {
     );
     const openProjectFolder = jest.fn(async () => ({ok: true as const, path: '/tmp/song.apc', files}));
     const bridge = folderBridge({openProjectFolder});
+    mockedRefreshPlayback.mockClear();
 
     const result = await openApcProject(bridge);
 
     expect(result.ok).toBe(true);
+    expect(mockedRefreshPlayback).not.toHaveBeenCalled();
     expect(snapshotFingerprint(captureProjectSnapshot())).toBe(snapshotFingerprint(original));
     expect(useDAWStore.getState().tracks.some(track => track.type === 'voice_audio')).toBe(false);
   });

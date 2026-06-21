@@ -14,6 +14,10 @@ type NativeIpcTraceOptions = {
   now?: () => number;
 };
 
+type NativeIpcTraceAsyncOptions = Omit<NativeIpcTraceOptions, 'invoke'> & {
+  invoke: () => Promise<string>;
+};
+
 export type NativeIpcTraceDecision = {
   traceEveryCommand: boolean;
   warnSlowCommand: boolean;
@@ -58,6 +62,42 @@ export function runNativeIpcWithTrace(options: NativeIpcTraceOptions): string {
 
   try {
     responseJson = options.invoke();
+    return responseJson;
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    const durationMs = Math.max(0, now() - startedAt);
+    const decision = nativeIpcTraceDecision(env, options.isPackaged, durationMs);
+    if (decision.warnSlowCommand || decision.traceEveryCommand) {
+      const message = nativeIpcTraceMessage({
+        command: options.command,
+        durationMs,
+        payloadJson: options.payloadJson,
+        responseJson,
+        failed,
+      });
+      if (decision.warnSlowCommand) {
+        logger.warn(message);
+      } else {
+        logger.log(message);
+      }
+    }
+  }
+}
+
+export async function runNativeIpcWithTraceAsync(
+  options: NativeIpcTraceAsyncOptions,
+): Promise<string> {
+  const logger = options.logger ?? console;
+  const env = options.env ?? process.env;
+  const now = options.now ?? (() => performance.now());
+  const startedAt = now();
+  let responseJson = '';
+  let failed = false;
+
+  try {
+    responseJson = await options.invoke();
     return responseJson;
   } catch (error) {
     failed = true;

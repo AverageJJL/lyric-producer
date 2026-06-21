@@ -3,7 +3,7 @@ import {useCallback, type DragEvent} from 'react';
 import type {AudioImportPlacement} from './useAudioImport';
 import {fileSystemPath, mediaKindForPath} from './useMediaDropImport';
 import type {AudioImportRequest} from '../native/mediaImportApi';
-import type {DAWBlock, DAWTrack} from '../store/useDAWStore';
+import type {DAWBlock} from '../store/useDAWStore';
 import {suppressImportedBlockPointerDrag} from '../ui/timelineImportDragSuppression';
 
 type ImportAudioFile = (
@@ -12,9 +12,7 @@ type ImportAudioFile = (
 ) => Promise<DAWBlock | null>;
 
 type TimelineAudioDropOptions = {
-  tracks: DAWTrack[];
   importAudioFile: ImportAudioFile;
-  trackIdAtClientY: (clientY: number) => string | null;
   beatAtClientX: (clientX: number) => number | null;
   onDropHandled: () => void;
 };
@@ -40,9 +38,7 @@ function droppedAudioFiles(event: DragEvent<HTMLElement>): DroppedAudioFile[] | 
 }
 
 export function useTimelineAudioDropImport({
-  tracks,
   importAudioFile,
-  trackIdAtClientY,
   beatAtClientX,
   onDropHandled,
 }: TimelineAudioDropOptions) {
@@ -70,18 +66,11 @@ export function useTimelineAudioDropImport({
     event.stopPropagation();
     onDropHandled();
 
-    const candidateTrackId = trackIdAtClientY(event.clientY);
-    const preferredTrackId = tracks.some(track =>
-      track.id === candidateTrackId && track.type === 'voice_audio',
-    )
-      ? candidateTrackId
-      : null;
-
     void (async () => {
       for (let index = 0; index < files.length; index += 1) {
         const importedBlock = await importAudioFile(
           {path: files[index]!.path},
-          {startBeat, preferredTrackId, stackIndex: index},
+          {startBeat},
         );
         if (importedBlock) {
           suppressImportedBlockPointerDrag(importedBlock.id);
@@ -90,7 +79,7 @@ export function useTimelineAudioDropImport({
     })();
 
     return true;
-  }, [beatAtClientX, importAudioFile, onDropHandled, trackIdAtClientY, tracks]);
+  }, [beatAtClientX, importAudioFile, onDropHandled]);
 
   return {
     handleTimelineAudioDragOver,

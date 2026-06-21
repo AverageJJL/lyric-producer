@@ -81,23 +81,36 @@
 }
 
 .waveform-fill {
-  fill: rgba(255, 255, 255, 0.82);
+  fill: rgba(255, 255, 255, 0.54);
+  stroke: rgba(255, 255, 255, 0.74);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.9;
+  vector-effect: non-scaling-stroke;
 }
 
 .waveform-fill.silent {
-  fill: rgba(255, 255, 255, 0.35);
+  fill: rgba(255, 255, 255, 0.2);
+  stroke: rgba(255, 255, 255, 0.34);
 }
 
 .waveform-preview.muted .waveform-fill {
-  fill: rgba(255, 255, 255, 0.28);
+  fill: rgba(255, 255, 255, 0.18);
+  stroke: rgba(255, 255, 255, 0.28);
 }
 
 .waveform-preview.gain-boosted .waveform-fill {
-  fill: rgba(255, 226, 156, 0.88);
+  fill: rgba(255, 226, 156, 0.58);
+  stroke: rgba(255, 237, 185, 0.82);
 }
 
 .waveform-preview.gain-reduced .waveform-fill {
-  fill: rgba(210, 225, 244, 0.56);
+  fill: rgba(210, 225, 244, 0.34);
+  stroke: rgba(218, 232, 250, 0.58);
+}
+
+.audio-editor-preview .waveform-fill {
+  stroke: rgba(var(--accent-primary-rgb), 0.82);
 }
 
 .waveform-preview.reversed .waveform-centerline {

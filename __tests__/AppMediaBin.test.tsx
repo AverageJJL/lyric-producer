@@ -1,12 +1,20 @@
 import React from 'react';
 import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {openBrowserDock, openSamplesDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const importMidi = jest.fn();
 const relinkAudio = jest.fn();
@@ -128,8 +136,11 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   revealAudioMedia.mockResolvedValue({ok: true});
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.mediaImport = {importAudio, importMidi, relinkAudio, revealAudioMedia};
   window.localStorage.clear();
 });
@@ -137,6 +148,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   importMidi.mockReset();
   relinkAudio.mockReset();

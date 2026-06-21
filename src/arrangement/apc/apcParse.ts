@@ -4,6 +4,7 @@ import {
   emptyCopilotChatProjectState,
   normalizeCopilotChatProjectState,
 } from '../../assistant/copilotChatHistory';
+import {defaultLyricDocument, normalizeLyricDocument} from '../../store/lyrics';
 import {
   APC_DIR,
   APC_FILE,
@@ -11,6 +12,7 @@ import {
   APC_SOURCE_FORMAT,
   APC_SOURCE_VERSION,
   type ApcProjectFile,
+  type ApcLyricsFile,
   type ApcProjectManifest,
   type ApcSourceFile,
   type ApcSourceProject,
@@ -75,6 +77,14 @@ export function parseApcSourceFiles(files: ApcSourceFile[]): ApcParseResult {
   const timeline = parseSingleton<ApcTimelineFile>(byPath, APC_FILE.timeline);
   if (!timeline.ok) {
     return {ok: false, error: timeline.error};
+  }
+  const lyrics = parseOptionalSingleton<ApcLyricsFile>(
+    byPath,
+    APC_FILE.lyrics,
+    defaultLyricDocument(),
+  );
+  if (!lyrics.ok) {
+    return {ok: false, error: lyrics.error};
   }
   const copilot = parseOptionalSingleton(
     byPath,
@@ -147,6 +157,7 @@ export function parseApcSourceFiles(files: ApcSourceFile[]): ApcParseResult {
       manifest: manifest.value,
       project: project.value,
       timeline: timeline.value,
+      lyrics: normalizeLyricDocument(lyrics.value),
       copilot: normalizeCopilotChatProjectState(copilot.value),
       tracks,
       clips,

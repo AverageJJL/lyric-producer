@@ -3,6 +3,8 @@ import {PIXELS_PER_BEAT} from '../ui/timelineLayout';
 
 /** Fixed horizontal spacing for live recording — avoids re-stretch jitter as the clip grows. */
 export const LIVE_WAVEFORM_PIXELS_PER_PEAK = 2;
+const MAX_RENDERED_WAVEFORM_POINTS = 8192;
+const MAX_LIVE_WAVEFORM_POINTS = 4096;
 
 export type WaveformPreviewLayoutOptions = {
   /** Map each peak to a fixed X step; new peaks append at the right edge only. */
@@ -95,30 +97,67 @@ function applyVisualGain(heightRatios: number[], gainDb: number | undefined): nu
   return heightRatios.map(height => Math.max(0, Math.min(1, height * linearGain)));
 }
 
-/** Build closed path: top envelope L→R, bottom envelope R→L. X in source-local pixels. */
+function pathNumber(value: number): string { return value.toFixed(2); }
+
+function appendSmoothCurve(d: string, points: Array<{x: number; y: number}>): string {
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index]!;
+    const next = points[index + 1];
+    const end = next ? {x: (point.x + next.x) / 2, y: (point.y + next.y) / 2} : point;
+    d += ` Q ${pathNumber(point.x)} ${pathNumber(point.y)} ${pathNumber(end.x)} ${pathNumber(end.y)}`;
+  }
+  return d;
+}
+
+function buildSmoothedBipolarEnvelopePath(
+  heightRatios: number[],
+  centerY: number,
+  drawableHeight: number,
+  xAt: (index: number) => number,
+): string {
+  const count = heightRatios.length;
+  if (count === 0) {
+    return '';
+  }
+
+  const halfAmp = drawableHeight / 2;
+  const points = heightRatios.map((height, index) => ({
+    x: xAt(index),
+    topY: centerY - height * halfAmp,
+    bottomY: centerY + height * halfAmp,
+  }));
+  const first = points[0]!;
+
+  if (points.length === 1) {
+    return `M ${pathNumber(first.x)} ${pathNumber(first.topY)} L ${pathNumber(first.x)} ${pathNumber(first.bottomY)} Z`;
+  }
+
+  let d = `M ${pathNumber(first.x)} ${pathNumber(first.topY)}`;
+  d = appendSmoothCurve(d, points.map(point => ({x: point.x, y: point.topY})));
+  const bottomPoints = points.slice().reverse().map(point => ({x: point.x, y: point.bottomY}));
+  const bottomStart = bottomPoints[0]!;
+  d += ` L ${pathNumber(bottomStart.x)} ${pathNumber(bottomStart.y)}`;
+  d = appendSmoothCurve(d, bottomPoints);
+  return `${d} Z`;
+}
+
+/** Build closed path: smoothed top envelope L→R, bottom envelope R→L. X in source-local pixels. */
 export function buildBipolarEnvelopePath(
   heightRatios: number[],
   envelopeWidthPx: number,
   centerY: number,
   drawableHeight: number,
 ): string {
-  const count = heightRatios.length;
-  if (count === 0 || envelopeWidthPx <= 0) {
+  if (envelopeWidthPx <= 0) {
     return '';
   }
-
-  const halfAmp = drawableHeight / 2;
-  const xAt = (index: number) =>
-    envelopeWidthPx * (count === 1 ? 0.5 : (index + 0.5) / count);
-
-  let d = `M ${xAt(0).toFixed(2)} ${(centerY - heightRatios[0]! * halfAmp).toFixed(2)}`;
-  for (let i = 1; i < count; i++) {
-    d += ` L ${xAt(i).toFixed(2)} ${(centerY - heightRatios[i]! * halfAmp).toFixed(2)}`;
-  }
-  for (let i = count - 1; i >= 0; i--) {
-    d += ` L ${xAt(i).toFixed(2)} ${(centerY + heightRatios[i]! * halfAmp).toFixed(2)}`;
-  }
-  return `${d} Z`;
+  const count = heightRatios.length;
+  return buildSmoothedBipolarEnvelopePath(
+    heightRatios,
+    centerY,
+    drawableHeight,
+    index => envelopeWidthPx * (count === 1 ? 0.5 : (index + 0.5) / count),
+  );
 }
 
 function clampFadeWidth(
@@ -165,22 +204,15 @@ export function buildBipolarEnvelopePathFixedSpacing(
   centerY: number,
   drawableHeight: number,
 ): string {
-  const count = heightRatios.length;
-  if (count === 0 || pixelsPerPeak <= 0) {
+  if (pixelsPerPeak <= 0) {
     return '';
   }
-
-  const halfAmp = drawableHeight / 2;
-  const xAt = (index: number) => (index + 0.5) * pixelsPerPeak;
-
-  let d = `M ${xAt(0).toFixed(2)} ${(centerY - heightRatios[0]! * halfAmp).toFixed(2)}`;
-  for (let i = 1; i < count; i++) {
-    d += ` L ${xAt(i).toFixed(2)} ${(centerY - heightRatios[i]! * halfAmp).toFixed(2)}`;
-  }
-  for (let i = count - 1; i >= 0; i--) {
-    d += ` L ${xAt(i).toFixed(2)} ${(centerY + heightRatios[i]! * halfAmp).toFixed(2)}`;
-  }
-  return `${d} Z`;
+  return buildSmoothedBipolarEnvelopePath(
+    heightRatios,
+    centerY,
+    drawableHeight,
+    index => (index + 0.5) * pixelsPerPeak,
+  );
 }
 
 /** First M x coordinate in a path (for tests). */
@@ -220,8 +252,8 @@ export function waveformPreviewLayout(
 
   if (options?.liveRecording && peaks.length > 0) {
     const displayPeaks =
-      peaks.length > 4096
-        ? resamplePeaksMaxPool(previewPeaks(peaks, options.isReversed), 4096)
+      peaks.length > MAX_LIVE_WAVEFORM_POINTS
+        ? resamplePeaksMaxPool(previewPeaks(peaks, options.isReversed), MAX_LIVE_WAVEFORM_POINTS)
         : previewPeaks(peaks, options.isReversed);
     const heights = applyVisualGain(
       normalizePeakHeights(displayPeaks, hasAudioFile),
@@ -246,7 +278,7 @@ export function waveformPreviewLayout(
   }
 
   const spanPx = Math.max(1, Math.min(sourceWidthPx, envelopeWidthPx ?? sourceWidthPx));
-  const targetPoints = Math.min(4096, Math.max(64, Math.ceil(spanPx)));
+  const targetPoints = Math.min(MAX_RENDERED_WAVEFORM_POINTS, Math.max(64, Math.ceil(spanPx)));
   const resampled = resamplePeaksMaxPool(previewPeaks(peaks, options?.isReversed), targetPoints);
   const heights = applyVisualGain(
     normalizePeakHeights(resampled, hasAudioFile),

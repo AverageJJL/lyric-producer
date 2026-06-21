@@ -52,7 +52,6 @@
 
 .onboarding-open-link {
   justify-self: start;
-  cursor: pointer;
   padding: 0;
   color: rgba(188, 207, 238, 0.82);
   font-size: 12px;
@@ -89,7 +88,6 @@
   width: 100%;
   padding: 9px 0;
   text-align: left;
-  cursor: pointer;
   background: transparent;
   border: 0;
 }

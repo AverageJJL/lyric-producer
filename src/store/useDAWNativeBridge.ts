@@ -1,12 +1,21 @@
 import {useEffect, useRef} from 'react';
 
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
-import {nativeBlockFingerprint, upsertBlockToEngine} from '../native/blockSync';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
+import {audioPathIsPlaybackReady} from '../native/audioPlaybackPreparation';
+import {
+  nativeBlockFingerprint,
+  shouldSyncFileAudioClip,
+  upsertBlockToEngineAsync,
+} from '../native/blockSync';
 import {buildNativeMasterMixPayload} from '../native/masterMixPayload';
 import {buildNativeTracksPayload} from '../native/trackPayload';
 import {
   applyTransportStatusFromResponse,
   buildNativeTransportPayload,
+  type NativeTransportPayload,
 } from '../native/transportPayload';
 import {buildNativeLoopRangePayload} from '../native/loopRangePayload';
 import {buildNativeTempoMapPayload} from '../native/tempoMapPayload';
@@ -17,9 +26,98 @@ import type {DAWBlock, DAWTrack} from './useDAWStore';
 import {useDAWStore} from './useDAWStore';
 
 const BLOCK_UPSERT_DEBOUNCE_MS = 200;
+const TRACK_MAPPING_DEBOUNCE_MS = 40;
+// Opening a saved project can make many clips dirty at once. File-backed audio
+// upserts are async, but the native engine still serializes media work; yielding
+// between clips keeps playback prep cooperative instead of one large burst.
+const BLOCK_UPSERT_CHUNK_DELAY_MS = 16;
+const BLOCK_UPSERT_CHUNK_SIZE = 1;
 
 let upsertTimer: ReturnType<typeof setTimeout> | null = null;
+let trackMappingTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingTrackMappingTracks: DAWTrack[] | null = null;
+const pendingTrackMappingCallbacks: Array<() => void> = [];
 const blockFingerprints = new Map<string, string>();
+let pendingProjectRestoreBlockSyncDeferral = 0;
+const projectRestoreDeferredAudioBlockIds = new Set<string>();
+let transportStartRequestId = 0;
+
+function clearPendingUpserts(): void {
+  if (!upsertTimer) {
+    return;
+  }
+  clearTimeout(upsertTimer);
+  upsertTimer = null;
+}
+
+function clearPendingTrackMappingTimer(): void {
+  if (!trackMappingTimer) {
+    return;
+  }
+  clearTimeout(trackMappingTimer);
+  trackMappingTimer = null;
+}
+
+export function deferNextNativeBlockSyncForProjectOpen(): () => void {
+  const token = pendingProjectRestoreBlockSyncDeferral + 1;
+  pendingProjectRestoreBlockSyncDeferral = token;
+  return () => {
+    if (pendingProjectRestoreBlockSyncDeferral === token) {
+      pendingProjectRestoreBlockSyncDeferral = 0;
+    }
+  };
+}
+
+function consumeProjectRestoreBlockSyncDeferral(): boolean {
+  if (pendingProjectRestoreBlockSyncDeferral === 0) {
+    return false;
+  }
+  pendingProjectRestoreBlockSyncDeferral = 0;
+  clearPendingUpserts();
+  return true;
+}
+
+function blockShouldDeferAfterProjectOpen(block: DAWBlock): boolean {
+  return shouldSyncFileAudioClip(block) &&
+    !audioPathIsPlaybackReady(block.audioFilePath) &&
+    !audioPathIsPlaybackReady(block.absoluteAudioFilePath);
+}
+
+function deferProjectOpenBlock(block: DAWBlock): void {
+  blockFingerprints.delete(block.id);
+  if (blockShouldDeferAfterProjectOpen(block)) {
+    projectRestoreDeferredAudioBlockIds.add(block.id);
+  } else {
+    projectRestoreDeferredAudioBlockIds.delete(block.id);
+  }
+}
+
+function deferredProjectOpenBlockIds(blocks: DAWBlock[]): Set<string> {
+  const ids = new Set<string>();
+  blocks.forEach(block => {
+    if (projectRestoreDeferredAudioBlockIds.has(block.id)) {
+      ids.add(block.id);
+    }
+  });
+  return ids;
+}
+
+function scheduleDeferredProjectOpenUpserts(blockIds: Set<string>): void {
+  if (blockIds.size === 0) {
+    return;
+  }
+  const {blocks} = useDAWStore.getState();
+  const readyIds = new Set<string>();
+  blockIds.forEach(blockId => {
+    const block = blocks.find(item => item.id === blockId);
+    if (!block || blockShouldDeferAfterProjectOpen(block)) {
+      return;
+    }
+    projectRestoreDeferredAudioBlockIds.delete(blockId);
+    readyIds.add(blockId);
+  });
+  scheduleUpserts(readyIds);
+}
 
 function syncRecordArm(tracks: DAWTrack[]): void {
   tracks.forEach(track => {
@@ -46,6 +144,40 @@ function syncTrackMapping(tracks: DAWTrack[]): void {
   syncRecordArm(nextActiveTracks);
 }
 
+function flushScheduledTrackMapping(): void {
+  if (!pendingTrackMappingTracks) {
+    clearPendingTrackMappingTimer();
+    return;
+  }
+
+  const tracks = pendingTrackMappingTracks;
+  const callbacks = pendingTrackMappingCallbacks.splice(0);
+  pendingTrackMappingTracks = null;
+  clearPendingTrackMappingTimer();
+
+  syncTrackMapping(tracks);
+  callbacks.forEach(callback => callback());
+}
+
+function scheduleTrackMapping(tracks: DAWTrack[], afterFlush?: () => void): void {
+  pendingTrackMappingTracks = tracks;
+  pendingTrackMappingCallbacks.length = 0;
+  if (afterFlush) {
+    pendingTrackMappingCallbacks.push(afterFlush);
+  }
+  clearPendingTrackMappingTimer();
+  trackMappingTimer = setTimeout(flushScheduledTrackMapping, TRACK_MAPPING_DEBOUNCE_MS);
+}
+
+function syncTrackMappingBeforePlayback(tracks: DAWTrack[]): void {
+  if (pendingTrackMappingTracks) {
+    pendingTrackMappingTracks = tracks;
+    flushScheduledTrackMapping();
+    return;
+  }
+  syncTrackMapping(tracks);
+}
+
 function playableTrackOrder(tracks: DAWTrack[]): string[] {
   return playableTracks(tracks).map(track => track.id);
 }
@@ -54,8 +186,7 @@ function trackOrderIsDifferent(previousTracks: DAWTrack[], nextTracks: DAWTrack[
   const previousOrder = playableTrackOrder(previousTracks);
   const nextOrder = playableTrackOrder(nextTracks);
 
-  return previousOrder.length !== nextOrder.length ||
-    previousOrder.some((trackId, index) => trackId !== nextOrder[index]);
+  return previousOrder.some((trackId, index) => trackId !== nextOrder[index]);
 }
 
 function syncLoopRange(state = useDAWStore.getState()): void {
@@ -66,6 +197,11 @@ function syncTempoMap(state = useDAWStore.getState()): void {
   sendNativeAudioCommand('set_tempo_map', buildNativeTempoMapPayload(state));
 }
 
+function markBlockSynced(block: DAWBlock): void {
+  blockFingerprints.set(block.id, nativeBlockFingerprint(block));
+  projectRestoreDeferredAudioBlockIds.delete(block.id);
+}
+
 function ensureArrangementSynced(blocks: DAWBlock[], state = useDAWStore.getState()): void {
   syncTempoMap(state);
   blocks.forEach(block => {
@@ -73,8 +209,8 @@ function ensureArrangementSynced(blocks: DAWBlock[], state = useDAWStore.getStat
     if (blockFingerprints.get(block.id) === fingerprint) {
       return;
     }
-    upsertBlockToEngine(block);
-    blockFingerprints.set(block.id, fingerprint);
+    upsertBlockToEngineAsync(block);
+    markBlockSynced(block);
   });
   syncLoopRange(state);
 }
@@ -84,32 +220,57 @@ function deleteBlockImmediate(block: DAWBlock): void {
   blockFingerprints.delete(block.id);
 }
 
-function scheduleUpserts(blocks: DAWBlock[], dirtyIds: Set<string>): void {
+function flushScheduledUpserts(dirtyIds: Set<string>): void {
+  const {blocks} = useDAWStore.getState();
+  let processed = 0;
+  while (processed < BLOCK_UPSERT_CHUNK_SIZE && dirtyIds.size > 0) {
+    const blockId = dirtyIds.values().next().value as string | undefined;
+    if (!blockId) {
+      break;
+    }
+    dirtyIds.delete(blockId);
+    processed += 1;
+
+    const block = blocks.find(item => item.id === blockId);
+    if (!block) {
+      blockFingerprints.delete(blockId);
+      continue;
+    }
+
+    const fingerprint = nativeBlockFingerprint(block);
+    if (blockFingerprints.get(blockId) === fingerprint) {
+      continue;
+    }
+
+    upsertBlockToEngineAsync(block);
+    markBlockSynced(block);
+  }
+
+  if (dirtyIds.size > 0) {
+    upsertTimer = setTimeout(
+      () => flushScheduledUpserts(dirtyIds),
+      BLOCK_UPSERT_CHUNK_DELAY_MS,
+    );
+    return;
+  }
+
+  upsertTimer = null;
+  syncLoopRange();
+}
+
+function scheduleUpserts(dirtyIds: Set<string>): void {
   if (dirtyIds.size === 0) {
     return;
   }
 
   if (upsertTimer) {
-    clearTimeout(upsertTimer);
+    clearPendingUpserts();
   }
 
-  upsertTimer = setTimeout(() => {
-    dirtyIds.forEach(blockId => {
-      const block = blocks.find(item => item.id === blockId);
-      if (!block) {
-        return;
-      }
-
-      const fingerprint = nativeBlockFingerprint(block);
-      if (blockFingerprints.get(blockId) === fingerprint) {
-        return;
-      }
-
-      upsertBlockToEngine(block);
-      blockFingerprints.set(blockId, fingerprint);
-    });
-    syncLoopRange();
-  }, BLOCK_UPSERT_DEBOUNCE_MS);
+  upsertTimer = setTimeout(
+    () => flushScheduledUpserts(new Set(dirtyIds)),
+    BLOCK_UPSERT_DEBOUNCE_MS,
+  );
 }
 
 /** Growing recording clip stays in JS only — native upsert rebuilds the whole clip and stalls live MIDI. */
@@ -128,8 +289,8 @@ function excludeRecordingBlockFromDirty(
 }
 
 function upsertBlockImmediate(block: DAWBlock): void {
-  upsertBlockToEngine(block);
-  blockFingerprints.set(block.id, nativeBlockFingerprint(block));
+  upsertBlockToEngineAsync(block);
+  markBlockSynced(block);
 }
 
 function recordingTakeGroupForTakeId(blocks: DAWBlock[], takeId: string | null): string | null {
@@ -138,6 +299,41 @@ function recordingTakeGroupForTakeId(blocks: DAWBlock[], takeId: string | null):
   }
   return blocks.find(block => block.recordingTakeId === takeId || block.id === takeId)
     ?.recordingTakeGroupId ?? null;
+}
+
+function transportResponseFailed(response: string | null): boolean {
+  return response?.includes('"ok":false') === true;
+}
+
+function transportResponseOk(response: string | null): boolean {
+  return response != null && !transportResponseFailed(response);
+}
+
+async function sendTransportStartAsync(
+  payload: NativeTransportPayload,
+  deferredPlayBlockIds: Set<string>,
+): Promise<void> {
+  const requestId = ++transportStartRequestId;
+  let response = await sendNativeAudioCommandAsync('transport_play', payload);
+  if (requestId !== transportStartRequestId || !useDAWStore.getState().isPlaying) {
+    return;
+  }
+  applyTransportStatusFromResponse(response, true);
+
+  if (transportResponseFailed(response)) {
+    response = await sendNativeAudioCommandAsync('transport_play', {
+      ...payload,
+      isPlaying: true,
+    });
+    if (requestId !== transportStartRequestId || !useDAWStore.getState().isPlaying) {
+      return;
+    }
+    applyTransportStatusFromResponse(response, true);
+  }
+
+  if (transportResponseOk(response)) {
+    scheduleDeferredProjectOpenUpserts(deferredPlayBlockIds);
+  }
 }
 
 export function upsertRecordingCompGroup(blocks: DAWBlock[], groupId: string | null): void {
@@ -165,10 +361,11 @@ function findDirtyBlockIds(previous: DAWBlock[], next: DAWBlock[]): Set<string> 
 }
 
 export function useDAWNativeBridge(): void {
-  const previousBlocksRef = useRef<DAWBlock[]>([]);
+  const previousBlocksRef = useRef<DAWBlock[]>(useDAWStore.getState().blocks);
 
   useEffect(() => {
     const unsubscribe = useDAWStore.subscribe((nextState, prevState) => {
+      const deferProjectRestoreBlockSync = consumeProjectRestoreBlockSyncDeferral();
       const blocksChangedFromEngine =
         nextState.syncSource === 'engine' &&
         nextState.blocks !== prevState.blocks &&
@@ -179,21 +376,25 @@ export function useDAWNativeBridge(): void {
       }
 
       if (!prevState.isRecording && nextState.isRecording && upsertTimer) {
-        clearTimeout(upsertTimer);
-        upsertTimer = null;
+        clearPendingUpserts();
       }
 
       if (nextState.isPlaying !== prevState.isPlaying && !suppressNativeBridgeSync) {
+        let deferredPlayBlockIds = new Set<string>();
         if (nextState.isPlaying) {
           sendNativeAudioCommand('stop_pattern_preview', {});
           sendNativeAudioCommand('midi_all_notes_off', {});
-          syncTrackMapping(nextState.tracks);
+          syncTrackMappingBeforePlayback(nextState.tracks);
           syncMasterMix(nextState.masterVolumeDb, nextState.masterPan);
           const blocksToSync =
             nextState.isRecording && nextState.recordingBlockId
               ? nextState.blocks.filter(block => block.id !== nextState.recordingBlockId)
               : nextState.blocks;
-          ensureArrangementSynced(blocksToSync, nextState);
+          deferredPlayBlockIds = deferredProjectOpenBlockIds(blocksToSync);
+          ensureArrangementSynced(
+            blocksToSync.filter(block => !deferredPlayBlockIds.has(block.id)),
+            nextState,
+          );
           sendNativeAudioCommand('set_bpm', {bpm: nextState.bpm});
           sendNativeAudioCommand('set_click_track', {enabled: nextState.isMetronomeEnabled});
         }
@@ -204,14 +405,15 @@ export function useDAWNativeBridge(): void {
           nextState.playheadBeat,
           nextState.playheadSeconds,
         );
-        const transportResponse = sendNativeAudioCommand('transport_play', transportPayload);
-        applyTransportStatusFromResponse(transportResponse, nextState.isPlaying);
-        if (nextState.isPlaying && transportResponse?.includes('"ok":false')) {
-          const retryResponse = sendNativeAudioCommand('transport_play', {
-            ...transportPayload,
-            isPlaying: true,
+        if (nextState.isPlaying) {
+          void sendTransportStartAsync(transportPayload, deferredPlayBlockIds);
+        } else {
+          const requestId = ++transportStartRequestId;
+          void sendNativeAudioCommandAsync('transport_play', transportPayload).then(response => {
+            if (requestId === transportStartRequestId && !useDAWStore.getState().isPlaying) {
+              applyTransportStatusFromResponse(response, false);
+            }
           });
-          applyTransportStatusFromResponse(retryResponse, true);
         }
       }
 
@@ -247,25 +449,30 @@ export function useDAWNativeBridge(): void {
       }
 
       if (nextState.tracks !== prevState.tracks) {
-        syncTrackMapping(nextState.tracks);
-
         const prevPlayableIds = playableTrackIds(prevState.tracks);
         const nextPlayableIds = playableTrackIds(nextState.tracks);
         const playableOrderChanged = trackOrderIsDifferent(prevState.tracks, nextState.tracks);
         const newlyDisabledIds = [...prevPlayableIds].filter(trackId => !nextPlayableIds.has(trackId));
         const newlyEnabledIds = [...nextPlayableIds].filter(trackId => !prevPlayableIds.has(trackId));
 
-        nextState.blocks
-          .filter(block => newlyDisabledIds.includes(block.trackId))
-          .forEach(deleteBlockImmediate);
-        if (playableOrderChanged) {
-          nextState.blocks
-            .filter(block => nextPlayableIds.has(block.trackId))
-            .forEach(upsertBlockImmediate);
+        if (deferProjectRestoreBlockSync) {
+          scheduleTrackMapping(nextState.tracks);
+          nextState.blocks.forEach(deferProjectOpenBlock);
         } else {
           nextState.blocks
-            .filter(block => newlyEnabledIds.includes(block.trackId))
-            .forEach(upsertBlockImmediate);
+            .filter(block => newlyDisabledIds.includes(block.trackId))
+            .forEach(deleteBlockImmediate);
+          scheduleTrackMapping(nextState.tracks, () => {
+            if (playableOrderChanged) {
+              nextState.blocks
+                .filter(block => nextPlayableIds.has(block.trackId))
+                .forEach(upsertBlockImmediate);
+            } else {
+              nextState.blocks
+                .filter(block => newlyEnabledIds.includes(block.trackId))
+                .forEach(upsertBlockImmediate);
+            }
+          });
         }
       }
 
@@ -304,8 +511,29 @@ export function useDAWNativeBridge(): void {
           }
         }
 
-        if (dirtyIds.size > 0) {
-          scheduleUpserts(nextState.blocks, dirtyIds);
+        if (deferProjectRestoreBlockSync) {
+          const immediateDirtyIds = new Set<string>();
+          dirtyIds.forEach(blockId => {
+            const block = nextState.blocks.find(item => item.id === blockId);
+            if (!block) {
+              blockFingerprints.delete(blockId);
+              projectRestoreDeferredAudioBlockIds.delete(blockId);
+              return;
+            }
+            if (blockShouldDeferAfterProjectOpen(block)) {
+              deferProjectOpenBlock(block);
+            } else {
+              immediateDirtyIds.add(blockId);
+            }
+          });
+          if (immediateDirtyIds.size > 0) {
+            scheduleUpserts(immediateDirtyIds);
+          }
+          if (removedBlocks.length > 0) {
+            syncLoopRange(nextState);
+          }
+        } else if (dirtyIds.size > 0) {
+          scheduleUpserts(dirtyIds);
         } else if (removedBlocks.length > 0 || recordingJustFinalized) {
           syncLoopRange(nextState);
         }
@@ -336,6 +564,11 @@ export function useDAWNativeBridge(): void {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      clearPendingTrackMappingTimer();
+      pendingTrackMappingTracks = null;
+      pendingTrackMappingCallbacks.length = 0;
+    };
   }, []);
 }

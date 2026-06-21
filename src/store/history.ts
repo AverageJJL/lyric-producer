@@ -1,6 +1,7 @@
 import type {DrumPattern} from '../music/drumPatterns';
 import {refreshPlaybackAndInstruments} from '../native/refreshPlayback';
 import type {DAWBlock, DAWTrack} from './useDAWStore';
+import {cloneLyricDocument, type LyricDocument} from './lyrics';
 import {cloneSectionMarker, type ChordMetadata, type ScaleMetadata, type SectionMarker, type TimeSignature} from './projectMetadata';
 import type {LooperLengthBars, ProjectPerformanceMode} from '../transport/performanceMode';
 import type {MeterMapEvent, TempoMapEvent} from '../transport/tempoMap';
@@ -24,6 +25,7 @@ export type ArrangementHistorySnapshot = {
   scale: ScaleMetadata | null;
   chord: ChordMetadata | null;
   sections: SectionMarker[];
+  lyrics: LyricDocument;
 };
 
 const MAX_HISTORY = 50;
@@ -86,6 +88,7 @@ export function captureArrangementHistorySnapshot(
     scale: state.scale ? {...state.scale} : null,
     chord: state.chord ? {...state.chord} : null,
     sections: state.sections.map(cloneSectionMarker),
+    lyrics: cloneLyricDocument(state.lyrics),
   };
 }
 

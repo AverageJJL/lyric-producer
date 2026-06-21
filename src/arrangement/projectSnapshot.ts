@@ -11,6 +11,11 @@ import type {
   TimeSignature,
 } from '../store/projectMetadata';
 import {cloneSectionMarker, DEFAULT_TIME_SIGNATURE} from '../store/projectMetadata';
+import {
+  cloneLyricDocument,
+  defaultLyricDocument,
+  type LyricDocument,
+} from '../store/lyrics';
 import type {DAWBlock, DAWTrack} from '../store/useDAWStore';
 import type {DAWStore} from '../store/useDAWStore';
 import {useDAWStore} from '../store/useDAWStore';
@@ -74,6 +79,7 @@ export type ProjectSnapshot = {
   scale: ScaleMetadata | null;
   chord: ChordMetadata | null;
   sections: SectionMarker[];
+  lyrics: LyricDocument;
   tracks: DAWTrack[];
   patterns: Record<string, DrumPattern>;
   blocks: DAWBlock[];
@@ -121,6 +127,7 @@ const PROJECT_SNAPSHOT_SOURCE_KEYS = [
   'scale',
   'chord',
   'sections',
+  'lyrics',
   'tracks',
   'patterns',
   'blocks',
@@ -226,6 +233,7 @@ export function captureProjectSnapshot(): ProjectSnapshot {
     scale: state.scale ? {...state.scale} : null,
     chord: state.chord ? {...state.chord} : null,
     sections: state.sections.map(cloneSectionMarker),
+    lyrics: cloneLyricDocument(state.lyrics),
     tracks: state.tracks.map(cloneTrack),
     patterns: Object.fromEntries(
       Object.entries(state.patterns).map(([id, pattern]) => [id, clonePattern(pattern)]),
@@ -268,6 +276,7 @@ export function emptyProjectSnapshot(): ProjectSnapshot {
     scale: null,
     chord: null,
     sections: [],
+    lyrics: defaultLyricDocument(),
     tracks: [],
     patterns: {},
     blocks: [],

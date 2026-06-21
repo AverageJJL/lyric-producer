@@ -18,6 +18,7 @@ import {PIXELS_PER_BEAT, RULER_HEIGHT, ROW_HEIGHT} from '../src/ui/timelineLayou
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const importMidi = jest.fn();
 const relinkAudio = jest.fn();
@@ -190,6 +191,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   importAudio.mockImplementation(async (request?: {path?: string}) =>
     audioImportResponse(request?.path),
   );
@@ -201,13 +205,14 @@ beforeEach(() => {
   });
   relinkAudio.mockResolvedValue({ok: false, canceled: true, error: 'unused'});
   pathForFile.mockImplementation((file: File) => (file as DroppedTestFile).mockPath ?? null);
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.mediaImport = {pathForFile, importAudio, importMidi, relinkAudio};
 });
 
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   importMidi.mockReset();
   relinkAudio.mockReset();
@@ -223,7 +228,7 @@ test('imports a dropped audio file through the Electron file-path resolver', asy
   expect(pathForFile).toHaveBeenCalledTimes(1);
   expect(importAudio).toHaveBeenCalledWith({path: '/Users/me/drop-loop.wav'});
   expect(importMidi).not.toHaveBeenCalled();
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/tmp/imports/drop-loop.wav'}),
   );
@@ -235,7 +240,7 @@ test('imports a dropped audio file through the Electron file-path resolver', asy
   });
 });
 
-test('drops an audio file directly onto a voice audio timeline lane', async () => {
+test('drops an audio file onto the timeline by creating a new audio lane', async () => {
   const voiceTrack = trackFixture('track-voice', 'voice_audio');
   useDAWStore.setState({tracks: [voiceTrack]});
   render(<App />);
@@ -247,10 +252,10 @@ test('drops an audio file directly onto a voice audio timeline lane', async () =
   await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(1));
   expect(importAudio).toHaveBeenCalledWith({path: '/Users/me/drop-loop.wav'});
   const state = useDAWStore.getState();
-  expect(state.tracks).toHaveLength(1);
-  expect(state.blocks).toHaveLength(1);
+  expect(state.tracks).toHaveLength(2);
+  expect(state.tracks[1]).toMatchObject({type: 'voice_audio'});
   expect(state.blocks[0]).toMatchObject({
-    trackId: 'track-voice',
+    trackId: state.tracks[1]?.id,
     name: 'drop-loop',
     startBeat: 12,
     audioFilePath: 'imports/drop-loop.wav',
@@ -303,30 +308,40 @@ test('plays an imported timeline audio clip without staying in native-start load
     rawBeat: 0,
   });
   await waitFor(() => expect(useDAWStore.getState().blocks).toHaveLength(1));
+  await waitFor(() => {
+    expect(sendCommand.mock.calls.some(([command]) => command === 'setTracks')).toBe(true);
+    expect(sendCommandAsync.mock.calls.some(([command]) => command === 'upsert_audio_clip'))
+      .toBe(true);
+  });
+  const importCommandNames = sendCommand.mock.calls.map(([command]) => command);
+  const importAsyncCommandNames = sendCommandAsync.mock.calls.map(([command]) => command);
+  const importSetTracksIndex = importCommandNames.indexOf('setTracks');
+  const importUpsertAudioIndex = importAsyncCommandNames.indexOf('upsert_audio_clip');
+  expect(importSetTracksIndex).toBeGreaterThanOrEqual(0);
+  expect(importUpsertAudioIndex).toBeGreaterThanOrEqual(0);
+  expect(JSON.parse(sendCommandAsync.mock.calls[importUpsertAudioIndex]?.[1] ?? '{}')).toMatchObject({
+    audioFilePath: 'imports/drop-loop.wav',
+    absoluteAudioFilePath: '/tmp/imports/drop-loop.wav',
+  });
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Play'}));
 
   const commandNames = sendCommand.mock.calls.map(([command]) => command);
+  const asyncCommandNames = sendCommandAsync.mock.calls.map(([command]) => command);
   const setTracksIndex = commandNames.indexOf('setTracks');
-  const upsertAudioIndex = commandNames.indexOf('upsert_audio_clip');
-  const playIndex = commandNames.indexOf('transport_play');
+  const playIndex = asyncCommandNames.indexOf('transport_play');
   expect(setTracksIndex).toBeGreaterThanOrEqual(0);
-  expect(upsertAudioIndex).toBeGreaterThan(setTracksIndex);
-  expect(upsertAudioIndex).toBeGreaterThanOrEqual(0);
-  expect(playIndex).toBeGreaterThan(upsertAudioIndex);
-  expect(JSON.parse(sendCommand.mock.calls[upsertAudioIndex]?.[1] ?? '{}')).toMatchObject({
-    audioFilePath: 'imports/drop-loop.wav',
-    absoluteAudioFilePath: '/tmp/imports/drop-loop.wav',
-  });
-  expect(useDAWStore.getState()).toMatchObject({
+  expect(playIndex).toBeGreaterThanOrEqual(0);
+  await waitFor(() => expect(useDAWStore.getState()).toMatchObject({
     isPlaying: true,
     playAwaitingEngine: false,
-  });
+  }));
   expect(screen.getByRole('button', {name: 'Stop'})).toBeInTheDocument();
 });
 
-test('stacks multiple timeline-dropped audio files onto voice audio tracks', async () => {
+test('creates separate new tracks for multiple timeline-dropped audio files', async () => {
   const voiceTrack = trackFixture('track-voice', 'voice_audio');
   useDAWStore.setState({tracks: [voiceTrack]});
   render(<App />);
@@ -340,10 +355,10 @@ test('stacks multiple timeline-dropped audio files onto voice audio tracks', asy
   await waitFor(() => expect(importAudio).toHaveBeenCalledTimes(3));
   const state = useDAWStore.getState();
   const audioTracks = state.tracks.filter(track => track.type === 'voice_audio');
-  expect(audioTracks).toHaveLength(3);
+  expect(audioTracks).toHaveLength(4);
   expect(state.blocks).toHaveLength(3);
   expect(state.blocks.map(block => block.startBeat)).toEqual([4, 4, 4]);
-  expect(state.blocks.map(block => block.trackId)).toEqual(audioTracks.map(track => track.id));
+  expect(state.blocks.map(block => block.trackId)).toEqual(audioTracks.slice(1).map(track => track.id));
   expect(state.blocks.map(block => block.audioFilePath)).toEqual([
     'imports/loop-a.wav',
     'imports/loop-b.wav',
@@ -367,7 +382,7 @@ test('lets mixed timeline media drops fall back to the app-shell importer', asyn
   expect(importMidi).toHaveBeenCalledWith({path: '/Users/me/drop-lead.mid'});
   const state = useDAWStore.getState();
   expect(state.blocks.find(block => block.type === 'audio')).toMatchObject({
-    trackId: 'track-voice',
+    trackId: state.tracks[1]?.id,
     startBeat: 8,
     audioFilePath: 'imports/drop-loop.wav',
   });
@@ -390,6 +405,10 @@ test('imports a dropped MIDI file and syncs the created track before the clip', 
     trackId: state.tracks[0]?.id,
     startBeat: 8,
     notes: [{note: 67, velocity: 100, startBeat: 0, lengthBeats: 2}],
+  });
+  await waitFor(() => {
+    expect(sendCommand.mock.calls.some(([command]) => command === 'setTracks')).toBe(true);
+    expect(sendCommand.mock.calls.some(([command]) => command === 'upsert_midi_clip')).toBe(true);
   });
   const setTracksIndex = sendCommand.mock.calls.findIndex(([command]) => command === 'setTracks');
   const upsertMidiIndex = sendCommand.mock.calls.findIndex(([command]) => command === 'upsert_midi_clip');

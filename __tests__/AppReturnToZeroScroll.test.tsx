@@ -1,12 +1,20 @@
 import React from 'react';
 import {cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -51,13 +59,15 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  sendCommandAsync.mockResolvedValue(JSON.stringify({ok: true, data: {}}));
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.localStorage.clear();
 });
 
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   window.localStorage.clear();
 });
 
@@ -70,7 +80,8 @@ test('return to zero scrolls the timeline viewport home even when already at bea
 
   expect(useDAWStore.getState().playheadBeat).toBe(0);
   expect(scroll.scrollLeft).toBe(0);
-  expect(sendCommand).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommand).not.toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommandAsync).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
 });
 
 test('Enter on the focused workspace returns the timeline to zero', () => {
@@ -86,7 +97,8 @@ test('Enter on the focused workspace returns the timeline to zero', () => {
 
   expect(useDAWStore.getState().playheadBeat).toBe(0);
   expect(scroll.scrollLeft).toBe(0);
-  expect(sendCommand).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommand).not.toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommandAsync).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
 });
 
 test('transport keys override a focused toolbar button without reactivating it', () => {
@@ -107,5 +119,6 @@ test('transport keys override a focused toolbar button without reactivating it',
   expect(enterWasHandled).toBe(true);
   expect(useDAWStore.getState().playheadBeat).toBe(0);
   expect(useDAWStore.getState().isMetronomeEnabled).toBe(false);
-  expect(sendCommand).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommand).not.toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
+  expect(sendCommandAsync).toHaveBeenCalledWith('return_to_zero', JSON.stringify({}));
 });

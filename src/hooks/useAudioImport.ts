@@ -5,14 +5,17 @@ import {
   createImportedAudioBlock,
   type AudioAnalysis,
 } from '../music/audioImport';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {createTrackFromTemplate} from '../music/trackTemplates';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
+import {prepareAudioFileForPlayback} from '../native/audioPlaybackPreparation';
 import {getMediaImportBridge, type AudioImportRequest} from '../native/mediaImportApi';
 import {useDAWStore, type DAWBlock} from '../store/useDAWStore';
 
 export type AudioImportPlacement = {
   startBeat?: number;
-  preferredTrackId?: string | null;
-  stackIndex?: number;
 };
 
 function parseAnalysis(response: string | null): AudioAnalysis | null {
@@ -32,8 +35,8 @@ function parseCommandData(response: string | null): Record<string, unknown> | nu
   }
 }
 
-function analyzeAudioFile(absolutePath: string): AudioAnalysis | null {
-  return parseAnalysis(sendNativeAudioCommand('analyze_audio_file', {
+async function analyzeAudioFile(absolutePath: string): Promise<AudioAnalysis | null> {
+  return parseAnalysis(await sendNativeAudioCommandAsync('analyze_audio_file', {
     absoluteAudioFilePath: absolutePath,
   }));
 }
@@ -46,58 +49,12 @@ function currentEngineSampleRate(): number | undefined {
     : undefined;
 }
 
-function firstVoiceTrackId(): string | null {
-  return useDAWStore.getState().tracks.find(track => track.type === 'voice_audio')?.id ?? null;
-}
-
-function createVoiceTrack(): string | null {
-  const before = new Set(useDAWStore.getState().tracks.map(track => track.id));
-  useDAWStore.getState().addVoiceAudioTrack();
-  return useDAWStore.getState().tracks.find(track =>
-    track.type === 'voice_audio' && !before.has(track.id),
-  )?.id ?? firstVoiceTrackId();
-}
-
-function preferredVoiceTrackId(trackId: string | null | undefined): string | null {
-  if (!trackId) {
-    return null;
-  }
-  return useDAWStore.getState().tracks.find(track =>
-    track.id === trackId && track.type === 'voice_audio',
-  )?.id ?? null;
-}
-
-function resolveVoiceTrackForImport(placement?: AudioImportPlacement): string | null {
-  const existing = preferredVoiceTrackId(placement?.preferredTrackId);
-  const stackIndex = placement?.stackIndex ?? 0;
-  if (existing && stackIndex <= 0) {
-    return existing;
-  }
-  if (placement) {
-    return createVoiceTrack();
-  }
-
-  const first = firstVoiceTrackId();
-  if (first) {
-    return first;
-  }
-  return createVoiceTrack();
-}
-
 function safeImportStartBeat(placement?: AudioImportPlacement): number {
   const startBeat = placement?.startBeat;
   if (typeof startBeat === 'number' && Number.isFinite(startBeat)) {
     return Math.max(0, startBeat);
   }
   return useDAWStore.getState().playheadBeat;
-}
-
-function ensureVoiceTrack(): string | null {
-  const existing = firstVoiceTrackId();
-  if (existing) {
-    return existing;
-  }
-  return createVoiceTrack();
 }
 
 export function useAudioImport() {
@@ -126,32 +83,34 @@ export function useAudioImport() {
         return null;
       }
 
-      const analysis = analyzeAudioFile(imported.absolutePath);
+      const prepared = await prepareAudioFileForPlayback(imported);
+      if (!prepared) {
+        setErrorMessage('Imported audio could not be prepared for playback.');
+        return null;
+      }
+
+      const analysis = await analyzeAudioFile(prepared.absolutePath);
       if (!analysis) {
         setErrorMessage('Imported audio could not be analyzed.');
         return null;
       }
 
-      const trackId = placement ? resolveVoiceTrackForImport(placement) : ensureVoiceTrack();
-      if (!trackId) {
-        setErrorMessage('Could not create an audio track.');
-        return null;
-      }
-
       const state = useDAWStore.getState();
-      const trackIndex = Math.max(0, state.tracks.findIndex(track => track.id === trackId));
+      const trackIndex = state.tracks.length;
+      // A newly imported audio file should feel like a new recorded source: it
+      // gets its own lane, while the C++ engine still owns analysis/playback.
+      const track = createTrackFromTemplate('voice_audio', trackIndex);
       const block = createImportedAudioBlock({
-        trackId,
+        trackId: track.id,
         trackIndex,
         startBeat: safeImportStartBeat(placement),
         name: imported.name,
-        relativePath: imported.relativePath,
-        absolutePath: imported.absolutePath,
+        relativePath: prepared.relativePath,
+        absolutePath: prepared.absolutePath,
         analysis,
         projectSampleRate: currentEngineSampleRate(),
       });
-      useDAWStore.getState().addBlock(block);
-      useDAWStore.getState().selectBlock(block.id);
+      useDAWStore.getState().addTrackWithBlock(track, block);
       return block;
     } finally {
       setIsImporting(false);
@@ -183,7 +142,13 @@ export function useAudioImport() {
         return;
       }
 
-      const analysis = analyzeAudioFile(imported.absolutePath);
+      const prepared = await prepareAudioFileForPlayback(imported);
+      if (!prepared) {
+        setErrorMessage('Replacement audio could not be prepared for playback.');
+        return;
+      }
+
+      const analysis = await analyzeAudioFile(prepared.absolutePath);
       if (!analysis) {
         setErrorMessage('Replacement audio could not be analyzed.');
         return;
@@ -191,8 +156,8 @@ export function useAudioImport() {
 
       useDAWStore.getState().replaceAudioBlockMedia(blockId, {
         name: block.name || imported.name,
-        audioFilePath: imported.relativePath,
-        absoluteAudioFilePath: imported.absolutePath,
+        audioFilePath: prepared.relativePath,
+        absoluteAudioFilePath: prepared.absolutePath,
         lengthBeats: analysis.lengthBeats,
         durationSeconds: analysis.durationSeconds,
         waveformPeaks: analysis.waveformPeaks,
@@ -233,7 +198,13 @@ export function useAudioImport() {
         return;
       }
 
-      const analysis = analyzeAudioFile(duplicated.absolutePath);
+      const prepared = await prepareAudioFileForPlayback(duplicated);
+      if (!prepared) {
+        setErrorMessage('Duplicated audio could not be prepared for playback.');
+        return;
+      }
+
+      const analysis = await analyzeAudioFile(prepared.absolutePath);
       if (!analysis) {
         setErrorMessage('Duplicated audio could not be analyzed.');
         return;
@@ -242,8 +213,8 @@ export function useAudioImport() {
       const sourceName = block.mediaSourceName ?? block.name ?? duplicated.name;
       useDAWStore.getState().replaceAudioBlockMedia(blockId, {
         name: block.name,
-        audioFilePath: duplicated.relativePath,
-        absoluteAudioFilePath: duplicated.absolutePath,
+        audioFilePath: prepared.relativePath,
+        absoluteAudioFilePath: prepared.absolutePath,
         mediaSourceName: `${sourceName} Copy`,
         lengthBeats: analysis.lengthBeats,
         durationSeconds: analysis.durationSeconds,

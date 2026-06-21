@@ -13,6 +13,7 @@ const mockSendNativeAudioCommand = jest.fn();
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: (...args: unknown[]) => mockSendNativeAudioCommand(...args),
+  sendNativeAudioCommandAsync: jest.fn(() => Promise.resolve('{"ok":true}')),
 }));
 
 function resetStore() {

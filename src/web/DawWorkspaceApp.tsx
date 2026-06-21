@@ -20,8 +20,8 @@ import {useUndoRedoShortcuts} from '../hooks/useUndoRedoShortcuts';
 import {useWorkspacePanels} from '../hooks/useWorkspacePanels';
 import {moveSelectedClipsAsGroup} from '../arrangement/clipBulkMove';
 import {activeTracks, archivedTracks, blocksForActiveTracks} from '../music/trackOrganization';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
-import {refreshPlaybackOutputAfterVoice} from '../native/refreshPlayback';
+import {sendNativeAudioCommandAsync} from '../native/NativeAudioEngine';
+import {refreshPlaybackDeviceOnly} from '../native/refreshPlayback';
 import {toggleTransportPlayback} from '../store/dawRecording';
 import {useDAWNativeBridge} from '../store/useDAWNativeBridge';
 import {useDAWNativeEvents} from '../store/useDAWNativeEvents';
@@ -166,7 +166,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   }, []);
 
   const handleRefreshAudioDevice = useCallback(() => {
-    refreshPlaybackOutputAfterVoice();
+    refreshPlaybackDeviceOnly({useSystemDefault: true, forceReopen: false});
   }, []);
 
   useEffect(() => {
@@ -188,9 +188,9 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   }, []);
 
   const handleReturnToZero = useCallback(() => {
-    setPlayheadBeat(0, {pauseIfPlaying: true});
+    setPlayheadBeat(0, {pauseIfPlaying: true, syncTransport: false});
     window.dispatchEvent(new Event(TIMELINE_RETURN_TO_ZERO_EVENT));
-    sendNativeAudioCommand('return_to_zero', {});
+    void sendNativeAudioCommandAsync('return_to_zero', {});
   }, [setPlayheadBeat]);
 
   const focusWorkspace = useCallback((event: React.PointerEvent<HTMLElement>) => {

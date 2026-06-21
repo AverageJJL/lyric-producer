@@ -28,7 +28,6 @@
   overflow: visible;
   color: #edf4ff;
   text-align: left;
-  cursor: pointer;
   background: rgba(126, 174, 255, 0.16);
   border: 1px solid rgba(126, 174, 255, 0.34);
   border-radius: 4px;
@@ -47,6 +46,17 @@
   background: rgba(126, 174, 255, 0.24);
   border-color: rgba(126, 174, 255, 0.58);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.lyrics-section-chip.authored {
+  background: rgba(169, 216, 194, 0.13);
+  border-color: rgba(169, 216, 194, 0.32);
+}
+
+.lyrics-section-chip.authored:hover,
+.lyrics-section-chip.authored:focus-visible {
+  background: rgba(169, 216, 194, 0.21);
+  border-color: rgba(169, 216, 194, 0.56);
 }
 
 .lyrics-chip-section {

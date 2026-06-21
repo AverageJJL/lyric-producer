@@ -2,19 +2,8 @@ import {
   analyzeSongSeed,
   validateSongSeedModelSections,
 } from '../electron/songSeedAnalysis';
-import {
-  createSongIdeaAnalysis,
-  sectionsFromSongIdea,
-} from '../src/onboarding/songIdeaAnalysis';
 
 const lines = ['Line one', 'Line two', 'Line three'];
-
-function okJson(payload: unknown) {
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve(payload),
-  } as Response);
-}
 
 describe('song seed analysis validation', () => {
   it('accepts model sections with lyric ranges and production analysis', () => {
@@ -42,6 +31,7 @@ describe('song seed analysis validation', () => {
       name: 'Verse',
       lyrics: ['Line one', 'Line two'],
       productionDrivers: ['tight drums', 'dry vocal'],
+      sectionSource: 'model',
       producerInsight: expect.objectContaining({
         arrangementMove: expect.stringContaining('tight kick'),
         risk: expect.stringContaining('hook'),

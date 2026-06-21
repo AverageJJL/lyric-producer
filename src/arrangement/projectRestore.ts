@@ -3,6 +3,7 @@ import {normalizeDrumPattern} from '../music/drumPatterns';
 import {refreshPlaybackAndInstruments} from '../native/refreshPlayback';
 import {setTrackAmpSimState} from '../native/ampSimContract';
 import {setTrackFxState} from '../native/fxContractOps';
+import {deferNextNativeBlockSyncForProjectOpen} from '../store/useDAWNativeBridge';
 import {useDAWStore, type DAWBlock} from '../store/useDAWStore';
 import {
   captureProjectSnapshot,
@@ -29,10 +30,24 @@ import {
 import {normalizeTrackOrganizationLabel} from '../music/trackOrganization';
 import {storedTrackRoutingRole} from '../music/trackRouting';
 import {cloneSectionMarker, normalizeTimeSignature} from '../store/projectMetadata';
+import {cloneLyricDocument, normalizeLyricDocument} from '../store/lyrics';
 
 export type RestoreProjectSnapshotOptions = ApplyArrangementOptions & {
   /** Copilot staging reuses project snapshots as transient previews; those must not rewind live chat. */
   restoreCopilotChats?: boolean;
+  /**
+   * Project open/recover replaces the UI state first. Reopening the hardware device
+   * inside the click handler makes Electron feel frozen, especially on macOS where
+   * CoreAudio device changes can block the app process.
+   */
+  skipPlaybackRefresh?: boolean;
+  /**
+   * Project open should make the saved clips visible immediately, then let the native
+   * bridge prepare file-backed audio asynchronously. Binding several MP3 files while
+   * handling the open click path is exactly the kind of native work that makes macOS
+   * show a beachball.
+   */
+  deferNativeBlockSync?: boolean;
 };
 
 function blockFromSnapshot(block: DAWBlock): DAWBlock {
@@ -69,6 +84,9 @@ export function restoreProjectSnapshot(
   const bpm = normalizeTempoBpm(snapshot.bpm);
   const secondsPerBeat = bpm > 0 ? 60 / bpm : 0.5;
   const cycleRange = normalizeCycleRange(snapshot.cycleStartBeat, snapshot.cycleEndBeat);
+  const clearUnusedBlockSyncDeferral = options?.deferNativeBlockSync
+    ? deferNextNativeBlockSyncForProjectOpen()
+    : null;
   useDAWStore.setState({
     isPlaying: snapshot.isPlaying,
     bpm,
@@ -128,14 +146,18 @@ export function restoreProjectSnapshot(
     scale: snapshot.scale ? {...snapshot.scale} : null,
     chord: snapshot.chord ? {...snapshot.chord} : null,
     sections: snapshot.sections.map(cloneSectionMarker),
+    lyrics: cloneLyricDocument(normalizeLyricDocument(snapshot.lyrics)),
     midiAudition: null,
     liveMidiPreviewByTrack: {},
     liveAudioPreviewByClip: {},
     auditionedRecordingTakeId: null,
   });
+  clearUnusedBlockSyncDeferral?.();
 
   if (!options?.skipNativeRefresh) {
-    refreshPlaybackAndInstruments();
+    if (!options?.skipPlaybackRefresh) {
+      refreshPlaybackAndInstruments();
+    }
     const ampTrackIds = new Set(
       snapshot.tracks.filter(track => track.type === 'voice_audio').map(track => track.id),
     );

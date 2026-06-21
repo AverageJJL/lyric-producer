@@ -39,6 +39,10 @@ function ensureMidiExtension(filePath: string): string {
   return ext === '.mid' || ext === '.midi' ? filePath : `${filePath}.mid`;
 }
 
+function isProjectMediaRelativePath(relativePath: string): boolean {
+  return relativePath.startsWith('imports/') || relativePath.startsWith('recordings/');
+}
+
 async function showSaveDialog(mainWindow: BrowserWindow | null, options: SaveDialogOptions) {
   return mainWindow
     ? dialog.showSaveDialog(mainWindow, options)
@@ -128,7 +132,9 @@ export function registerFileIpc(config: FileIpcConfig): void {
   ipcMain.handle('media-file:resolve-audio', async (_event, request?: {references?: MediaResolveReference[]}) => {
     try {
       const references = Array.isArray(request?.references) ? request.references : [];
-      const resolved = references.map(reference => resolveReference(config, reference));
+      const resolved = await Promise.all(
+        references.map(reference => resolveReference(config, reference)),
+      );
       return {ok: true, resolved};
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not resolve audio media.';
@@ -184,35 +190,67 @@ export function registerFileIpc(config: FileIpcConfig): void {
   });
 }
 
-function resolveReference(config: FileIpcConfig, reference: MediaResolveReference) {
-  const absoluteCandidate = typeof reference.absolutePath === 'string'
-    ? reference.absolutePath
-    : '';
-  if (absoluteCandidate && fs.existsSync(absoluteCandidate)) {
-    return {
-      clipId: reference.clipId ?? '',
-      exists: true,
-      absolutePath: absoluteCandidate,
-      relativePath: reference.relativePath,
-    };
-  }
+async function copyAbsoluteFallbackToRelativePath(
+  sourcePath: string,
+  targetPath: string,
+): Promise<void> {
+  await fs.promises.mkdir(path.dirname(targetPath), {recursive: true});
+  await fs.promises.copyFile(sourcePath, targetPath);
+}
 
-  const relativeCandidate = typeof reference.relativePath === 'string'
-    ? resolveWritableAssetPath(config, reference.relativePath)
+async function resolveReference(config: FileIpcConfig, reference: MediaResolveReference) {
+  const relativePath = typeof reference.relativePath === 'string' ? reference.relativePath : '';
+  const relativeCandidate = relativePath
+    ? resolveWritableAssetPath(config, relativePath)
     : null;
   if (relativeCandidate && fs.existsSync(relativeCandidate)) {
     return {
       clipId: reference.clipId ?? '',
       exists: true,
       absolutePath: relativeCandidate,
-      relativePath: reference.relativePath,
+      relativePath,
+      isProjectManaged: true,
+      repaired: false,
+    };
+  }
+
+  const absoluteCandidate = typeof reference.absolutePath === 'string'
+    ? reference.absolutePath
+    : '';
+  if (absoluteCandidate && fs.existsSync(absoluteCandidate)) {
+    if (
+      relativeCandidate &&
+      relativePath &&
+      isProjectMediaRelativePath(relativePath)
+    ) {
+      await copyAbsoluteFallbackToRelativePath(absoluteCandidate, relativeCandidate);
+      return {
+        clipId: reference.clipId ?? '',
+        exists: true,
+        absolutePath: relativeCandidate,
+        relativePath,
+        isProjectManaged: true,
+        repaired: true,
+      };
+    }
+
+    const copied = await copyMediaFileIntoImportsAsync(config, absoluteCandidate);
+    return {
+      clipId: reference.clipId ?? '',
+      exists: true,
+      absolutePath: copied.absolutePath,
+      relativePath: copied.relativePath,
+      isProjectManaged: true,
+      repaired: true,
     };
   }
 
   return {
     clipId: reference.clipId ?? '',
     exists: false,
-    relativePath: reference.relativePath,
+    relativePath,
     absolutePath: absoluteCandidate || relativeCandidate || undefined,
+    isProjectManaged: false,
+    repaired: false,
   };
 }

@@ -1,8 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import type {SectionMarker} from '../../store/projectMetadata';
+import type {ChordMetadata, ScaleMetadata, SectionMarker} from '../../store/projectMetadata';
+import type {LyricDocument, LyricSection} from '../../store/lyrics';
 import {TimelineLyricEvidencePopup} from './TimelineLyricEvidencePopup';
 import {
+  buildAuthoredLyricEvidenceModel,
   buildLyricEvidenceModel,
   firstLyric,
   hasAnalysis,
@@ -16,9 +18,12 @@ type TimelineLyricsLaneProps = {
   pixelsPerBeat: number;
   beatsPerBar?: number;
   onJumpToBeat: (beat: number) => void;
+  authoredLyrics?: LyricDocument;
+  scale?: ScaleMetadata | null;
+  chord?: ChordMetadata | null;
 };
 
-type ActiveHover = {sectionId: string; pointerX: number};
+type ActivePopup = {id: string; pointerX: number};
 type PopupGeometry = {left: number; width: number; arrowLeft: number; isCursor: boolean};
 
 const CURSOR_POPOVER_WIDTH = 260;
@@ -35,12 +40,12 @@ function pointerXFromEvent(event: React.PointerEvent<HTMLElement>, fallback: num
   return event.clientX - left;
 }
 
-function popupGeometry(layout: TimelineLyricLayout, hover: ActiveHover, timelineWidth: number): PopupGeometry {
+function popupGeometry(layout: TimelineLyricLayout, active: ActivePopup, timelineWidth: number): PopupGeometry {
   const isCursor = layout.width < CURSOR_POPOVER_WIDTH;
   const width = isCursor ? CURSOR_POPOVER_WIDTH : layout.width;
-  const desiredLeft = isCursor ? hover.pointerX - 24 : layout.startPx;
+  const desiredLeft = isCursor ? active.pointerX - 24 : layout.startPx;
   const left = clamp(desiredLeft, 0, Math.max(0, timelineWidth - width));
-  const anchorX = isCursor ? hover.pointerX : layout.startPx + 18;
+  const anchorX = isCursor ? active.pointerX : layout.startPx + 18;
   return {
     left,
     width,
@@ -49,33 +54,78 @@ function popupGeometry(layout: TimelineLyricLayout, hover: ActiveHover, timeline
   };
 }
 
+function lyricSectionEnd(section: LyricSection, sections: LyricSection[], index: number, fallback: number): number {
+  return section.endBeat ?? sections.slice(index + 1).find(item => item.startBeat !== undefined)?.startBeat ?? fallback;
+}
+
+function authoredPreview(section: LyricSection): string {
+  return section.lines.find(line => line.text.trim().length > 0)?.text.trim() ?? 'Untimed lyrics';
+}
+
+function authoredContext(list: LyricSection[], index: number) {
+  return [list[index - 1], list[index + 1]]
+    .filter((section): section is LyricSection => Boolean(section))
+    .map(section => ({sectionName: section.name, lines: section.lines}));
+}
+
 export function TimelineLyricsLane({
   sections,
+  authoredLyrics,
   visibleTimelineBeats,
   pixelsPerBeat,
   beatsPerBar = 4,
   onJumpToBeat,
+  scale,
+  chord,
 }: TimelineLyricsLaneProps) {
-  const hideTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const [activeHover, setActiveHover] = useState<ActiveHover | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const [activeHover, setActiveHover] = useState<ActivePopup | null>(null);
+  const [pinnedPopup, setPinnedPopup] = useState<ActivePopup | null>(null);
   const timelineWidth = Math.max(CURSOR_POPOVER_WIDTH, visibleTimelineBeats * pixelsPerBeat);
+  const authoredLayouts = useMemo(
+    (): TimelineLyricLayout[] => {
+      const layouts: TimelineLyricLayout[] = [];
+      (authoredLyrics?.sections ?? []).forEach((section, index, list) => {
+        if (section.startBeat === undefined) return;
+        const startBeat = Math.max(0, section.startBeat);
+        const endBeat = Math.min(visibleTimelineBeats, lyricSectionEnd(section, list, index, visibleTimelineBeats));
+        layouts.push({
+          id: `authored-${section.id}`,
+          name: section.name,
+          startBeat,
+          startPx: startBeat * pixelsPerBeat,
+          width: Math.max(54, Math.max(1, endBeat - startBeat) * pixelsPerBeat),
+          preview: authoredPreview(section),
+          ariaLabel: `${section.name} authored lyrics`,
+          className: 'authored',
+          evidence: buildAuthoredLyricEvidenceModel(section, endBeat, beatsPerBar, {scale, chord}, authoredContext(list, index)),
+        });
+      });
+      return layouts;
+    },
+    [authoredLyrics, beatsPerBar, chord, pixelsPerBeat, scale, visibleTimelineBeats],
+  );
   const lyricLayouts = useMemo(
-    () => sections
+    (): TimelineLyricLayout[] => sections
       .filter(hasAnalysis)
       .map(section => {
         const startBeat = Math.max(0, section.startBeat);
         const endBeat = Math.min(visibleTimelineBeats, startBeat + Math.max(1, section.lengthBeats));
         const width = Math.max(54, (endBeat - startBeat) * pixelsPerBeat);
         return {
-          section,
+          id: section.id,
+          name: section.name,
           startBeat,
           startPx: startBeat * pixelsPerBeat,
           width,
-          evidence: buildLyricEvidenceModel(section, sections, beatsPerBar),
+          preview: firstLyric(section),
+          ariaLabel: `${section.name} lyric analysis`,
+          evidence: buildLyricEvidenceModel(section, sections, beatsPerBar, {scale, chord}),
         };
       }),
-    [beatsPerBar, pixelsPerBeat, sections, visibleTimelineBeats],
+    [beatsPerBar, chord, pixelsPerBeat, scale, sections, visibleTimelineBeats],
   );
+  const allLayouts = useMemo(() => [...authoredLayouts, ...lyricLayouts], [authoredLayouts, lyricLayouts]);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -90,35 +140,46 @@ export function TimelineLyricsLane({
   }, [clearHideTimer]);
 
   useEffect(() => clearHideTimer, [clearHideTimer]);
+  useEffect(() => {
+    if (!pinnedPopup) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPinnedPopup(null);
+        setActiveHover(null);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [pinnedPopup]);
 
-  if (lyricLayouts.length === 0) {
+  if (allLayouts.length === 0) {
     return null;
   }
 
-  const activeLayout = activeHover
-    ? lyricLayouts.find(layout => layout.section.id === activeHover.sectionId)
-    : undefined;
-  const geometry = activeLayout && activeHover
-    ? popupGeometry(activeLayout, activeHover, timelineWidth)
+  const activePopup = activeHover ?? pinnedPopup;
+  const activeLayout = activePopup ? allLayouts.find(layout => layout.id === activePopup.id) : undefined;
+  const geometry = activeLayout && activePopup
+    ? popupGeometry(activeLayout, activePopup, timelineWidth)
     : null;
+  const isPinned = Boolean(activeLayout && pinnedPopup?.id === activeLayout.id);
 
   return (
     <div className="lyrics-lane" aria-label="Lyrics lane">
-      {lyricLayouts.map(layout => {
-        const {section, startPx, width} = layout;
-        const tooltipId = popoverIdFor(section.id);
-        const isActive = activeHover?.sectionId === section.id;
+      {allLayouts.map(layout => {
+        const {id, name, startBeat, startPx, width} = layout;
+        const tooltipId = popoverIdFor(id);
+        const isActive = activePopup?.id === id;
         const showAt = (pointerX: number) => {
           clearHideTimer();
-          setActiveHover({sectionId: section.id, pointerX});
+          setActiveHover({id, pointerX});
         };
         return (
           <button
-            key={section.id}
+            key={id}
             type="button"
-            className={`lyrics-section-chip${isActive ? ' is-active' : ''}`}
+            className={`lyrics-section-chip${layout.className ? ` ${layout.className}` : ''}${isActive ? ' is-active' : ''}`}
             style={{left: startPx, width}}
-            aria-label={`${section.name} lyric analysis`}
+            aria-label={layout.ariaLabel}
             aria-describedby={isActive ? tooltipId : undefined}
             aria-expanded={isActive}
             onFocus={() => showAt(startPx + width / 2)}
@@ -130,20 +191,26 @@ export function TimelineLyricsLane({
               }
             }}
             onPointerLeave={scheduleHide}
-            onClick={() => onJumpToBeat(Math.max(0, section.startBeat))}>
-            <span className="lyrics-chip-section">{section.name}</span>
-            <small className="lyrics-chip-preview">{firstLyric(section)}</small>
+            onClick={() => onJumpToBeat(Math.max(0, startBeat))}>
+            <span className="lyrics-chip-section">{name}</span>
+            <small className="lyrics-chip-preview">{layout.preview}</small>
           </button>
         );
       })}
       {activeLayout && geometry ? (
         <TimelineLyricEvidencePopup
-          id={popoverIdFor(activeLayout.section.id)}
+          id={popoverIdFor(activeLayout.id)}
           model={activeLayout.evidence}
           left={geometry.left}
           width={geometry.width}
           arrowLeft={geometry.arrowLeft}
           isCursor={geometry.isCursor}
+          isPinned={isPinned}
+          onPin={() => activePopup && setPinnedPopup(isPinned ? null : {...activePopup})}
+          onClose={() => {
+            setPinnedPopup(null);
+            setActiveHover(null);
+          }}
           onPointerEnter={clearHideTimer}
           onPointerLeave={scheduleHide}
         />

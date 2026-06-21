@@ -1,5 +1,5 @@
 import {createSongIdeaAnalysis} from '../src/onboarding/songIdeaAnalysis';
-import {mergeReferenceMetadata, mergeSectionEnrichment} from '../src/web/components/songIdeaFlowHelpers';
+import {analysisKey, mergeReferenceMetadata, mergeSectionEnrichment} from '../src/web/components/songIdeaFlowHelpers';
 
 function baseAnalysis() {
   return createSongIdeaAnalysis({
@@ -59,6 +59,47 @@ describe('song idea Cyanite metadata helpers', () => {
       bpm: 129,
       scale: {root: 'Eb', mode: 'major'},
       bpmKey: {source: 'cyanite'},
+    });
+  });
+
+  it('separates cached analyses by lyric structure and provider status', () => {
+    const track = {id: 'mxm-1', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch' as const};
+    const lyrics = 'Oh, woah\nBaby, baby, baby, oh';
+
+    expect(analysisKey(track, lyrics, {intro: [0], chorus: [1]}, 'catalog-feed')).not.toBe(
+      analysisKey(track, lyrics, undefined, 'unavailable:missing track_isrc from track.search'),
+    );
+  });
+
+  it('does not let enrichment replace protected lyric sections', () => {
+    const base = createSongIdeaAnalysis({
+      track: {id: 'mxm-1', title: 'Baby', artist: 'Justin Bieber', hasLyrics: true, source: 'musixmatch'},
+      lyrics: 'Oh, woah\nBaby, baby, baby, oh',
+      lyricStructure: {intro: [0], chorus: [1]},
+    });
+    const enriched = {
+      ...base,
+      sections: base.sections.map(section => ({
+        ...section,
+        name: 'Wrong section',
+        lyricRange: {startLine: 99, endLine: 99},
+        lyrics: ['wrong lyric'],
+        lyricPreview: ['wrong lyric'],
+        mood: 'web enriched',
+        meaning: 'updated meaning',
+        productionDrivers: ['web cue'],
+        productionCue: 'web cue',
+        sectionSource: 'model' as const,
+      })),
+    };
+
+    const merged = mergeSectionEnrichment(base, enriched);
+    expect(merged.sections.map(section => section.name)).toEqual(['Intro', 'Chorus 1']);
+    expect(merged.sections[0]).toMatchObject({
+      lyricRange: {startLine: 0, endLine: 0},
+      lyrics: ['Oh, woah'],
+      mood: 'web enriched',
+      sectionSource: 'musixmatch-structure',
     });
   });
 });

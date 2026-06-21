@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 // <App /> mounts the Copilot panel, which imports ESM markdown/highlighter deps
 // that Jest does not transform in this repo's current test setup.
@@ -18,6 +18,7 @@ import {openBrowserDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const importMidi = jest.fn();
 const relinkAudio = jest.fn();
@@ -100,6 +101,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   importAudio.mockResolvedValue({
     ok: true,
     originalPath: '/Users/me/loop.wav',
@@ -122,6 +126,7 @@ beforeEach(() => {
   });
   window.audioEngine = {
     sendCommand,
+    sendCommandAsync,
     onEvent: () => () => undefined,
   };
   window.mediaImport = {importAudio, importMidi, relinkAudio};
@@ -131,6 +136,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   importMidi.mockReset();
   relinkAudio.mockReset();
@@ -157,6 +163,10 @@ test('imports MIDI and creates a software instrument clip', async () => {
     notes: [{note: 60, velocity: 90, startBeat: 0, lengthBeats: 1}],
   });
   expect(state.selectedBlockIds).toEqual([state.blocks[0]?.id]);
+  await waitFor(() => {
+    expect(sendCommand.mock.calls.some(([command]) => command === 'setTracks')).toBe(true);
+    expect(sendCommand.mock.calls.some(([command]) => command === 'upsert_midi_clip')).toBe(true);
+  });
   const setTracksIndex = sendCommand.mock.calls.findIndex(([command]) => command === 'setTracks');
   const upsertMidiIndex = sendCommand.mock.calls.findIndex(([command]) => command === 'upsert_midi_clip');
   expect(setTracksIndex).toBeGreaterThanOrEqual(0);
@@ -176,7 +186,7 @@ test('imports audio through native analysis and creates an audio clip', async ()
   });
 
   expect(importAudio).toHaveBeenCalledWith();
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/tmp/imports/loop.wav'}),
   );
@@ -276,7 +286,7 @@ test('relinks a selected missing audio clip through native analysis', async () =
   });
 
   expect(relinkAudio).toHaveBeenCalledWith();
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/tmp/imports/replacement.wav'}),
   );

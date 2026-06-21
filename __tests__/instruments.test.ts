@@ -77,7 +77,7 @@ describe('instrument catalog', () => {
     const samples = buildSamplePathMap(POP_DRUM_KIT_ID);
     expect(assignment?.params.samples).toEqual(samples);
     expect(Object.keys(samples)).toHaveLength(8);
-    expect(samples.kick).toBe('sample-library/core-drums/kick.wav');
+    expect(samples.kick).toBe('drums/kick.wav');
   });
 
   it('maps track types to instrument definitions', () => {

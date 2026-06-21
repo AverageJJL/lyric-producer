@@ -118,6 +118,9 @@ export function TimelineGrid({
   const meterMap = useDAWStore(state => state.meterMap);
   const tempoMap = useDAWStore(state => state.tempoMap);
   const sections = useDAWStore(state => state.sections);
+  const lyrics = useDAWStore(state => state.lyrics);
+  const scale = useDAWStore(state => state.scale);
+  const chord = useDAWStore(state => state.chord);
   const setSections = useDAWStore(state => state.setSections);
   const setRecordingCompRange = useDAWStore(state => state.setRecordingCompRange);
   const auditionedRecordingTakeId = useDAWStore(state => state.auditionedRecordingTakeId);
@@ -132,10 +135,11 @@ export function TimelineGrid({
       computeVisibleTimelineBeats({
         blocks,
         sections,
+        lyrics,
         playheadBeat,
         recordingBlockId,
       }),
-    [blocks, playheadBeat, recordingBlockId, sections],
+    [blocks, lyrics, playheadBeat, recordingBlockId, sections],
   );
 
   const timelineWidth = timelineWidthPx(visibleTimelineBeats, pixelsPerBeat);
@@ -261,9 +265,7 @@ export function TimelineGrid({
     handleTimelineAudioDragOver,
     handleTimelineAudioDrop,
   } = useTimelineAudioDropImport({
-    tracks,
     importAudioFile,
-    trackIdAtClientY,
     beatAtClientX,
     onDropHandled: onTimelineMediaDropHandled,
   });
@@ -536,7 +538,7 @@ export function TimelineGrid({
             onDrop={handleTimelineDrop}
             onPointerDownCapture={handleTimelineSurfacePointerDownCapture}
             style={{width: timelineWidth, height: surfaceHeight}}>
-            <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
+            <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} authoredLyrics={lyrics} scale={scale} chord={chord} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
             <div className="timeline-display-rows" aria-hidden="true">
               {displayLaneLayout.lanes.map(lane => (
                 <span

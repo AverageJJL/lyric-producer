@@ -154,7 +154,11 @@ export function useProjectFileLifecycle() {
   const saveProject = useCallback(
     () =>
       runFileAction(
-        () => saveCurrentApcProject(getProjectFileBridge(), currentPath),
+        () => saveCurrentApcProject(
+          getProjectFileBridge(),
+          currentPath,
+          {consolidateMedia: true, mediaBridge: getMediaImportBridge()},
+        ),
         'Project saved',
       ),
     [currentPath, runFileAction],

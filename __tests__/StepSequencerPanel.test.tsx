@@ -1,7 +1,10 @@
 import React from 'react';
 import {act, fireEvent, render, screen} from '@testing-library/react';
 
-import {sendNativeAudioCommand} from '../src/native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../src/native/NativeAudioEngine';
 import {createEmptyPattern} from '../src/music/drumPatterns';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
@@ -10,6 +13,7 @@ import {StepSequencerPanel} from '../src/web/components/StepSequencerPanel';
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: jest.fn(() => '{"ok":true}'),
+  sendNativeAudioCommandAsync: jest.fn(() => Promise.resolve('{"ok":true}')),
 }));
 
 jest.mock('../src/native/NativeAudioEngineEvents', () => ({
@@ -18,6 +22,9 @@ jest.mock('../src/native/NativeAudioEngineEvents', () => ({
 }));
 
 const mockedSend = sendNativeAudioCommand as jest.MockedFunction<typeof sendNativeAudioCommand>;
+const mockedSendAsync = sendNativeAudioCommandAsync as jest.MockedFunction<
+  typeof sendNativeAudioCommandAsync
+>;
 
 const drumTrack: DAWTrack = {
   id: 'track-drums',
@@ -92,6 +99,7 @@ function resetStore(blocks: DAWBlock[] = [], patterns = {}): void {
 describe('StepSequencerPanel', () => {
   beforeEach(() => {
     mockedSend.mockClear();
+    mockedSendAsync.mockClear();
   });
 
   it('keeps hook order stable when a drum clip becomes selected', () => {
@@ -114,7 +122,7 @@ describe('StepSequencerPanel', () => {
     const {container} = render(<StepSequencerPanel track={drumTrack} selectedBlockId={patternBlock.id} />);
 
     fireEvent.click(screen.getByRole('button', {name: 'Play'}));
-    expect(mockedSend).toHaveBeenCalledWith('start_pattern_preview', expect.any(Object));
+    expect(mockedSendAsync).toHaveBeenCalledWith('start_pattern_preview', expect.any(Object));
 
     act(() => {
       useDAWStore.setState({isPlaying: true, syncSource: 'ui'});

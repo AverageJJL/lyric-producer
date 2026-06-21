@@ -61,8 +61,7 @@ function agentAnswer(text: string, midiBlockEdits: unknown[]) {
 function openCopilotAndSend(message: string): void {
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByRole('textbox', {name: 'Message Copilot'});
-  input.replaceChildren(document.createTextNode(message));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: message}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 }
 

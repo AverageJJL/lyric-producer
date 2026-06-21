@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent} from 'react';
 import {applyReferenceAnalysis, createSongIdeaAnalysis, normalizeSongIdeaAnalysis, type SongIdeaAnalysis} from '../../onboarding/songIdeaAnalysis';
-import {analyzeSongSeed, getSongSeedLyrics, lookupSongSeedBpmKey, searchSongSeed, type SongSeedBpmKeyResponse, type SongSeedTrack} from '../../native/songSeedApi';
+import {analyzeSongSeed, getSongSeedLyrics, lookupSongSeedBpmKey, searchSongSeed, type SongSeedBpmKeyResponse, type SongSeedLyricStructure, type SongSeedTrack} from '../../native/songSeedApi';
 import type {ReferenceMoodAnalysis} from '../../store/referenceMoodAnalysis';
 import type {SongAnalysisPhase} from './SongAnalysisPanel';
 import {waitForSongMetadata} from './songIdeaMetadataWait';
@@ -34,6 +34,7 @@ export function useSongIdeaFlow(
   const selectionSessionRef = useRef(0);
   const currentTrackKeyRef = useRef<string | null>(null);
   const lyricsTextRef = useRef('');
+  const lyricStructureRef = useRef<SongSeedLyricStructure | undefined>(undefined);
   const draftDirtyRef = useRef<Required<MetadataFieldState>>({bpm: false, key: false});
   const metadataCacheRef = useRef(new Map<string, SongSeedBpmKeyResponse | null>());
   const metadataPromiseRef = useRef(new Map<string, Promise<SongSeedBpmKeyResponse | null>>());
@@ -60,12 +61,10 @@ export function useSongIdeaFlow(
       const response = await searchSongSeed(query, 8);
       if (requestId !== searchRequestRef.current) return;
       if (!response) {
-        setSearchState('error'); setSearchError('Song search is available in the Electron app.');
-        return;
+        setSearchState('error'); setSearchError('Song search is available in the Electron app.'); return;
       }
       if (!response.ok) {
-        setSearchState('error'); setSearchError(response.error); setResults([]);
-        return;
+        setSearchState('error'); setSearchError(response.error); setResults([]); return;
       }
       setResults(response.tracks);
       setHighlightedIndex(0);
@@ -130,7 +129,7 @@ export function useSongIdeaFlow(
     if (selectionSessionRef.current !== sessionId || currentTrackKeyRef.current !== key || !response?.ok) {
       return;
     }
-    const metadataAnalysis = createSongIdeaAnalysis({track, lyrics: lyricsTextRef.current, bpmKey: response});
+    const metadataAnalysis = createSongIdeaAnalysis({track, lyrics: lyricsTextRef.current, lyricStructure: lyricStructureRef.current, bpmKey: response});
     const locks = referenceMetadataAppliedRef.current ?? {};
     setLookupStatus(`${response.source} metadata ready`);
     setAnalysis(current => current ? mergeMetadata(current, metadataAnalysis, locks) : current);
@@ -144,8 +143,7 @@ export function useSongIdeaFlow(
     setSelectedTrack(null); setAnalysis(null); setMetadataDraft(null);
     setLyricsText(''); setLyricsCopyright(null); setLyricsState('idle');
     setLookupStatus(null); setActiveSection(0); setAnalysisPhase('idle');
-    currentTrackKeyRef.current = null;
-    lyricsTextRef.current = '';
+    currentTrackKeyRef.current = null; lyricsTextRef.current = ''; lyricStructureRef.current = undefined;
     draftDirtyRef.current = {bpm: false, key: false};
     referenceMetadataAppliedRef.current = null;
     autoOpenedRef.current = false;
@@ -160,11 +158,12 @@ export function useSongIdeaFlow(
   const runBackgroundAnalysis = (
     track: SongSeedTrack, key: string, lyrics: string, cacheKey: string,
     metadataPromise: Promise<SongSeedBpmKeyResponse | null>,
+    lyricStructure?: SongSeedLyricStructure,
   ) => {
     const requestId = analysisRequestRef.current + 1;
     analysisRequestRef.current = requestId;
     void waitForSongMetadata(metadataPromise)
-      .then(response => analyzeSongSeed({track, lyrics, bpmKeyCandidates: response?.ok ? response.candidates : []}))
+      .then(response => analyzeSongSeed({track, lyrics, lyricStructure, bpmKeyCandidates: response?.ok ? response.candidates : []}))
       .then(response => {
         if (requestId !== analysisRequestRef.current || currentTrackKeyRef.current !== key) {
           return;
@@ -181,20 +180,17 @@ export function useSongIdeaFlow(
             return merged;
           });
           setLookupStatus(response.warning ?? 'Enhanced section analysis ready');
-        } else if (response.warning) {
-          setLookupStatus(response.warning);
-        }
+        } else if (response.warning) setLookupStatus(response.warning);
       });
   };
-  const beginAnalysisForTrack = (
-    track: SongSeedTrack, key: string, lyrics: string,
-    metadataPromise: Promise<SongSeedBpmKeyResponse | null>, initialMetadata: SongSeedBpmKeyResponse | null,
-  ) => {
+  const beginAnalysisForTrack = (track: SongSeedTrack, key: string, lyrics: string,
+    metadataPromise: Promise<SongSeedBpmKeyResponse | null>, initialMetadata: SongSeedBpmKeyResponse | null, lyricStructure?: SongSeedLyricStructure, structureStatus = '') => {
     const cachedMetadata = initialMetadata ?? metadataCacheRef.current.get(key) ?? null;
-    const cacheKey = analysisKey(track, lyrics);
+    const cacheKey = analysisKey(track, lyrics, lyricStructure, structureStatus);
     const cachedAnalysis = analysisCacheRef.current.get(cacheKey);
+    const structureNote = structureStatus.startsWith('unavailable') ? 'Musixmatch structure unavailable; using local lyric parser' : undefined;
     const localAnalysis = cachedAnalysis ?? createSongIdeaAnalysis({
-      track, lyrics, bpmKey: cachedMetadata?.ok ? cachedMetadata : null,
+      track, lyrics, lyricStructure, structureNote, bpmKey: cachedMetadata?.ok ? cachedMetadata : null,
     });
     draftDirtyRef.current = {bpm: false, key: false};
     autoOpenedRef.current = false;
@@ -205,9 +201,11 @@ export function useSongIdeaFlow(
     setAnalysisPhase('analysing-sections');
     setLookupStatus(cachedAnalysis
       ? 'Enhanced analysis ready'
+      : structureNote
+        ? structureNote
       : cachedMetadata?.ok ? 'Local structure ready; refining in background' : 'Estimating metadata; refining in background');
     if (!cachedAnalysis) {
-      runBackgroundAnalysis(track, key, lyrics, cacheKey, metadataPromise);
+      runBackgroundAnalysis(track, key, lyrics, cacheKey, metadataPromise, lyricStructure);
     }
   };
   const selectTrack = async (track: SongSeedTrack) => {
@@ -229,27 +227,27 @@ export function useSongIdeaFlow(
     setLookupStatus('Loading lyrics, tempo, and key');
     setActiveSection(0);
     setAnalysisPhase('checking-metadata');
-    lyricsTextRef.current = '';
+    lyricsTextRef.current = ''; lyricStructureRef.current = undefined;
     draftDirtyRef.current = {bpm: false, key: false};
     referenceMetadataAppliedRef.current = null;
     autoOpenedRef.current = false;
     const metadataPromise = startMetadataLookup(track);
     void metadataPromise.then(response => applyMetadataResult(track, key, sessionId, response));
-    const response = await getSongSeedLyrics(track.id);
+    const response = await getSongSeedLyrics(track);
     if (selectionSessionRef.current !== sessionId || requestId !== lyricsRequestRef.current) {
       return;
     }
     if (response?.ok) {
       lyricsTextRef.current = response.lyrics;
+      lyricStructureRef.current = response.structure;
       setLyricsText(response.lyrics);
       setLyricsCopyright(response.copyright ?? null);
       setLyricsState('ready');
-      const metadata = await waitForSongMetadata(metadataPromise);
-      if (selectionSessionRef.current !== sessionId) return;
-      if (!metadata?.ok) setLookupStatus('Estimating metadata; refining in background');
-      beginAnalysisForTrack(track, key, response.lyrics, metadataPromise, metadata?.ok ? metadata : null);
+      const structureStatus = [response.structureSource, response.structureUnavailableReason].filter(Boolean).join(':');
+      beginAnalysisForTrack(track, key, response.lyrics, metadataPromise, metadataCacheRef.current.get(key) ?? null, response.structure, structureStatus);
       return;
     }
+    lyricStructureRef.current = undefined;
     setLyricsState('error');
     setLookupStatus(response?.error ?? 'Lyrics are unavailable for this song.');
     const metadata = await waitForSongMetadata(metadataPromise);

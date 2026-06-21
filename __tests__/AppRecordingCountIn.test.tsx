@@ -1,11 +1,19 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const fetchMock = jest.fn();
 
 function resetStore(): void {
@@ -65,8 +73,12 @@ function installAudioEngineMock(): void {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   window.audioEngine = {
     sendCommand,
+    sendCommandAsync,
     onEvent: () => () => undefined,
   };
 }
@@ -85,6 +97,7 @@ afterEach(() => {
   jest.useRealTimers();
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   fetchMock.mockReset();
 });
 
@@ -98,6 +111,7 @@ test('voice track count-in delays the native audio capture command', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Voice / Audio'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
   expect(screen.getByRole('button', {name: 'Cancel recording lead-in'})).toBeInTheDocument();
@@ -126,7 +140,7 @@ test('voice track count-in delays the native audio capture command', () => {
   expect(startCaptureCall?.[1]).toContain('"startBeat":6');
 });
 
-test('voice recording after the default count-in finalizes as a visible audio clip', () => {
+test('voice recording after the default count-in finalizes as a visible audio clip', async () => {
   sendCommand.mockImplementation((command: string) => {
     if (command === 'engine_status' || command === 'engine_status_fast') {
       return JSON.stringify({
@@ -156,8 +170,9 @@ test('voice recording after the default count-in finalizes as a visible audio cl
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
-  act(() => {
+  await act(async () => {
     jest.advanceTimersByTime(2000);
+    await Promise.resolve();
   });
   fireEvent.click(screen.getByRole('button', {name: 'Stop recording'}));
 
@@ -184,6 +199,7 @@ test('voice track count-in can be canceled without moving the playhead', () => {
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Cancel recording lead-in'}));
 
@@ -238,10 +254,11 @@ test('voice track pre-roll starts native transport before native audio capture',
   fireEvent.click(screen.getByRole('button', {name: 'Voice / Audio'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
-  const preRollPlayCall = sendCommand.mock.calls.find(
+  const preRollPlayCall = sendCommandAsync.mock.calls.find(
     ([command, payload]) =>
       command === 'transport_play' &&
       typeof payload === 'string' &&
@@ -280,6 +297,7 @@ test('voice track pre-roll can be canceled before capture starts', () => {
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Cancel recording lead-in'}));
 
@@ -299,7 +317,7 @@ test('voice track pre-roll can be canceled before capture starts', () => {
   expect(sendCommand.mock.calls.some(([command]) => command === 'start_audio_recording')).toBe(false);
 });
 
-test('voice track punch recording starts and stops at the cycle range', () => {
+test('voice track punch recording starts and stops at the cycle range', async () => {
   render(<App />);
 
   act(() => {
@@ -311,6 +329,7 @@ test('voice track punch recording starts and stops at the cycle range', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Voice / Audio'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
@@ -320,6 +339,9 @@ test('voice track punch recording starts and stops at the cycle range', () => {
   expect(startCaptureCall).toBeTruthy();
   expect(startCaptureCall?.[1]).toContain('"startBeat":4');
   expect(sendCommand.mock.calls.some(([command]) => command === 'stop_audio_recording')).toBe(false);
+  await act(async () => {
+    await Promise.resolve();
+  });
 
   act(() => {
     jest.advanceTimersByTime(1999);
@@ -333,7 +355,7 @@ test('voice track punch recording starts and stops at the cycle range', () => {
   expect(sendCommand.mock.calls.some(([command]) => command === 'stop_audio_recording')).toBe(true);
 });
 
-test('virtual instrument recording starts without record arm when track is selected', () => {
+test('virtual instrument recording starts without record arm when track is selected', async () => {
   render(<App />);
 
   fireEvent.click(screen.getByText('+ Add track'));
@@ -343,6 +365,7 @@ test('virtual instrument recording starts without record arm when track is selec
     useDAWStore.getState().setRecordingCountInBeats(0);
   });
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   const recordButton = screen.getByRole('button', {name: 'Start recording'});
   expect(recordButton).toBeEnabled();
@@ -353,6 +376,9 @@ test('virtual instrument recording starts without record arm when track is selec
     ([command]) => command === 'start_recording',
   );
   expect(startCaptureCall).toBeTruthy();
+  await act(async () => {
+    await Promise.resolve();
+  });
   expect(useDAWStore.getState().isRecording).toBe(true);
 });
 
@@ -375,6 +401,7 @@ test('instrument loop recording starts MIDI capture at the cycle start', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Pop Lead'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 
@@ -405,6 +432,7 @@ test('voice loop recording starts audio capture at the cycle start', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Voice / Audio'}));
   fireEvent.click(screen.getByRole('button', {name: 'R'}));
   sendCommand.mockClear();
+  sendCommandAsync.mockClear();
 
   fireEvent.click(screen.getByRole('button', {name: 'Start recording'}));
 

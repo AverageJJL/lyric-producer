@@ -19,6 +19,14 @@ export type ChordMetadata = {
   symbol: string;
 };
 
+export type ChordProgressionMetadata = {
+  source: string;
+  chords: string[];
+  confidence?: number;
+};
+
+export type LyricSectionSource = 'musixmatch-structure' | 'lyric-headers' | 'repetition' | 'model' | 'fallback-template';
+
 export const PROJECT_KEY_ROOTS = [
   'C',
   'C#',
@@ -77,6 +85,10 @@ export type SectionMarker = {
     bpmConfidence?: number;
     keyConfidence?: number;
     confidence?: number;
+    sectionSource?: LyricSectionSource;
+    sectionConfidence?: number;
+    structureNote?: string;
+    chordProgression?: ChordProgressionMetadata;
     reference?: ReferenceMoodAnalysis;
     lyricRange?: {startLine: number; endLine: number};
     lyrics?: string[];
@@ -98,6 +110,9 @@ export function cloneSectionMarker(section: SectionMarker): SectionMarker {
             : undefined,
           lyricRange: section.analysis.lyricRange
             ? {...section.analysis.lyricRange}
+            : undefined,
+          chordProgression: section.analysis.chordProgression
+            ? {...section.analysis.chordProgression, chords: [...section.analysis.chordProgression.chords]}
             : undefined,
           reference: section.analysis.reference
             ? cloneReferenceMoodAnalysis(section.analysis.reference)
@@ -124,6 +139,19 @@ function stringArray(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
 }
 
+function chordProgression(value: unknown): ChordProgressionMetadata | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  const source = stringOr(raw.source, '');
+  const chords = stringArray(raw.chords)?.slice(0, 12) ?? [];
+  if (!source || chords.length === 0) return undefined;
+  return {
+    source,
+    chords,
+    confidence: typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : undefined,
+  };
+}
+
 function producerInsight(value: unknown): ProducerInsight | undefined {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -138,6 +166,13 @@ function producerInsight(value: unknown): ProducerInsight | undefined {
     risk: stringOr(raw.risk, ''),
   };
   return Object.values(insight).some(item => item.length > 0) ? insight : undefined;
+}
+
+function lyricSectionSource(value: unknown): LyricSectionSource | undefined {
+  return value === 'musixmatch-structure' || value === 'lyric-headers'
+    || value === 'repetition' || value === 'model' || value === 'fallback-template'
+    ? value
+    : undefined;
 }
 
 export function normalizeSectionMarker(value: unknown): SectionMarker | null {
@@ -175,6 +210,12 @@ export function normalizeSectionMarker(value: unknown): SectionMarker | null {
       bpmConfidence: typeof analysis.bpmConfidence === 'number' ? analysis.bpmConfidence : undefined,
       keyConfidence: typeof analysis.keyConfidence === 'number' ? analysis.keyConfidence : undefined,
       confidence: typeof analysis.confidence === 'number' ? analysis.confidence : undefined,
+      sectionSource: lyricSectionSource(analysis.sectionSource),
+      sectionConfidence: typeof analysis.sectionConfidence === 'number'
+        ? Math.max(0, Math.min(1, analysis.sectionConfidence))
+        : undefined,
+      structureNote: stringOr(analysis.structureNote, ''),
+      chordProgression: chordProgression(analysis.chordProgression),
       reference: normalizeReferenceMoodAnalysis(analysis.reference),
       lyricRange: typeof lyricRange?.startLine === 'number' && typeof lyricRange.endLine === 'number'
         ? {startLine: lyricRange.startLine, endLine: lyricRange.endLine}

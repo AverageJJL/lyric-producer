@@ -62,6 +62,16 @@ function mergeStrippedFields(path: string, original: string | undefined, next: s
   }
 }
 
+function restoreLiveClipStrippedFields(files: Map<string, string>, snapshot: ProjectSnapshot): void {
+  snapshot.blocks.forEach(block => {
+    const path = APC_PATHS.clip(block.id);
+    const current = files.get(path);
+    if (current) {
+      files.set(path, mergeStrippedFields(path, canonicalJsonStringify(block), current));
+    }
+  });
+}
+
 /**
  * Lock enforcement for the patch path. The operation-based edit path runs lock checks
  * inside applyArrangementOperations, but a patch compiles to a full snapshot and stages
@@ -201,6 +211,7 @@ export function applyApcPatch(patch: ApcPatchTransaction): ApcPatchApplyResult {
   const files = new Map(
     serializeApcSource(decomposeSnapshotToApcSource(snapshot, TS)).map(f => [f.relativePath, f.content]),
   );
+  restoreLiveClipStrippedFields(files, snapshot);
 
   for (const change of patch.changes) {
     if (!pathIsSafe(change.path)) {

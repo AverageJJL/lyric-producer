@@ -15,6 +15,7 @@
 #include "JuceMessageThread.h"
 #include "JsonResponse.h"
 #include "MediaAnalysisCommands.h"
+#include "MediaPreparationCommands.h"
 #include "MeterSnapshot.h"
 #include "MidiPhrasePreview.h"
 #include "MixdownRenderManager.h"
@@ -437,6 +438,11 @@ class AudioEngineController::Impl {
         return commandResultToJson(result);
       }
 
+      if (command == "prepare_audio_file_for_playback") {
+        const auto result = handlePrepareAudioFileForPlayback(payloadJson);
+        return commandResultToJson(result);
+      }
+
       if (command == "detect_audio_transients") {
         const auto result = handleDetectAudioTransients(*edit_, payloadJson);
         return commandResultToJson(result);
@@ -834,11 +840,12 @@ class AudioEngineController::Impl {
   std::string handleTransportPlay(const std::string& payloadJson) {
     nlohmann::json payload = payloadJson.empty() ? nlohmann::json::object()
                                                  : nlohmann::json::parse(payloadJson, nullptr, false);
-    if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
-      return commandResultToJson(makeError("transport_play", "audio_device_unavailable", *error));
-    }
-
     const bool shouldPlay = payload.value("isPlaying", true);
+    if (shouldPlay) {
+      if (const auto error = playbackRouting_.prepareForAudiblePlayback(*engine_, *edit_)) {
+        return commandResultToJson(makeError("transport_play", "audio_device_unavailable", *error));
+      }
+    }
     auto& transport = edit_->getTransport();
 
     if (shouldPlay) {

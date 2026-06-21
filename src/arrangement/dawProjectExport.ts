@@ -229,6 +229,7 @@ function extensionJson(snapshot: ProjectSnapshot, trackIds: Map<string, string>)
       type: track.type,
     })),
     sections: snapshot.sections,
+    lyrics: snapshot.lyrics,
   }, null, 2);
 }
 

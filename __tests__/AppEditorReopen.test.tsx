@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -99,7 +99,7 @@ test('clicking a track row reopens the editor after closing it', () => {
   expect(screen.getByRole('heading', {name: 'Piano Roll'})).toBeInTheDocument();
 });
 
-test('clicking a MIDI block reopens the editor after closing it', () => {
+test('clicking a MIDI block reopens the editor after closing it', async () => {
   const {container} = render(<App />);
 
   addGrandPianoTrack();
@@ -128,7 +128,9 @@ test('clicking a MIDI block reopens the editor after closing it', () => {
   const block = container.querySelector('.timeline-block') as HTMLDivElement;
   const blockSurface = block.querySelector('.timeline-block-clip-surface') as HTMLDivElement;
   block.setPointerCapture = jest.fn();
-  fireEvent.pointerDown(blockSurface, {pointerId: 1, clientX: 24, clientY: 52});
+  fireEvent.pointerDown(blockSurface, {pointerId: 1, clientX: 24, clientY: 120, pageX: 24, pageY: 120});
 
-  expect(screen.getByRole('heading', {name: 'Piano Roll'})).toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByRole('heading', {name: 'Piano Roll'})).toBeInTheDocument();
+  });
 });

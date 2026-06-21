@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import {analyzeSongSeed, type SongSeedAnalyzeRequest} from './songSeedAnalysis';
 import {analyzeSongSeedReference} from './songSeedReference';
+import {checkLyricsSimilarity} from './songSeedLyricsSimilarity';
 import {
   getMusixmatchLyrics,
   lookupGetSongBpm,
@@ -32,6 +33,9 @@ export function registerSongSeedIpc(options: SongSeedIpcOptions = {}): void {
   );
   ipcMain.handle('song-seed:get-lyrics', (_event, request: SongSeedLyricsRequest) =>
     getMusixmatchLyrics(request),
+  );
+  ipcMain.handle('song-seed:check-lyrics-similarity', (_event, request) =>
+    checkLyricsSimilarity(request),
   );
   ipcMain.handle('song-seed:lookup-bpm-key', (_event, request: SongSeedBpmKeyRequest) =>
     lookupGetSongBpm(request),

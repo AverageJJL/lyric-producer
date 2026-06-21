@@ -1,6 +1,13 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -8,6 +15,7 @@ import {openBrowserDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const recoverOfflineAudio = jest.fn();
 
 function resetStore(): void {
@@ -87,6 +95,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   recoverOfflineAudio.mockResolvedValue({
     ok: true,
     folderPath: '/recovery',
@@ -101,7 +112,7 @@ beforeEach(() => {
     }],
     missing: [],
   });
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.mediaImport = {recoverOfflineAudio};
   window.localStorage.clear();
 });
@@ -109,6 +120,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   recoverOfflineAudio.mockReset();
   window.localStorage.clear();
   delete window.audioEngine;
@@ -130,7 +142,7 @@ test('recovers offline media sources through the media bin', async () => {
       }],
     });
   });
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/tmp/assets/imports/missing.wav'}),
   );
@@ -140,7 +152,7 @@ test('recovers offline media sources through the media bin', async () => {
     isMissingMedia: false,
     sourceLengthBeats: 4,
   });
-  expect(screen.getByText('Recovered 1 clips.')).toBeInTheDocument();
+  expect(await screen.findByText('Recovered 1 clips.')).toBeInTheDocument();
 
   act(() => {
     useDAWStore.getState().undo();

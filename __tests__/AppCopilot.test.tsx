@@ -111,8 +111,7 @@ test('shows a Copilot answer and highlights the add-track target', async () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('How do I add a track?'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'How do I add a track?'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Use + Add track in the Tracks sidebar.')).toBeInTheDocument();
@@ -142,8 +141,7 @@ test('sends visible Track Details popup controls in Copilot context', async () =
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('What controls are in this popup?'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'What controls are in this popup?'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(agentAsk).toHaveBeenCalled());
@@ -168,8 +166,7 @@ test('can reveal selected track details from a Copilot navigation action', async
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Show me track details'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Show me track details'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
@@ -193,8 +190,7 @@ test('can reveal the selected track volume control from a hidden workflow action
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Show me the piano volume'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Show me the piano volume'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
@@ -219,8 +215,7 @@ test('can reveal the Add Track menu without creating a track', async () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Show me add track options'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Show me add track options'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => expect(screen.getByRole('menu', {name: 'Add track menu'})).toBeInTheDocument());
@@ -253,8 +248,7 @@ test('renders MIDI option cards, previews natively, and imports a bass track', a
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Give me a bassline'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Give me a bassline'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Root Push')).toBeInTheDocument();
@@ -285,8 +279,7 @@ test('can open an existing right panel from a Copilot action', async () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Open audio settings'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Open audio settings'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   await waitFor(() => {

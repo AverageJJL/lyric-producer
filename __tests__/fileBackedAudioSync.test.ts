@@ -1,16 +1,24 @@
-import {sendNativeAudioCommand} from '../src/native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../src/native/NativeAudioEngine';
 import {upsertBlockForEngine} from '../src/native/refreshPlayback';
 import {useDAWStore, type DAWBlock} from '../src/store/useDAWStore';
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: jest.fn(() => '{"ok":true}'),
+  sendNativeAudioCommandAsync: jest.fn(() => Promise.resolve('{"ok":true}')),
 }));
 
 const mockedSend = sendNativeAudioCommand as jest.MockedFunction<typeof sendNativeAudioCommand>;
+const mockedSendAsync = sendNativeAudioCommandAsync as jest.MockedFunction<
+  typeof sendNativeAudioCommandAsync
+>;
 
 describe('file-backed audio sync', () => {
   beforeEach(() => {
     mockedSend.mockClear();
+    mockedSendAsync.mockClear();
     useDAWStore.setState({tracks: []});
   });
 
@@ -35,7 +43,8 @@ describe('file-backed audio sync', () => {
 
     upsertBlockForEngine(block);
 
-    expect(mockedSend).toHaveBeenCalledWith(
+    expect(mockedSend).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
+    expect(mockedSendAsync).toHaveBeenCalledWith(
       'upsert_audio_clip',
       expect.objectContaining({
         clipId: 'clip-import',
@@ -110,6 +119,26 @@ describe('file-backed audio sync', () => {
 
     expect(mockedSend).toHaveBeenCalledWith('delete_clip', {clipId: 'clip-missing'});
     expect(mockedSend).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
+  });
+
+  it('keeps compressed audio out of native clip binding until it is prepared', () => {
+    const block: DAWBlock = {
+      id: 'clip-compressed',
+      trackId: 'track-audio',
+      name: 'Compressed Loop',
+      startBeat: 0,
+      lengthBeats: 4,
+      type: 'audio',
+      color: '#4a7fd4',
+      audioFilePath: 'imports/loop.mp3',
+      absoluteAudioFilePath: '/tmp/imports/loop.mp3',
+    };
+
+    upsertBlockForEngine(block);
+
+    expect(mockedSend).toHaveBeenCalledWith('delete_clip', {clipId: 'clip-compressed'});
+    expect(mockedSend).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
+    expect(mockedSendAsync).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
   });
 
   it('removes clips on disabled tracks from native playback', () => {

@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('audioEngine', {
     return ipcRenderer.sendSync('audio-engine:send-command', command, payloadJson);
   },
 
+  sendCommandAsync(command: string, payloadJson: string): Promise<string> {
+    return ipcRenderer.invoke('audio-engine:send-command-async', command, payloadJson);
+  },
+
   onEvent(
     eventName: AudioEngineEventName,
     callback: (payloadJson: string) => void,
@@ -151,8 +155,18 @@ contextBridge.exposeInMainWorld('songSeed', {
     return ipcRenderer.invoke('song-seed:search', request);
   },
 
-  getLyrics(request: {trackId?: string}) {
+  getLyrics(request: {
+    trackId?: string;
+    trackIsrc?: string;
+    commontrackId?: string;
+    hasTrackStructure?: boolean;
+    debugLog?: boolean;
+  }) {
     return ipcRenderer.invoke('song-seed:get-lyrics', request);
+  },
+
+  checkLyricsSimilarity(request: {lyrics?: string; lineIds?: string[]}) {
+    return ipcRenderer.invoke('song-seed:check-lyrics-similarity', request);
   },
 
   lookupBpmKey(request: {title?: string; artist?: string}) {

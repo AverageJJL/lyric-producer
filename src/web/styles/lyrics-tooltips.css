@@ -1,0 +1,64 @@
+.lyrics-panel-toolbar button {
+  position: relative;
+}
+
+.lyrics-panel-toolbar button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 172px;
+  padding: 6px 8px;
+  color: rgba(238, 240, 244, 0.92);
+  background: rgba(18, 22, 30, 0.96);
+  border-radius: 6px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1.25;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.lyrics-panel-toolbar button:hover::after,
+.lyrics-panel-toolbar button:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.lyrics-panel-toolbar .lyrics-similarity-button {
+  grid-auto-flow: column;
+  gap: 6px;
+  width: auto;
+  padding: 0 9px;
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.lyrics-similarity-spinner {
+  display: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(126, 174, 255, 0.24);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: lyrics-similarity-spin 720ms linear infinite;
+}
+
+.lyrics-similarity-button:disabled .lyrics-similarity-spinner {
+  display: block;
+}
+
+.lyrics-panel-toolbar .lyrics-similarity-button:disabled {
+  color: var(--accent-primary);
+  opacity: 0.72;
+}
+
+@keyframes lyrics-similarity-spin {
+  to { transform: rotate(360deg); }
+}

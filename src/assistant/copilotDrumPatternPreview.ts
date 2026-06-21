@@ -1,7 +1,10 @@
 import {createTrackFromTemplate} from '../music/trackTemplates';
 import {patternStepsPayload} from '../music/drumPatterns';
 import {activeTracks} from '../music/trackOrganization';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import {buildNativeTracksPayload} from '../native/trackPayload';
 import {syncTrackInstruments, syncTrackInstrumentToEngine} from '../native/syncTrackInstruments';
 import type {DAWTrack} from '../store/useDAWStore';
@@ -18,6 +21,7 @@ type PreviewState = {
 };
 
 let activePreview: PreviewState | null = null;
+let previewStartRequestId = 0;
 
 function previewTrackForOption(option: CopilotDrumPatternOption, tracks: DAWTrack[]): DAWTrack {
   return createTrackFromTemplate('drum_machine', tracks.length, {
@@ -51,6 +55,7 @@ function commandSucceeded(response: string | null): boolean {
 }
 
 export function stopCopilotDrumPatternPreview(): void {
+  previewStartRequestId += 1;
   if (!activePreview) {
     return;
   }
@@ -61,25 +66,38 @@ export function stopCopilotDrumPatternPreview(): void {
 
 export function startCopilotDrumPatternPreview(
   option: CopilotDrumPatternOption,
-): {ok: true} | {ok: false; error: string} {
+): Promise<{ok: true} | {ok: false; error: string}> {
+  const requestId = previewStartRequestId + 1;
+  previewStartRequestId = requestId;
   stopCopilotMidiOptionPreview();
   stopCopilotDrumPatternPreview();
+  previewStartRequestId = requestId;
   const tracks = activeTracks(useDAWStore.getState().tracks);
   const previewTrack = previewTrackForOption(option, tracks);
   setNativePreviewTracks(tracks, previewTrack);
   const pattern = patternFromCopilotDrumLanes(option.lanes, option.label, `preview-${option.id}`);
-  const response = sendNativeAudioCommand('start_pattern_preview', {
+  return sendNativeAudioCommandAsync('start_pattern_preview', {
     trackId: previewTrack.id,
     bpm: useDAWStore.getState().bpm,
     lanes: patternStepsPayload(pattern),
+  }).then(response => {
+    if (requestId !== previewStartRequestId) {
+      return {ok: false as const, error: 'Drum preview was stopped.'};
+    }
+    if (!commandSucceeded(response)) {
+      sendNativeAudioCommand('stop_pattern_preview', {});
+      restoreNativeTracks(tracks);
+      return {ok: false as const, error: 'Drum preview could not start.'};
+    }
+    activePreview = {optionId: option.id, trackId: previewTrack.id};
+    return {ok: true as const};
+  }).catch(() => {
+    if (requestId === previewStartRequestId) {
+      sendNativeAudioCommand('stop_pattern_preview', {});
+      restoreNativeTracks(tracks);
+    }
+    return {ok: false as const, error: 'Drum preview could not start.'};
   });
-  if (!commandSucceeded(response)) {
-    sendNativeAudioCommand('stop_pattern_preview', {});
-    restoreNativeTracks(tracks);
-    return {ok: false, error: 'Drum preview could not start.'};
-  }
-  activePreview = {optionId: option.id, trackId: previewTrack.id};
-  return {ok: true};
 }
 
 export function activeCopilotDrumPreviewOptionId(): string | null {

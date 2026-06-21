@@ -48,11 +48,18 @@ export function useCopilotDrumPatternController(scheduleFocusInput: () => void) 
   }, []);
 
   const playDrumPattern = useCallback((option: CopilotDrumPatternOption) => {
-    const result = startCopilotDrumPatternPreview(option);
-    if (!result.ok) {
-      setOptionStatus(current => ({...current, [option.id]: {error: result.error}}));
-      return;
-    }
+    void startCopilotDrumPatternPreview(option).then(result => {
+      if (!result.ok) {
+        if (result.error === 'Drum preview was stopped.') {
+          return;
+        }
+        setPlayingOptionId(current => current === option.id ? null : current);
+        setOptionStatus(current => ({...current, [option.id]: {error: result.error}}));
+        return;
+      }
+      setPlayingOptionId(option.id);
+      setOptionStatus(current => ({...current, [option.id]: {status: 'Previewing...'}}));
+    });
     setPlayingOptionId(option.id);
     setOptionStatus(current => ({...current, [option.id]: {status: 'Previewing...'}}));
   }, []);

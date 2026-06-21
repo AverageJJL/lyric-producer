@@ -1,22 +1,11 @@
-import {
-  applyArrangementOperations,
-} from '../src/arrangement/operations';
-import {
-  captureProjectSnapshot,
-  emptyProjectSnapshot,
-  snapshotFingerprint,
-} from '../src/arrangement/projectSnapshot';
+import {applyArrangementOperations} from '../src/arrangement/operations';
+import {captureProjectSnapshot, emptyProjectSnapshot, snapshotFingerprint} from '../src/arrangement/projectSnapshot';
 import {createEmptyPattern} from '../src/music/drumPatterns';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore} from '../src/store/useDAWStore';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
-import {
-  compileApcSourceToSnapshot,
-  decomposeSnapshotToApcSource,
-  parseApcSourceFiles,
-  serializeApcSource,
-} from '../src/arrangement/apc';
+import {compileApcSourceToSnapshot, decomposeSnapshotToApcSource, parseApcSourceFiles, serializeApcSource} from '../src/arrangement/apc';
 
 jest.mock('../src/native/refreshPlayback', () => ({
   refreshPlaybackAndInstruments: jest.fn(),
@@ -168,16 +157,7 @@ describe('.apc source round-trip', () => {
     // compile. This fails loudly the moment that happens.
     buildRichProject();
     const source = decomposeSnapshotToApcSource(captureProjectSnapshot(), SAVED_AT);
-    const explicitOverrides = [
-      'tracks',
-      'blocks',
-      'patterns',
-      'fxStates',
-      'fxSummaries',
-      'ampSimStates',
-      'mediaReferences',
-      'copilotChats',
-    ];
+    const explicitOverrides = ['tracks', 'blocks', 'patterns', 'fxStates', 'fxSummaries', 'ampSimStates', 'mediaReferences', 'copilotChats', 'lyrics'];
     const covered = new Set([
       ...Object.keys(source.project),
       ...Object.keys(source.timeline),
@@ -285,10 +265,24 @@ describe('.apc source round-trip', () => {
     });
 
     const original = captureProjectSnapshot();
-    const fingerprint = snapshotFingerprint(original);
+    const expected = {
+      ...original,
+      blocks: original.blocks.map(block =>
+        block.type === 'audio'
+          ? {...block, absoluteAudioFilePath: undefined}
+          : block,
+      ),
+      mediaReferences: original.mediaReferences.map(reference =>
+        reference.kind === 'audio'
+          ? {...reference, absolutePath: undefined}
+          : reference,
+      ),
+    };
+    const fingerprint = snapshotFingerprint(expected);
     expect(original.ampSimStates).toHaveLength(1);
 
     const source = decomposeSnapshotToApcSource(original, SAVED_AT);
+    expect(source.clips['clip-voice']?.absoluteAudioFilePath).toBeUndefined();
     const result = compileApcSourceToSnapshot(source);
 
     expect(result.ok).toBe(true);

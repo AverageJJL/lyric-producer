@@ -81,6 +81,8 @@ describe('song seed providers', () => {
       trackId: '42',
       lyrics: 'Line one\nLine two',
       copyright: 'Lyrics copyright Musixmatch',
+      structureSource: 'unavailable',
+      structureUnavailableReason: 'selected track was not flagged with has_track_structure',
     });
   });
 

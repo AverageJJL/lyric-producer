@@ -1,5 +1,5 @@
 import React from 'react';
-import {cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
 jest.mock('remark-gfm', () => () => null);
@@ -14,6 +14,7 @@ import {resetCopilotChatHistoryForTests} from '../src/assistant/copilotChatHisto
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const agentAsk = jest.fn();
 
 function resetStore(): void {
@@ -46,7 +47,8 @@ beforeEach(() => {
   resetStore();
   resetCopilotChatHistoryForTests();
   sendCommand.mockImplementation(() => JSON.stringify({ok: true, data: {}}));
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  sendCommandAsync.mockImplementation((command: string, payload: string) => Promise.resolve(sendCommand(command, payload)));
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.copilot = {agentAsk};
   HTMLElement.prototype.scrollIntoView = jest.fn();
   HTMLElement.prototype.getBoundingClientRect = () =>
@@ -57,6 +59,7 @@ afterEach(() => {
   cleanup();
   resetCopilotChatHistoryForTests();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   agentAsk.mockReset();
   delete window.audioEngine;
   delete window.copilot;
@@ -96,13 +99,14 @@ test('renders drum pattern options, previews natively, and imports a step sequen
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
   const input = screen.getByLabelText('Message Copilot');
-  input.replaceChildren(document.createTextNode('Make a drum beat'));
-  fireEvent.input(input);
+  fireEvent.change(input, {target: {value: 'Make a drum beat'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
   expect(await screen.findByText('Backbeat')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Play preview'}));
-  expect(sendCommand).toHaveBeenCalledWith('start_pattern_preview', expect.stringContaining('"kick":[0,8]'));
+  await waitFor(() => {
+    expect(sendCommandAsync).toHaveBeenCalledWith('start_pattern_preview', expect.stringContaining('"kick":[0,8]'));
+  });
 
   fireEvent.click(screen.getByRole('button', {name: 'Import drum pattern'}));
   const state = useDAWStore.getState();

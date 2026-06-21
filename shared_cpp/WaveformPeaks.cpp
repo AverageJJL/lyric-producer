@@ -41,8 +41,8 @@ float bufferPeak(const juce::AudioBuffer<float>& buffer, int channels, int sampl
 
 int peakCountForDuration(double durationSeconds) {
   constexpr int kMinPoints = 256;
-  constexpr int kMaxPoints = 4096;
-  constexpr double kPointsPerSecond = 50.0;
+  constexpr int kMaxPoints = 8192;
+  constexpr double kPointsPerSecond = 100.0;
   const int count = static_cast<int>(std::ceil(std::max(0.0, durationSeconds) * kPointsPerSecond));
   return std::clamp(count, kMinPoints, kMaxPoints);
 }

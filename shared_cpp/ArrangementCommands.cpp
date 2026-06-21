@@ -66,9 +66,12 @@ CommandResult handleSetAssetRoot(ProjectState& projectState, const std::string& 
     writableDir.getChildFile("recordings").createDirectory();
   }
 
+  projectState.setSampleLibraryRoot(payload.value("sampleLibraryRoot", std::string{}));
+
   nlohmann::json data;
   data["assetRoot"] = projectState.assetRoot();
   data["writableAssetRoot"] = projectState.writableAssetRoot();
+  data["sampleLibraryRoot"] = projectState.sampleLibraryRoot();
   return makeSuccess("set_asset_root", data.dump());
 }
 

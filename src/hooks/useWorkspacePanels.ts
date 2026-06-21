@@ -1,6 +1,6 @@
 import {useCallback, useState} from 'react';
 
-export type RightPanelId = 'samples' | 'browser' | 'audio' | 'copilot';
+export type RightPanelId = 'samples' | 'browser' | 'audio' | 'lyrics' | 'copilot';
 
 export const RIGHT_DOCK_MIN_WIDTH = 280;
 export const RIGHT_DOCK_MAX_WIDTH = 560;

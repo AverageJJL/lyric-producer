@@ -1,7 +1,10 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {parseNativeCommandError, parseNativeCommandOk} from '../native/parseNativeResponse';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import {capturePlaybackOutputDevice} from '../native/refreshPlayback';
 import {buildNativeTransportPayload} from '../native/transportPayload';
 import {stopActiveRecordingSession} from '../store/dawRecording';
@@ -40,6 +43,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
   const setRecordingCountInBeats = useDAWStore(state => state.setRecordingCountInBeats);
   const setRecordingPreRollBeats = useDAWStore(state => state.setRecordingPreRollBeats);
   const setPunchRecordingEnabled = useDAWStore(state => state.setPunchRecordingEnabled);
+  const setLoopRecordingEnabled = useDAWStore(state => state.setLoopRecordingEnabled);
   const setRecordingLatencyCompensationMs = useDAWStore(state => state.setRecordingLatencyCompensationMs);
   const startRecordingSession = useDAWStore(state => state.startRecordingSession);
   const activateRecordingSession = useDAWStore(state => state.activateRecordingSession);
@@ -79,18 +83,12 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
   }, []);
 
   const startLeadInTransport = useCallback((beat: number, forceClick: boolean) => {
-    const state = useDAWStore.getState();
     const startBeat = Math.max(0, beat);
-    const startSeconds = tempoMapSecondsAtBeat(startBeat, state.bpm, state.tempoMap);
     useDAWStore.getState().setPlayheadBeat(startBeat, {syncTransport: false});
     setIsPlaying(true);
     if (forceClick) {
       sendNativeAudioCommand('set_click_track', {enabled: true});
     }
-    sendNativeAudioCommand(
-      'transport_play',
-      buildNativeTransportPayload(true, startBeat, startSeconds),
-    );
   }, [setIsPlaying]);
 
   const startNativeCountInClick = useCallback((recordStartBeat: number, beats: number) => {
@@ -157,7 +155,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
     );
   }, [bpm, clearPunchOutTimer, tempoMap]);
 
-  const startNativeRecording = useCallback((
+  const startNativeRecording = useCallback(async (
     recordTrackId: string,
     requestedStartBeat?: number,
     requestedStopBeat?: number,
@@ -199,7 +197,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
       }
       captureStarted = true;
     }
-    const transportResponse = sendNativeAudioCommand(
+    const transportResponse = await sendNativeAudioCommandAsync(
       'transport_play',
       buildNativeTransportPayload(
         true,
@@ -241,7 +239,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
     recordStopBeat?: number,
   ) => {
     if (effectivePreRollBeats <= 0) {
-      startNativeRecording(recordTrackId, recordStartBeat, recordStopBeat);
+      void startNativeRecording(recordTrackId, recordStartBeat, recordStopBeat);
       return;
     }
 
@@ -257,7 +255,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
     leadInTimerRef.current = window.setTimeout(
       () => {
         leadInTimerRef.current = null;
-        startNativeRecording(recordTrackId, recordStartBeat, recordStopBeat);
+        void startNativeRecording(recordTrackId, recordStartBeat, recordStopBeat);
       },
       recordingPreRollSeconds(effectivePreRollBeats, bpm, tempoMap, recordStartBeat) * 1000,
     );
@@ -319,7 +317,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
       return;
     }
 
-    startNativeRecording(recordTrack.id, recordStartBeat, recordStopBeat);
+    void startNativeRecording(recordTrack.id, recordStartBeat, recordStopBeat);
   }, [
     armedTrack,
     activeTrack,
@@ -361,6 +359,7 @@ export function useRecordingLaunch({armedTrack, activeTrack}: RecordingLaunchOpt
     setRecordingCountInBeats,
     setRecordingPreRollBeats,
     setPunchRecordingEnabled,
+    setLoopRecordingEnabled,
     setRecordingLatencyCompensationMs,
     handleStartRecording,
     handleStopRecording,

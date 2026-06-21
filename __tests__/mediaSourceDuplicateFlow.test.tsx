@@ -1,6 +1,13 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
+jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
+jest.mock('remark-gfm', () => () => null);
+jest.mock('react-syntax-highlighter', () => ({
+  Prism: ({children}: {children: React.ReactNode}) => <pre>{children}</pre>,
+}));
+jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus: {}}));
+
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore} from '../src/store/useDAWStore';
@@ -8,6 +15,7 @@ import {openBrowserDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const importMidi = jest.fn();
 const relinkAudio = jest.fn();
@@ -103,6 +111,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   duplicateAudio.mockResolvedValue({
     ok: true,
     originalPath: '/tmp/imports/linked.wav',
@@ -110,7 +121,7 @@ beforeEach(() => {
     relativePath: 'imports/linked-1.wav',
     name: 'linked-1',
   });
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.mediaImport = {
     importAudio,
     importMidi,
@@ -124,6 +135,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   importMidi.mockReset();
   relinkAudio.mockReset();
@@ -159,7 +171,7 @@ test('duplicates one media-bin source without rebinding sibling clips', async ()
     });
   expect(useDAWStore.getState().blocks.find(block => block.id === 'clip-sibling')?.mediaSourceName)
     .toBeUndefined();
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/tmp/assets/imports/linked-1.wav'}),
   );

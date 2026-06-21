@@ -4,10 +4,13 @@ import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
 
 const mockSendNativeAudioCommand = jest.fn();
+const mockSendNativeAudioCommandAsync = jest.fn();
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: (command: string, payload: unknown) =>
     mockSendNativeAudioCommand(command, payload),
+  sendNativeAudioCommandAsync: (command: string, payload: unknown) =>
+    mockSendNativeAudioCommandAsync(command, payload),
 }));
 
 const track: DAWTrack = {
@@ -58,6 +61,8 @@ function resetStore(blocks = [audioBlock('clip-a', 0), audioBlock('clip-b', 2)])
 describe('audio clip render in place', () => {
   beforeEach(() => {
     resetStore();
+    mockSendNativeAudioCommand.mockReset();
+    mockSendNativeAudioCommandAsync.mockReset();
     mockSendNativeAudioCommand.mockImplementation((command: string) => {
       if (command === 'render_mixdown_async') {
         return JSON.stringify({ok: true, data: {status: 'running'}});
@@ -84,6 +89,9 @@ describe('audio clip render in place', () => {
       }
       return JSON.stringify({ok: false});
     });
+    mockSendNativeAudioCommandAsync.mockImplementation(async (command: string, payload: unknown) =>
+      mockSendNativeAudioCommand(command, payload),
+    );
   });
 
   it('renders selected same-track audio clips and replaces them with one undoable clip', async () => {
@@ -108,7 +116,7 @@ describe('audio clip render in place', () => {
       startBeat: 0,
       endBeat: 4,
     }));
-    expect(mockSendNativeAudioCommand).toHaveBeenCalledWith('analyze_audio_file', {
+    expect(mockSendNativeAudioCommandAsync).toHaveBeenCalledWith('analyze_audio_file', {
       absoluteAudioFilePath: '/tmp/assets/imports/render.wav',
     });
 

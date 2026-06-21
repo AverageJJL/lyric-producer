@@ -24,6 +24,8 @@ export type AudioMediaResolution = {
   exists: boolean;
   relativePath?: string;
   absolutePath?: string;
+  isProjectManaged?: boolean;
+  repaired?: boolean;
 };
 
 export type AudioMediaResolveResponse =

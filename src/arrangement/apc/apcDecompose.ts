@@ -1,16 +1,21 @@
 import {canonicalJsonStringify} from '../canonicalJson';
 import type {ProjectSnapshot} from '../projectSnapshot';
+import {isProjectManagedAudioPath} from '../mediaConsolidation';
+import type {DAWBlock} from '../../store/useDAWStore';
 import type {TrackAmpSimState} from '../../native/ampSimContract';
 import {
   APC_PATHS,
   APC_SOURCE_FORMAT,
   APC_SOURCE_VERSION,
   type ApcProjectFile,
+  type ApcLyricsFile,
   type ApcSourceFile,
   type ApcSourceProject,
   type ApcTimelineFile,
   type ApcTrackFxFile,
 } from './apcSourceTypes';
+
+const FALLBACK_SAVED_AT = '1970-01-01T00:00:00.000Z';
 
 function projectFileFromSnapshot(snapshot: ProjectSnapshot): ApcProjectFile {
   return {
@@ -45,6 +50,19 @@ function timelineFileFromSnapshot(snapshot: ProjectSnapshot): ApcTimelineFile {
   };
 }
 
+function lyricsFileFromSnapshot(snapshot: ProjectSnapshot): ApcLyricsFile {
+  return snapshot.lyrics;
+}
+
+function clipFileFromSnapshot(block: DAWBlock): DAWBlock {
+  if (block.type !== 'audio' || !isProjectManagedAudioPath(block.audioFilePath)) {
+    return block;
+  }
+  const projectManagedClip = {...block};
+  delete projectManagedClip.absoluteAudioFilePath;
+  return projectManagedClip;
+}
+
 /**
  * Split a {@link ProjectSnapshot} into the in-memory `.apc` tree.
  *
@@ -55,7 +73,7 @@ function timelineFileFromSnapshot(snapshot: ProjectSnapshot): ApcTimelineFile {
  */
 export function decomposeSnapshotToApcSource(
   snapshot: ProjectSnapshot,
-  savedAt: string,
+  savedAt: string = FALLBACK_SAVED_AT,
 ): ApcSourceProject {
   const tracks: ApcSourceProject['tracks'] = {};
   snapshot.tracks.forEach(track => {
@@ -64,7 +82,7 @@ export function decomposeSnapshotToApcSource(
 
   const clips: ApcSourceProject['clips'] = {};
   snapshot.blocks.forEach(block => {
-    clips[block.id] = block;
+    clips[block.id] = clipFileFromSnapshot(block);
   });
 
   const patterns: ApcSourceProject['patterns'] = {...snapshot.patterns};
@@ -95,6 +113,7 @@ export function decomposeSnapshotToApcSource(
     },
     project: projectFileFromSnapshot(snapshot),
     timeline: timelineFileFromSnapshot(snapshot),
+    lyrics: lyricsFileFromSnapshot(snapshot),
     copilot: snapshot.copilotChats,
     tracks,
     clips,
@@ -113,6 +132,7 @@ export function serializeApcSource(source: ApcSourceProject): ApcSourceFile[] {
     {relativePath: APC_PATHS.manifest, content: canonicalJsonStringify(source.manifest)},
     {relativePath: APC_PATHS.project, content: canonicalJsonStringify(source.project)},
     {relativePath: APC_PATHS.timeline, content: canonicalJsonStringify(source.timeline)},
+    {relativePath: APC_PATHS.lyrics, content: canonicalJsonStringify(source.lyrics)},
   ];
   if (source.copilot.sessions.length > 0 || source.copilot.activeSessionId !== null) {
     files.push({relativePath: APC_PATHS.copilot, content: canonicalJsonStringify(source.copilot)});

@@ -30,14 +30,27 @@ void ProjectState::setWritableAssetRoot(std::string root) {
   writableAssetRoot_ = std::move(root);
 }
 
+void ProjectState::setSampleLibraryRoot(std::string root) {
+  sampleLibraryRoot_ = std::move(root);
+}
+
 std::string ProjectState::resolveAssetPath(const std::string& relativePath) const {
   const auto normalizedRelativePath = normalizeSlashes(relativePath);
-  const bool useWritableRoot = !writableAssetRoot_.empty()
-                               && (normalizedRelativePath.rfind("recordings/", 0) == 0
-                                   || normalizedRelativePath.rfind("spectrograms/", 0) == 0
-                                   || normalizedRelativePath.rfind("imports/", 0) == 0
-                                   || normalizedRelativePath.rfind("sample-library/", 0) == 0);
-  const auto& rootPath = useWritableRoot ? writableAssetRoot_ : assetRoot_;
+  // Project media and shared libraries are intentionally different ownership
+  // domains. Imports/recordings/spectrograms belong inside the open `.apc`
+  // bundle so a song is portable; the sample library is app-wide so moving or
+  // opening a project cannot make factory drums disappear or create per-song
+  // copies of optional packs.
+  const bool isProjectMedia = normalizedRelativePath.rfind("recordings/", 0) == 0
+                              || normalizedRelativePath.rfind("spectrograms/", 0) == 0
+                              || normalizedRelativePath.rfind("imports/", 0) == 0;
+  const bool isSampleLibrary = normalizedRelativePath.rfind("sample-library/", 0) == 0;
+  const auto& rootPath =
+      isProjectMedia && !writableAssetRoot_.empty()
+          ? writableAssetRoot_
+          : isSampleLibrary && !sampleLibraryRoot_.empty()
+                ? sampleLibraryRoot_
+                : assetRoot_;
 
   if (rootPath.empty()) {
     return relativePath;
@@ -166,7 +179,28 @@ std::string ProjectState::drumSamplePath(const std::string& trackId, const std::
     return {};
   }
 
-  return resolveAssetPath(sampleIt->second);
+  const auto relativePath = normalizeSlashes(sampleIt->second);
+  const auto resolved = resolveAssetPath(relativePath);
+  if (juce::File(resolved).existsAsFile()) {
+    return resolved;
+  }
+
+  // Older projects saved the stock kit as `sample-library/core-drums/*.wav`.
+  // The built-in kit now lives under bundled `assets/drums`, so keep those
+  // projects audible even when the optional app-wide sample pack is absent.
+  constexpr const char* legacyCoreDrumPrefix = "sample-library/core-drums/";
+  if (relativePath.rfind(legacyCoreDrumPrefix, 0) == 0 && !assetRoot_.empty()) {
+    const auto fileName = relativePath.substr(std::char_traits<char>::length(legacyCoreDrumPrefix));
+    if (!fileName.empty()) {
+      return juce::File(assetRoot_)
+          .getChildFile("drums")
+          .getChildFile(juce::String(fileName))
+          .getFullPathName()
+          .toStdString();
+    }
+  }
+
+  return resolved;
 }
 
 void ProjectState::setTrackInstrument(const std::string& trackId, const std::string& instrument) {

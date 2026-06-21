@@ -51,7 +51,7 @@ export const DRUM_LANE_ICONS: Record<DrumSampleKey, string> = {
 };
 
 export function drumSampleRelativePath(key: DrumSampleKey): string {
-  return `sample-library/core-drums/${key}.wav`;
+  return `drums/${key}.wav`;
 }
 
 const POP_DRUM_KIT_SAMPLE_MAP: Record<DrumSampleKey, string> = {

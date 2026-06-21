@@ -210,7 +210,6 @@
   color: rgba(238, 240, 244, 0.18);
   filter: blur(1.25px);
   opacity: 0.32;
-  cursor: pointer;
   transition: color 360ms ease, filter 360ms ease, opacity 360ms ease, transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 

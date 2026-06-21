@@ -1,6 +1,6 @@
 import {useCallback} from 'react';
 
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {sendNativeAudioCommandAsync} from '../native/NativeAudioEngine';
 import {clampVelocity} from '../music/noteUtils';
 
 type PreviewSampleArgs = {
@@ -15,7 +15,7 @@ type PreviewSampleArgs = {
 export function useSamplePreview() {
   const previewSample = useCallback(
     ({trackId, sampleKey, velocity = 100, step = 0}: PreviewSampleArgs) => {
-      sendNativeAudioCommand('play_sample', {
+      void sendNativeAudioCommandAsync('play_sample', {
         trackId,
         sampleKey,
         velocity: clampVelocity(velocity),

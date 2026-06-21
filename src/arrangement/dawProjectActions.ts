@@ -1,6 +1,9 @@
 import {clearArrangementHistory} from '../store/history';
 import type {AudioAnalysis} from '../music/audioImport';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import type {ProjectFileBridge} from '../native/projectFileApi';
 import {captureProjectSnapshot, snapshotFingerprint} from './projectSnapshot';
 import {restoreProjectSnapshot} from './projectRestore';
@@ -39,8 +42,8 @@ function parseCommandData(response: string | null): Record<string, unknown> | nu
   }
 }
 
-function analyzeAudioFile(absolutePath: string): AudioAnalysis | null {
-  const data = parseCommandData(sendNativeAudioCommand('analyze_audio_file', {
+async function analyzeAudioFile(absolutePath: string): Promise<AudioAnalysis | null> {
+  const data = parseCommandData(await sendNativeAudioCommandAsync('analyze_audio_file', {
     absoluteAudioFilePath: absolutePath,
   }));
   return data ? data as AudioAnalysis : null;
@@ -57,10 +60,6 @@ function currentEngineSampleRate(): number | undefined {
 function dawProjectDefaultPath(currentPath?: string | null): string {
   const fileName = currentPath?.split(/[\\/]/).pop() ?? 'Untitled';
   return `${fileName.replace(/\.(apcproject|json)$/i, '')}.dawproject`;
-}
-
-function analyzeImportedMedia(media: DawProjectImportedMedia): AudioAnalysis | null {
-  return analyzeAudioFile(media.absolutePath);
 }
 
 export async function exportDawProjectFile(
@@ -101,12 +100,16 @@ export async function importDawProjectFile(
   if (!response.ok) {
     return response;
   }
+  const analyses = new Map<string, AudioAnalysis | null>();
+  for (const media of response.mediaFiles) {
+    analyses.set(media.archivePath, await analyzeAudioFile(media.absolutePath));
+  }
   const imported = dawProjectSnapshotFromPackage({
     extensionJson: response.extensionJson,
     mediaFiles: response.mediaFiles,
     metadataXml: response.metadataXml,
     projectXml: response.projectXml,
-  }, analyzeImportedMedia, currentEngineSampleRate());
+  }, (media: DawProjectImportedMedia) => analyses.get(media.archivePath) ?? null, currentEngineSampleRate());
   if (!imported.ok) {
     return imported;
   }

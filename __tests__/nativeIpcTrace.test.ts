@@ -1,6 +1,7 @@
 import {
   nativeIpcTraceDecision,
   runNativeIpcWithTrace,
+  runNativeIpcWithTraceAsync,
   SLOW_NATIVE_IPC_MS,
 } from '../electron/nativeIpcTrace';
 
@@ -34,5 +35,25 @@ describe('native IPC tracing', () => {
       traceEveryCommand: false,
       warnSlowCommand: false,
     });
+  });
+
+  it('traces async native commands after the promise resolves', async () => {
+    const logger = {log: jest.fn(), warn: jest.fn()};
+    const nowValues = [10, 30];
+    const response = await runNativeIpcWithTraceAsync({
+      command: 'analyze_audio_file',
+      payloadJson: '{"absoluteAudioFilePath":"/tmp/song.mp3"}',
+      isPackaged: false,
+      env: {},
+      logger,
+      now: () => nowValues.shift() ?? 30,
+      invoke: async () => '{"ok":true}',
+    });
+
+    expect(response).toBe('{"ok":true}');
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[native-ipc] analyze_audio_file 20.0ms payload=41B response=11B',
+    );
+    expect(logger.log).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,10 @@ import {
   createNativeAudioEngineEventEmitter,
   DRUM_PATTERN_STEP_EVENT,
 } from '../native/NativeAudioEngineEvents';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 
 type UseDrumPatternTransportArgs = {
   trackId: string;
@@ -82,7 +85,7 @@ export function useDrumPatternTransport({
       return;
     }
 
-    sendNativeAudioCommand('start_pattern_preview', {
+    void sendNativeAudioCommandAsync('start_pattern_preview', {
       trackId,
       bpm,
       lanes: patternStepsPayload(pattern),

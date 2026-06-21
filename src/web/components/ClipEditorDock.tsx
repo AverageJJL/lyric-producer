@@ -26,7 +26,6 @@ type ClipEditorDockProps = {
 export function ClipEditorDock({
   recordingLaunch,
   editorSuppressed = false,
-  sampleLibraryStatus,
   onDownloadDrumLibrary,
   onEditorActiveChange,
   onEditorClose,
@@ -86,8 +85,10 @@ export function ClipEditorDock({
   }, [editorSuppressed, hasInstrumentEditor, onEditorActiveChange]);
 
   const showEditors = !editorSuppressed;
-  const drumPack = sampleLibraryStatus?.packs.find(pack => pack.id === 'core-drums');
-  const isDrumLibraryInstalled = !drumPack || drumPack.state === 'installed';
+  // The stock drum machine is a factory instrument now. Optional sample-library
+  // packs can still be downloaded from the browser, but the core editor must not
+  // go silent just because an optional `core-drums` pack is missing or stale.
+  const isFactoryDrumKitAvailable = true;
 
   return (
     <>
@@ -119,7 +120,7 @@ export function ClipEditorDock({
           <StepSequencerPanel
             track={activeTrack}
             selectedBlockId={selectedBlockId}
-            isDrumLibraryInstalled={isDrumLibraryInstalled}
+            isDrumLibraryInstalled={isFactoryDrumKitAvailable}
             onDownloadDrumLibrary={onDownloadDrumLibrary}
           />
         </ResizableEditorPanel>

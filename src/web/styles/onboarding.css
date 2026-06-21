@@ -85,7 +85,6 @@ html[data-onboarding='active'] .app-shell::before {
 .onboarding-link {
   display: grid;
   place-items: center;
-  cursor: pointer;
   width: 38px;
   height: 38px;
   min-height: 38px;
@@ -112,7 +111,6 @@ html[data-onboarding='active'] .app-shell::before {
   display: grid;
   align-content: center;
   gap: 4px;
-  cursor: pointer;
   min-height: 72px;
   padding: 13px 16px;
   text-align: left;
@@ -208,7 +206,6 @@ html[data-onboarding='active'] .app-shell::before {
 
 .song-idea-form button,
 .onboarding-secondary {
-  cursor: pointer;
   min-height: 38px;
   padding: 0 14px;
   color: var(--accent-primary-contrast);

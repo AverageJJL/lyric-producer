@@ -4,6 +4,7 @@ import {act, fireEvent, render, screen} from '@testing-library/react';
 import {TimelineLyricsLane} from '../src/web/components/TimelineLyricsLane';
 import type {ReferenceMoodAnalysis} from '../src/store/referenceMoodAnalysis';
 import type {SectionMarker} from '../src/store/projectMetadata';
+import {defaultLyricDocument, type LyricDocument} from '../src/store/lyrics';
 
 function reference(overrides: Partial<ReferenceMoodAnalysis> = {}): ReferenceMoodAnalysis {
   return {
@@ -67,7 +68,12 @@ function section(id: string, name: string, startBeat: number, lengthBeats: numbe
   };
 }
 
-function renderLane(sections: SectionMarker[], pixelsPerBeat = 8) {
+function renderLane(
+  sections: SectionMarker[],
+  pixelsPerBeat = 8,
+  authoredLyrics?: LyricDocument,
+  harmony: {scale?: {root: string; mode: string}; chord?: {symbol: string}} = {},
+) {
   render(
     <TimelineLyricsLane
       visibleTimelineBeats={64}
@@ -75,6 +81,9 @@ function renderLane(sections: SectionMarker[], pixelsPerBeat = 8) {
       beatsPerBar={4}
       onJumpToBeat={jest.fn()}
       sections={sections}
+      authoredLyrics={authoredLyrics}
+      scale={harmony.scale}
+      chord={harmony.chord}
     />,
   );
 }
@@ -92,6 +101,10 @@ describe('TimelineLyricsLane', () => {
 
     expect(chip).toHaveTextContent('Nice to meet you');
     expect(chip).not.toHaveAttribute('title');
+    expect(tooltip).toHaveTextContent('Song seed');
+    expect(tooltip).toHaveTextContent('Nice to meet you');
+    expect(tooltip).toHaveTextContent('1 line');
+    expect(tooltip).toHaveTextContent('4 syllables');
     expect(tooltip).not.toHaveTextContent('Reference evidence');
     expect(tooltip).not.toHaveTextContent('Fallback section mood');
     expect(tooltip).toHaveTextContent('Mood tags');
@@ -102,6 +115,20 @@ describe('TimelineLyricsLane', () => {
     expect(tooltip).not.toHaveTextContent('96 BPM');
     expect(tooltip).not.toHaveTextContent('The narrator sharpens the conflict.');
     expect(tooltip).not.toHaveTextContent('Use clipped drums and muted guitar responses');
+  });
+
+  it('surfaces unavailable Musixmatch structure status in the popup source label', () => {
+    const fallback = section('intro', 'Intro', 0, 16);
+    fallback.analysis!.sectionSource = 'repetition';
+    fallback.analysis!.sectionConfidence = 0.86;
+    fallback.analysis!.structureNote = 'Musixmatch structure unavailable; using local lyric parser';
+    renderLane([fallback]);
+
+    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Intro lyric analysis'}), {clientX: 80});
+    const tooltip = screen.getByRole('tooltip');
+
+    expect(tooltip).toHaveTextContent('detected from repetition');
+    expect(tooltip).toHaveTextContent('Musixmatch structure unavailable');
   });
 
   it('keeps full song sections visible when lyrics are partial', () => {
@@ -195,5 +222,61 @@ describe('TimelineLyricsLane', () => {
     act(() => { jest.advanceTimersByTime(160); });
 
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  });
+
+  it('shows authored lyric text, counts, rhyme, and suggested chords in the shared popup', () => {
+    const lyrics = defaultLyricDocument();
+    lyrics.sections[0] = {
+      id: 'hook',
+      name: 'Hook',
+      startBeat: 0,
+      endBeat: 8,
+      lines: [
+        {id: 'line-a', text: 'come back tonight', startBeat: 0, timingSource: 'manual'},
+        {id: 'line-b', text: 'meet me in the light', startBeat: 4, timingSource: 'manual'},
+      ],
+    };
+    renderLane([], 10, lyrics, {scale: {root: 'C', mode: 'major'}});
+
+    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Hook authored lyrics'}), {clientX: 80});
+    const tooltip = screen.getByRole('tooltip');
+
+    expect(tooltip).toHaveTextContent('Authored');
+    expect(tooltip).toHaveTextContent('2 lines');
+    expect(tooltip).toHaveTextContent('9 syllables');
+    expect(tooltip).toHaveTextContent('A A');
+    expect(screen.getByText('Rhyme')).toHaveAttribute('title', expect.stringContaining('A marks'));
+    expect(tooltip).toHaveTextContent('come back tonight');
+    expect(tooltip).toHaveTextContent('Suggested progression');
+    expect(tooltip).toHaveTextContent('C - G - Am - F');
+  });
+
+  it('keeps a pinned popup open until closed', () => {
+    jest.useFakeTimers();
+    renderLane([section('verse', 'Verse', 0, 16, reference())]);
+    const chip = screen.getByRole('button', {name: 'Verse lyric analysis'});
+    fireEvent.pointerEnter(chip, {clientX: 80});
+    fireEvent.click(screen.getByRole('button', {name: 'Pin lyric popup'}));
+
+    fireEvent.pointerLeave(chip);
+    act(() => { jest.advanceTimersByTime(160); });
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Close lyric popup'}));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('prefers verified chord progressions over project chords or suggestions', () => {
+    const verified = section('chorus', 'Chorus', 0, 16);
+    verified.analysis!.chordProgression = {source: 'manual', chords: ['Am', 'F', 'C', 'G'], confidence: 0.92};
+    renderLane([verified], 8, undefined, {scale: {root: 'C', mode: 'major'}, chord: {symbol: 'Cmaj7'}});
+
+    fireEvent.pointerEnter(screen.getByRole('button', {name: 'Chorus lyric analysis'}), {clientX: 80});
+    const tooltip = screen.getByRole('tooltip');
+
+    expect(tooltip).toHaveTextContent('Verified progression');
+    expect(tooltip).toHaveTextContent('Am - F - C - G');
+    expect(tooltip).not.toHaveTextContent('Cmaj7');
+    expect(tooltip).not.toHaveTextContent('Suggested progression');
   });
 });

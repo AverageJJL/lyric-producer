@@ -45,7 +45,9 @@ function isAgentVisibleFile(relativePath: string): boolean {
   // Chat transcripts are project data for save/open, but they are not editable
   // arrangement source. Keeping them out of the agent tree prevents one chat session
   // from leaking into a new session through copilot.json.
-  return relativePath !== APC_PATHS.copilot;
+  // Authored lyrics are personal creative text; they save to disk but should not be
+  // sent to Copilot implicitly just because the panel exists.
+  return relativePath !== APC_PATHS.copilot && relativePath !== APC_PATHS.lyrics;
 }
 
 /** FNV-1a 32-bit hash → 8 hex chars. Deterministic, dependency-free. */

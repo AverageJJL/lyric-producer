@@ -1,6 +1,9 @@
 import {isDrumPatternBlock} from '../music/clipFactories';
 import {audioSampleRateWarning, type AudioAnalysis} from '../music/audioImport';
-import {sendNativeAudioCommand} from '../native/NativeAudioEngine';
+import {
+  sendNativeAudioCommand,
+  sendNativeAudioCommandAsync,
+} from '../native/NativeAudioEngine';
 import type {MediaImportBridge} from '../native/mediaImportApi';
 import {
   captureArrangementHistorySnapshot,
@@ -35,8 +38,19 @@ function safeNativeCommand(command: string, payload: Record<string, unknown>): s
   }
 }
 
-function analyzeAudioFile(absolutePath: string): AudioAnalysis | null {
-  const data = parseCommandData(safeNativeCommand('analyze_audio_file', {
+async function safeNativeCommandAsync(
+  command: string,
+  payload: Record<string, unknown>,
+): Promise<string | null> {
+  try {
+    return await sendNativeAudioCommandAsync(command, payload);
+  } catch {
+    return null;
+  }
+}
+
+async function analyzeAudioFile(absolutePath: string): Promise<AudioAnalysis | null> {
+  const data = parseCommandData(await safeNativeCommandAsync('analyze_audio_file', {
     absoluteAudioFilePath: absolutePath,
   }));
   if (!data || typeof data.durationSeconds !== 'number' || typeof data.sampleRate !== 'number') {
@@ -156,7 +170,7 @@ export async function renderSelectedAudioClipsInPlace(
     return {ok: false, error: rendered.error};
   }
 
-  const analysis = analyzeAudioFile(destination.absolutePath);
+  const analysis = await analyzeAudioFile(destination.absolutePath);
   if (!analysis) {
     return {ok: false, error: 'Rendered audio could not be analyzed.'};
   }

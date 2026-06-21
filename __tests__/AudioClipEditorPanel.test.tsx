@@ -34,10 +34,13 @@ function mockRecordingLaunch(overrides: Partial<RecordingLaunch> = {}): Recordin
 }
 
 const mockSendNativeAudioCommand = jest.fn();
+const mockSendNativeAudioCommandAsync = jest.fn();
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: (command: string, payload: unknown) =>
     mockSendNativeAudioCommand(command, payload),
+  sendNativeAudioCommandAsync: (command: string, payload: unknown) =>
+    mockSendNativeAudioCommandAsync(command, payload),
 }));
 
 const track: DAWTrack = {
@@ -104,6 +107,8 @@ function resetStore(blocks: DAWBlock[] = [block], selectedBlockIds: string[] = [
 describe('AudioClipEditorPanel', () => {
   beforeEach(() => {
     resetStore();
+    mockSendNativeAudioCommand.mockReset();
+    mockSendNativeAudioCommandAsync.mockReset();
     mockSendNativeAudioCommand.mockImplementation((command: string) => {
       if (command === 'render_mixdown_async') {
         return JSON.stringify({ok: true, data: {requestId: 'render-1', status: 'running'}});
@@ -122,6 +127,9 @@ describe('AudioClipEditorPanel', () => {
       }
       return JSON.stringify({ok: true});
     });
+    mockSendNativeAudioCommandAsync.mockImplementation(async (command: string, payload: unknown) =>
+      mockSendNativeAudioCommand(command, payload),
+    );
     window.mediaImport = {
       importAudio: jest.fn(),
       prepareAudioRender: jest.fn(async () => ({
@@ -137,6 +145,7 @@ describe('AudioClipEditorPanel', () => {
   afterEach(() => {
     delete window.mediaImport;
     mockSendNativeAudioCommand.mockReset();
+    mockSendNativeAudioCommandAsync.mockReset();
   });
 
   it('toggles track mute through the dock control', () => {

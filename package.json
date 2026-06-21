@@ -5,6 +5,8 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node electron/scripts/dev.mjs",
+    "dev:fast": "node electron/scripts/dev.mjs --skip-native-build",
+    "dev:rebuild": "node electron/scripts/dev.mjs --force-native-build",
     "setup:submodules": "node electron/scripts/setup-submodules.mjs",
     "build": "npm run build:engine && npm run build:electron && vite build",
     "build:electron": "tsc -p electron/tsconfig.json",

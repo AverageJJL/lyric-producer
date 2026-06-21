@@ -9,10 +9,16 @@ import {
 import {restoreProjectSnapshot} from '../projectRestore';
 import {resolveProjectMediaReferences} from '../projectMediaResolution';
 import {consolidateProjectMediaSources} from '../projectMediaConsolidation';
+import {deferNextNativeBlockSyncForProjectOpen} from '../../store/useDAWNativeBridge';
 import {decomposeSnapshotToApcSource, serializeApcSource} from './apcDecompose';
 import {parseApcSourceFiles} from './apcParse';
 import {compileApcSourceToSnapshot} from './apcCompile';
 import type {ApcSourceFile} from './apcSourceTypes';
+
+const OPEN_PROJECT_RESTORE_OPTIONS = {
+  skipPlaybackRefresh: true,
+  deferNativeBlockSync: true,
+} as const;
 
 export type ApcProjectActionResult =
   | {
@@ -52,7 +58,16 @@ export async function saveCurrentApcProject(
 
   let consolidatedMediaCount = 0;
   let failedMediaCount = 0;
+  let targetPath = folderPath ?? undefined;
   if (options?.consolidateMedia) {
+    if (!targetPath) {
+      const initialResponse = await bridge.saveProjectFolder({files: currentSourceFiles()});
+      if (!initialResponse.ok) {
+        return initialResponse;
+      }
+      targetPath = initialResponse.path;
+    }
+    await bridge.setProjectAssetRoot({folderPath: targetPath});
     const consolidation = await consolidateProjectMediaSources(options.mediaBridge ?? null);
     if (!consolidation.ok) {
       return consolidation;
@@ -67,7 +82,7 @@ export async function saveCurrentApcProject(
   const files = serializeApcSource(decomposeSnapshotToApcSource(snapshot, new Date().toISOString()));
   const response = await bridge.saveProjectFolder({
     files,
-    ...(folderPath ? {folderPath} : {}),
+    ...(targetPath ? {folderPath: targetPath} : {}),
   });
   if (!response.ok) {
     return response;
@@ -114,13 +129,28 @@ export async function openApcProject(
   await bridge.setProjectAssetRoot({folderPath: response.path});
 
   const resolved = await resolveProjectMediaReferences(mediaBridge ?? null, compiled.snapshot);
-  const snapshot = restoreProjectSnapshot(resolved.snapshot);
+  restoreProjectSnapshot(resolved.snapshot, OPEN_PROJECT_RESTORE_OPTIONS);
+  let consolidatedMediaCount = 0;
+  let failedMediaCount = 0;
+  if (mediaBridge) {
+    const clearMediaPrepDeferral = deferNextNativeBlockSyncForProjectOpen();
+    const consolidation = await consolidateProjectMediaSources(mediaBridge)
+      .finally(clearMediaPrepDeferral);
+    if (!consolidation.ok) {
+      return consolidation;
+    }
+    consolidatedMediaCount = consolidation.consolidatedClipCount;
+    failedMediaCount = consolidation.failedClipCount;
+  }
+  const snapshot = captureProjectSnapshot();
   clearArrangementHistory();
   return {
     ok: true,
     path: response.path,
     fingerprint: snapshotFingerprint(snapshot),
     missingMediaCount: resolved.missingMediaCount,
+    consolidatedMediaCount,
+    failedMediaCount,
   };
 }
 
@@ -134,7 +164,7 @@ export function restoreApcProjectFromFiles(files: ApcSourceFile[]): ApcProjectAc
   if (!compiled.ok) {
     return {ok: false, error: compiled.errors[0]?.message ?? 'Autosave source is invalid.'};
   }
-  const snapshot = restoreProjectSnapshot(compiled.snapshot);
+  const snapshot = restoreProjectSnapshot(compiled.snapshot, OPEN_PROJECT_RESTORE_OPTIONS);
   clearArrangementHistory();
   return {ok: true, fingerprint: snapshotFingerprint(snapshot)};
 }
@@ -142,7 +172,7 @@ export function restoreApcProjectFromFiles(files: ApcSourceFile[]): ApcProjectAc
 export async function createNewApcProject(
   bridge?: ProjectFileBridge | null,
 ): Promise<ApcProjectActionResult> {
-  const snapshot = restoreProjectSnapshot(emptyProjectSnapshot());
+  const snapshot = restoreProjectSnapshot(emptyProjectSnapshot(), OPEN_PROJECT_RESTORE_OPTIONS);
   clearArrangementHistory();
   // Reset the writable asset root back to the unsaved-draft area.
   await bridge?.setProjectAssetRoot({folderPath: null});

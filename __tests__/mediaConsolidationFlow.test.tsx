@@ -13,10 +13,12 @@ jest.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({vscDarkPlus:
 import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {resetArrangementHistoryForTests} from '../src/store/history';
 import {useDAWStore} from '../src/store/useDAWStore';
+import {consolidateProjectMediaSources} from '../src/arrangement/projectMediaConsolidation';
 import {openBrowserDock} from './helpers/workspacePanels';
 import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
+const sendCommandAsync = jest.fn();
 const importAudio = jest.fn();
 const duplicateAudio = jest.fn();
 const resolveAudioMedia = jest.fn();
@@ -119,6 +121,9 @@ beforeEach(() => {
     }
     return JSON.stringify({ok: true, data: {}});
   });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) =>
+    Promise.resolve(sendCommand(command, payloadJson)),
+  );
   duplicateAudio.mockResolvedValue({
     ok: true,
     originalPath: '/external/shared.wav',
@@ -126,8 +131,36 @@ beforeEach(() => {
     relativePath: 'imports/shared.wav',
     name: 'shared',
   });
-  resolveAudioMedia.mockResolvedValue({ok: true, resolved: []});
-  window.audioEngine = {sendCommand, onEvent: () => () => undefined};
+  resolveAudioMedia.mockResolvedValue({
+    ok: true,
+    resolved: [
+      {
+        clipId: 'clip-external-a',
+        exists: true,
+        relativePath: 'imports/shared.wav',
+        absolutePath: '/assets/imports/shared.wav',
+        isProjectManaged: true,
+        repaired: true,
+      },
+      {
+        clipId: 'clip-external-b',
+        exists: true,
+        relativePath: 'imports/shared.wav',
+        absolutePath: '/assets/imports/shared.wav',
+        isProjectManaged: true,
+        repaired: true,
+      },
+      {
+        clipId: 'clip-imported',
+        exists: true,
+        relativePath: 'imports/imported.wav',
+        absolutePath: '/assets/imports/imported.wav',
+        isProjectManaged: true,
+        repaired: false,
+      },
+    ],
+  });
+  window.audioEngine = {sendCommand, sendCommandAsync, onEvent: () => () => undefined};
   window.projectFiles = {saveProjectFolder: jest.fn(), openProjectFolder: jest.fn(), setProjectAssetRoot: jest.fn()};
   window.mediaImport = {importAudio, duplicateAudio, resolveAudioMedia};
   window.localStorage.clear();
@@ -136,6 +169,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sendCommand.mockReset();
+  sendCommandAsync.mockReset();
   importAudio.mockReset();
   duplicateAudio.mockReset();
   resolveAudioMedia.mockReset();
@@ -154,10 +188,10 @@ test('consolidates external project media through the media bin', async () => {
   });
 
   await waitFor(() => {
-    expect(duplicateAudio).toHaveBeenCalledWith({path: '/external/shared.wav'});
+    expect(resolveAudioMedia).toHaveBeenCalled();
   });
-  expect(duplicateAudio).toHaveBeenCalledTimes(1);
-  expect(sendCommand).toHaveBeenCalledWith(
+  expect(duplicateAudio).not.toHaveBeenCalled();
+  expect(sendCommandAsync).toHaveBeenCalledWith(
     'analyze_audio_file',
     JSON.stringify({absoluteAudioFilePath: '/assets/imports/shared.wav'}),
   );
@@ -185,4 +219,66 @@ test('consolidates external project media through the media bin', async () => {
   });
   expect(useDAWStore.getState().blocks.find(block => block.id === 'clip-external-a'))
     .toMatchObject({absoluteAudioFilePath: '/external/shared.wav'});
+});
+
+test('prepares project-managed mp3 media as wav during consolidation', async () => {
+  useDAWStore.setState({
+    blocks: [{
+      id: 'clip-mp3',
+      trackId: 'track-audio',
+      name: 'Vocal',
+      startBeat: 0,
+      lengthBeats: 4,
+      type: 'audio',
+      color: '#64a5ff',
+      audioFilePath: 'imports/vocal.mp3',
+      absoluteAudioFilePath: '/assets/imports/vocal.mp3',
+    }],
+  });
+  resolveAudioMedia.mockResolvedValue({
+    ok: true,
+    resolved: [{
+      clipId: 'clip-mp3',
+      exists: true,
+      relativePath: 'imports/vocal.mp3',
+      absolutePath: '/assets/imports/vocal.mp3',
+      isProjectManaged: true,
+      repaired: false,
+    }],
+  });
+  sendCommandAsync.mockImplementation((command: string, payloadJson: string) => {
+    if (command === 'prepare_audio_file_for_playback') {
+      return Promise.resolve(JSON.stringify({
+        ok: true,
+        data: {
+          absoluteAudioFilePath: '/assets/imports/vocal.wav',
+          relativeAudioFilePath: 'imports/vocal.wav',
+          converted: true,
+        },
+      }));
+    }
+    return Promise.resolve(sendCommand(command, payloadJson));
+  });
+
+  const result = await consolidateProjectMediaSources({
+    importAudio,
+    resolveAudioMedia,
+  });
+
+  expect(result).toMatchObject({ok: true, consolidatedClipCount: 1});
+  expect(sendCommandAsync).toHaveBeenCalledWith(
+    'prepare_audio_file_for_playback',
+    JSON.stringify({
+      absoluteAudioFilePath: '/assets/imports/vocal.mp3',
+      relativeAudioFilePath: 'imports/vocal.mp3',
+    }),
+  );
+  expect(sendCommandAsync).toHaveBeenCalledWith(
+    'analyze_audio_file',
+    JSON.stringify({absoluteAudioFilePath: '/assets/imports/vocal.wav'}),
+  );
+  expect(useDAWStore.getState().blocks[0]).toMatchObject({
+    audioFilePath: 'imports/vocal.wav',
+    absoluteAudioFilePath: '/assets/imports/vocal.wav',
+  });
 });

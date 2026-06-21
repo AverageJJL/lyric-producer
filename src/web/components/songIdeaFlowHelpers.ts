@@ -1,5 +1,5 @@
 import {normalizeSongIdeaAnalysis, type SongIdeaAnalysis} from '../../onboarding/songIdeaAnalysis';
-import type {SongSeedTrack} from '../../native/songSeedApi';
+import type {SongSeedLyricStructure, SongSeedTrack} from '../../native/songSeedApi';
 import type {ReferenceMoodAnalysis} from '../../store/referenceMoodAnalysis';
 
 export type SearchState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
@@ -34,11 +34,26 @@ export function applyDraft(analysis: SongIdeaAnalysis, draft: MetadataDraft): So
 }
 
 export function trackKey(track: SongSeedTrack): string {
-  return [track.id, track.title, track.artist, track.album, track.releaseYear].filter(Boolean).join('|');
+  return [
+    track.id, track.isrc, track.commontrackId, track.title, track.artist,
+    track.album, track.releaseYear, track.hasTrackStructure ? 'structured' : 'unstructured',
+  ].filter(Boolean).join('|');
 }
 
-export function analysisKey(track: SongSeedTrack, lyrics: string): string {
-  return `${trackKey(track)}|${lyrics.length}|${lyrics.slice(0, 180)}`;
+function structureSignature(structure: SongSeedLyricStructure | undefined): string {
+  if (!structure) return 'no-structure';
+  return Object.keys(structure).sort()
+    .map(role => `${role}:${[...(structure[role as keyof SongSeedLyricStructure] ?? [])].sort((a, b) => a - b).join(',')}`)
+    .join(';') || 'empty-structure';
+}
+
+export function analysisKey(
+  track: SongSeedTrack,
+  lyrics: string,
+  structure?: SongSeedLyricStructure,
+  structureStatus = '',
+): string {
+  return `${trackKey(track)}|${lyrics.length}|${lyrics.slice(0, 180)}|${structureSignature(structure)}|${structureStatus}`;
 }
 
 export function mergeMetadata(base: SongIdeaAnalysis, metadata: SongIdeaAnalysis, locks: MetadataFieldState = {}): SongIdeaAnalysis {
@@ -81,7 +96,12 @@ export function mergeReferenceMetadata(base: SongIdeaAnalysis, reference: Refere
 }
 
 export function mergeSectionEnrichment(base: SongIdeaAnalysis, enriched: SongIdeaAnalysis): SongIdeaAnalysis {
-  if (enriched.sections.length >= base.sections.length) {
+  const protectsLyricRanges = base.sections.some(section => (
+    section.sectionSource === 'musixmatch-structure'
+    || section.sectionSource === 'lyric-headers'
+    || section.sectionSource === 'repetition'
+  ));
+  if (!protectsLyricRanges && enriched.sections.length >= base.sections.length) {
     return normalizeSongIdeaAnalysis({...base, sections: enriched.sections});
   }
   return normalizeSongIdeaAnalysis({
