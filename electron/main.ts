@@ -293,7 +293,7 @@ if (shouldRunApp) {
   });
 
   app.whenReady().then(() => {
-    app.setName('AI Producer Core');
+    app.setName('Aria');
     installPermissionPolicy(session.defaultSession);
     Menu.setApplicationMenu(Menu.buildFromTemplate(
       createAppMenuTemplate(sendProjectCommand, process.platform),

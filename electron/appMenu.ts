@@ -112,7 +112,7 @@ function windowMenu(): MenuItemConstructorOptions {
 
 function appMenu(): MenuItemConstructorOptions {
   return {
-    label: 'AI Producer Core',
+    label: 'Aria',
     submenu: [
       {role: 'about'},
       {type: 'separator'},

@@ -27,43 +27,16 @@
 
 .right-dock[data-panel='copilot'] {
   z-index: 35;
-  background:
-    linear-gradient(115deg, rgba(221, 237, 255, 0.07), transparent 34%),
-    linear-gradient(245deg, rgba(98, 152, 230, 0.055), transparent 42%),
-    linear-gradient(180deg, rgba(11, 15, 23, 0.92), rgba(4, 7, 12, 0.96));
-  border-left-color: rgba(255, 255, 255, 0.14);
+  background: #0d1119;
+  border-left-color: rgba(255, 255, 255, 0.12);
   box-shadow:
-    inset 1px 0 rgba(255, 255, 255, 0.13),
-    inset 18px 0 38px rgba(255, 255, 255, 0.035),
-    -22px 0 58px rgba(3, 8, 18, 0.54);
-  backdrop-filter: blur(34px) saturate(142%) brightness(72%) contrast(112%);
-  -webkit-backdrop-filter: blur(34px) saturate(142%) brightness(72%) contrast(112%);
+    inset 1px 0 rgba(255, 255, 255, 0.08),
+    -18px 0 42px rgba(3, 8, 18, 0.48);
 }
 
 .right-dock[data-panel='copilot']::before,
 .right-dock[data-panel='copilot']::after {
-  position: absolute;
-  pointer-events: none;
-  content: "";
-}
-
-.right-dock[data-panel='copilot']::before {
-  inset: -18%;
-  background:
-    radial-gradient(ellipse at 20% 10%, rgba(231, 243, 255, 0.065), transparent 32%),
-    radial-gradient(ellipse at 78% 22%, rgba(126, 174, 255, 0.052), transparent 36%),
-    radial-gradient(ellipse at 52% 94%, rgba(70, 96, 148, 0.07), transparent 42%);
-  filter: blur(20px);
-  opacity: 0.34;
-}
-
-.right-dock[data-panel='copilot']::after {
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.055), transparent 20%, transparent 84%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 24%, rgba(0, 0, 0, 0.42));
-  mix-blend-mode: screen;
-  opacity: 0.24;
+  display: none;
 }
 
 .right-dock-resize {
@@ -95,7 +68,7 @@
 
 .right-dock[data-panel='copilot'] .right-dock-header {
   color: rgba(238, 243, 251, 0.82);
-  background: rgba(8, 12, 19, 0.38);
+  background: #111722;
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -109,7 +82,7 @@
 }
 
 .right-dock[data-panel='copilot'] .right-dock-body {
-  background: rgba(4, 7, 12, 0.22);
+  background: #0d1119;
 }
 
 .workspace-stage[data-right-panel='copilot'] .timeline-toolbar {

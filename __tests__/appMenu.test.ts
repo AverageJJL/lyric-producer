@@ -25,7 +25,7 @@ describe('Electron app menu', () => {
     importItem?.click?.();
     exportItem?.click?.();
 
-    expect(template[0]?.label).toBe('AI Producer Core');
+    expect(template[0]?.label).toBe('Aria');
     expect(commands).toEqual([
       {command: 'saveProject'},
       {command: 'openProject'},

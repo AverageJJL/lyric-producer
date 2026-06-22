@@ -50,10 +50,10 @@ function assertMacPackaging() {
   if (!scripts.pack || !scripts.dist) {
     errors.push('Missing Electron Builder pack/dist scripts.');
   }
-  if (build.appId !== 'com.musicapp.aiproducercore') {
+  if (build.appId !== 'com.musicapp.aria') {
     errors.push('macOS package appId is not stable.');
   }
-  if (build.productName !== 'AI Producer Core') {
+  if (build.productName !== 'Aria') {
     errors.push('macOS package productName must match the desktop product.');
   }
   if (!build.mac) {
