@@ -4,6 +4,7 @@ import * as path from 'node:path';
 type RawPublicDemoConfig = {
   enabled?: unknown;
   openRouterProxyBaseUrl?: unknown;
+  musixmatchProxyBaseUrl?: unknown;
   openRouterPublicToken?: unknown;
   openRouterModel?: unknown;
   openRouterFallbackModels?: unknown;
@@ -16,6 +17,7 @@ type RawPublicDemoConfig = {
 export type PublicDemoConfig = {
   enabled: boolean;
   openRouterProxyBaseUrl?: string;
+  musixmatchProxyBaseUrl?: string;
   openRouterPublicToken: string;
   openRouterModel: string;
   openRouterFallbackModels: string[];
@@ -76,6 +78,8 @@ export function readPublicDemoConfig(
     enabled,
     openRouterProxyBaseUrl: cleanString(env.AI_PRODUCER_DEMO_PROXY_BASE_URL)
       ?? cleanString(raw.openRouterProxyBaseUrl),
+    musixmatchProxyBaseUrl: cleanString(env.AI_PRODUCER_DEMO_MUSIXMATCH_PROXY_BASE_URL)
+      ?? cleanString(raw.musixmatchProxyBaseUrl),
     openRouterPublicToken: cleanString(env.AI_PRODUCER_DEMO_PUBLIC_TOKEN)
       ?? cleanString(raw.openRouterPublicToken)
       ?? DEFAULT_PUBLIC_TOKEN,
@@ -104,11 +108,22 @@ export function songSeedEnvForPublicDemo(
   env: NodeJS.ProcessEnv,
   config: PublicDemoConfig,
 ): NodeJS.ProcessEnv {
-  if (!config.enabled || !config.disableLiveSongSeedProviders) return env;
+  if (!config.enabled) return env;
   const next: NodeJS.ProcessEnv = {...env};
-  delete next.MUSIXMATCH_API_KEY;
+  if (config.openRouterProxyBaseUrl) {
+    next.OPENROUTER_API_KEY = config.openRouterPublicToken;
+    next.AI_PRODUCER_API_BASE_URL = config.openRouterProxyBaseUrl;
+    next.OPENROUTER_ANALYSIS_MODEL = config.openRouterModel;
+  }
+  if (config.musixmatchProxyBaseUrl && !config.disableLiveSongSeedProviders) {
+    next.MUSIXMATCH_API_KEY = config.openRouterPublicToken;
+    next.MUSIXMATCH_API_BASE_URL = config.musixmatchProxyBaseUrl;
+  }
+  if (config.disableLiveSongSeedProviders) {
+    delete next.MUSIXMATCH_API_KEY;
+    delete next.MUSIXMATCH_API_BASE_URL;
+  }
   delete next.GETSONGBPM_API_KEY;
-  delete next.OPENROUTER_API_KEY;
   return next;
 }
 

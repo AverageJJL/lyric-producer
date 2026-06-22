@@ -21,6 +21,11 @@ function coverInitial(track: SongSeedTrack): string {
   return track.title.trim().charAt(0).toUpperCase() || 'A';
 }
 
+const CACHED_CYANITE_SONGS = [
+  'Blank Space - Taylor Swift',
+  'Baby - Justin Bieber feat. Ludacris',
+];
+
 export function SongSearchForm({
   songInput,
   results,
@@ -36,6 +41,12 @@ export function SongSearchForm({
   return (
     <div className="song-idea-form" role="search">
       <label htmlFor="song-idea-input">Search for a song</label>
+      <p className="song-search-demo-note">
+        Live Musixmatch search is enabled. Cyanite is disabled for uncached songs in this demo to protect API usage.
+      </p>
+      <p className="song-search-demo-cache">
+        Cached Cyanite pre-runs: {CACHED_CYANITE_SONGS.join('; ')}.
+      </p>
       <div className="song-search-field">
         <input
           id="song-idea-input"

@@ -1,6 +1,7 @@
 import type {SongSeedSyncedLyricLine} from './songSeedTypes';
 import {text, type FetchLike} from './songSeedUtils';
 
+const DEFAULT_MUSIXMATCH_BASE_URL = 'https://api.musixmatch.com/ws/1.1';
 const LRC_TIMESTAMP = /\[(\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?\]/g;
 
 function numberLike(value: unknown): number | undefined {
@@ -116,8 +117,9 @@ export async function getMusixmatchSyncedLyrics(
   trackId: string,
   apiKey: string,
   fetchImpl: FetchLike,
+  apiBaseUrl = DEFAULT_MUSIXMATCH_BASE_URL,
 ): Promise<SongSeedSyncedLyricLine[]> {
-  const url = new URL('https://api.musixmatch.com/ws/1.1/track.subtitle.get');
+  const url = new URL(`${apiBaseUrl.replace(/\/$/, '')}/track.subtitle.get`);
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('track_id', trackId);
   url.searchParams.set('subtitle_format', 'lrc');

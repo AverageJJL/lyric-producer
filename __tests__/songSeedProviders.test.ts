@@ -97,6 +97,22 @@ describe('song seed providers', () => {
     });
   });
 
+  it('can search Musixmatch through a configured proxy base URL', async () => {
+    const fetchMock = jest.fn(() => okJson({message: {body: {track_list: []}}}));
+
+    await expect(searchMusixmatchTracks(
+      {query: 'halo'},
+      {
+        MUSIXMATCH_API_KEY: 'public-token',
+        MUSIXMATCH_API_BASE_URL: 'https://demo.example/api/musixmatch',
+      },
+      fetchMock as typeof fetch,
+    )).resolves.toEqual({ok: true, tracks: []});
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('https://demo.example/api/musixmatch/track.search');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('apikey=public-token');
+  });
+
   it('fetches Musixmatch lyrics for a selected track', async () => {
     const fetchMock = jest.fn(() => okJson({
       message: {

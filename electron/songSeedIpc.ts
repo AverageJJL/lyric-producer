@@ -54,6 +54,10 @@ function demoConfig(options: SongSeedIpcOptions): PublicDemoConfig {
     ?? readPublicDemoConfig(options.appWideRoots?.().readRoot, process.env);
 }
 
+function providerEnv(config: PublicDemoConfig): NodeJS.ProcessEnv {
+  return songSeedEnvForPublicDemo(process.env, config);
+}
+
 function unavailableSimilarity() {
   return {
     ok: true as const,
@@ -71,29 +75,29 @@ export function registerSongSeedIpc(options: SongSeedIpcOptions = {}): void {
     const config = demoConfig(options);
     return config.enabled && config.disableLiveSongSeedProviders
       ? searchDemoSongSeedTracks(request, demoSongSeedPath(options))
-      : searchMusixmatchTracks(request);
+      : searchMusixmatchTracks(request, providerEnv(config));
   });
   ipcMain.handle('song-seed:get-lyrics', (_event, request: SongSeedLyricsRequest) => {
     const config = demoConfig(options);
     return config.enabled && config.disableLiveSongSeedProviders
       ? getDemoSongSeedLyrics(request, demoSongSeedPath(options))
-      : getMusixmatchLyrics(request);
+      : getMusixmatchLyrics(request, providerEnv(config));
   });
   ipcMain.handle('song-seed:check-lyrics-similarity', (_event, request) => {
     const config = demoConfig(options);
     return config.enabled && config.disableLiveSongSeedProviders
       ? unavailableSimilarity()
-      : checkLyricsSimilarity(request);
+      : checkLyricsSimilarity(request, providerEnv(config));
   });
   ipcMain.handle('song-seed:lookup-bpm-key', (_event, request: SongSeedBpmKeyRequest) => {
     const config = demoConfig(options);
     return config.enabled && config.disableLiveSongSeedProviders
       ? lookupDemoSongSeedBpmKey(request, demoSongSeedPath(options))
-      : lookupGetSongBpm(request);
+      : lookupGetSongBpm(request, providerEnv(config));
   });
   ipcMain.handle('song-seed:analyze', (_event, request: SongSeedAnalyzeRequest) => {
     const config = demoConfig(options);
-    return analyzeSongSeed(request, songSeedEnvForPublicDemo(process.env, config));
+    return analyzeSongSeed(request, providerEnv(config));
   });
   ipcMain.handle('song-seed:analyze-reference', async (_event, request: SongSeedReferenceAnalyzeRequest) => {
     const config = demoConfig(options);

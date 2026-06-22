@@ -139,6 +139,8 @@ describe('SongOnboardingPage', () => {
     expect(screen.queryByLabelText('Lyric analysis preview')).not.toBeInTheDocument();
     expect(screen.queryByText('Analyse selected song')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Search for a song')).toBeInTheDocument();
+    expect(screen.getByText(/Live Musixmatch search is enabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cached Cyanite pre-runs: Blank Space - Taylor Swift/i)).toBeInTheDocument();
     const backButton = screen.getByRole('button', {name: 'Back'});
     expect(backButton).toHaveAttribute('aria-label', 'Back');
     expect(backButton).not.toHaveTextContent('Back');

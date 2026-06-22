@@ -200,6 +200,8 @@ holds the real OpenRouter key and enforces request caps.
 
 - Public demo song startup may use bundled, provider-shaped demo fixtures and the
   existing `assets/song-seed` Cyanite reference seed cache.
+- Public demo song search may call Musixmatch through the server-side demo proxy
+  so the API key is never shipped in the desktop app.
 - Public demo builds must never enqueue new Cyanite analysis jobs. Cache hits remain
   visible; uncached references return a user-facing limit message and point viewers
   to the demo video.

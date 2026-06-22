@@ -44,6 +44,7 @@ import './web/styles/copilot-drums.css';
 import './web/styles/onboarding.css';
 import './web/styles/onboarding-home.css';
 import './web/styles/song-search.css';
+import './web/styles/song-search-demo.css';
 import './web/styles/song-analyser.css';
 import './web/styles/song-reference.css';
 import './web/styles/structureStack.css';

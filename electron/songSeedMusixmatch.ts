@@ -13,8 +13,18 @@ import {numberText, numberValue, text, type FetchLike, yearFromDate} from './son
 
 export {parseMusixmatchSubtitlePayload} from './songSeedMusixmatchSubtitle';
 
+const DEFAULT_MUSIXMATCH_BASE_URL = 'https://api.musixmatch.com/ws/1.1';
+
 function musixmatchKey(env: NodeJS.ProcessEnv): string | undefined {
   return text(env.MUSIXMATCH_API_KEY);
+}
+
+function musixmatchBaseUrl(env: NodeJS.ProcessEnv): string {
+  return text(env.MUSIXMATCH_API_BASE_URL) ?? DEFAULT_MUSIXMATCH_BASE_URL;
+}
+
+export function musixmatchApiUrl(method: string, env: NodeJS.ProcessEnv): URL {
+  return new URL(`${musixmatchBaseUrl(env).replace(/\/$/, '')}/${method}`);
 }
 
 function musixmatchStatus(payload: unknown): number | undefined {
@@ -127,7 +137,7 @@ export async function searchMusixmatchTracks(
   if (!apiKey) {
     return {ok: false, code: 'missing_key', error: 'MUSIXMATCH_API_KEY is not set.'};
   }
-  const url = new URL('https://api.musixmatch.com/ws/1.1/track.search');
+  const url = musixmatchApiUrl('track.search', env);
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('q_track', query);
   url.searchParams.set('f_has_lyrics', '1');
@@ -155,12 +165,13 @@ export async function searchMusixmatchTracks(
 async function getMusixmatchDumpStructure(
   trackIsrc: string | undefined,
   apiKey: string,
+  env: NodeJS.ProcessEnv,
   fetchImpl: FetchLike,
 ): Promise<StructureLookup> {
   if (!trackIsrc) {
     return {reason: 'missing track_isrc from track.search'};
   }
-  const url = new URL('https://api.musixmatch.com/ws/1.1/track.dump.get');
+  const url = musixmatchApiUrl('track.dump.get', env);
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('track_isrc', trackIsrc);
   try {
@@ -190,7 +201,7 @@ export async function getMusixmatchLyrics(
   if (!apiKey) {
     return {ok: false, code: 'missing_key', error: 'MUSIXMATCH_API_KEY is not set.'};
   }
-  const url = new URL('https://api.musixmatch.com/ws/1.1/track.lyrics.get');
+  const url = musixmatchApiUrl('track.lyrics.get', env);
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('track_id', trackId);
   try {
@@ -205,9 +216,9 @@ export async function getMusixmatchLyrics(
     }
     let lookup: StructureLookup = {reason: 'selected track was not flagged with has_track_structure'};
     if (request.hasTrackStructure) {
-      lookup = await getMusixmatchDumpStructure(text(request.trackIsrc), apiKey, fetchImpl);
+      lookup = await getMusixmatchDumpStructure(text(request.trackIsrc), apiKey, env, fetchImpl);
     }
-    const syncedLyrics = await getMusixmatchSyncedLyrics(trackId, apiKey, fetchImpl);
+    const syncedLyrics = await getMusixmatchSyncedLyrics(trackId, apiKey, fetchImpl, musixmatchBaseUrl(env));
     const syncedFields = syncedLyrics.length > 0
       ? {syncedLyrics, syncedLyricsSource: 'musixmatch-subtitle' as const}
       : {};

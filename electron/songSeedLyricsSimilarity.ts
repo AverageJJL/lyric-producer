@@ -3,7 +3,7 @@ import type {
   SongSeedLyricsSimilarityResponse,
   SongSeedTrack,
 } from './songSeedTypes';
-import {getMusixmatchLyrics, parseMusixmatchSearchPayload} from './songSeedMusixmatch';
+import {getMusixmatchLyrics, musixmatchApiUrl, parseMusixmatchSearchPayload} from './songSeedMusixmatch';
 import {text, type FetchLike} from './songSeedUtils';
 
 type UserLine = {id: string; text: string; words: string[]; endWord: string; rhymeKey: string};
@@ -76,7 +76,7 @@ async function searchLyrics(
 ): Promise<Candidate[]> {
   const apiKey = musixmatchKey(env);
   if (!apiKey) return [];
-  const url = new URL('https://api.musixmatch.com/ws/1.1/track.search');
+  const url = musixmatchApiUrl('track.search', env);
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('q_lyrics', query);
   url.searchParams.set('f_has_lyrics', '1');

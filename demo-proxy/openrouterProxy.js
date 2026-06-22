@@ -5,6 +5,13 @@ const DEFAULT_ALLOWED_MODELS = [
 ];
 const DEFAULT_PUBLIC_TOKEN = 'apc-public-demo';
 const DEFAULT_OPENROUTER_URL = 'https://openrouter.ai/api/v1';
+const DEFAULT_MUSIXMATCH_URL = 'https://api.musixmatch.com/ws/1.1';
+const ALLOWED_MUSIXMATCH_METHODS = new Set([
+  'track.search',
+  'track.lyrics.get',
+  'track.dump.get',
+  'track.subtitle.get',
+]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const buckets = new Map();
 
@@ -19,6 +26,10 @@ function numberEnv(env, name, fallback) {
 
 function csv(value) {
   return cleanString(value)?.split(',').map(item => item.trim()).filter(Boolean) ?? [];
+}
+
+function queryString(value) {
+  return Array.isArray(value) ? cleanString(value[0]) : cleanString(value);
 }
 
 function bodyObject(req) {
@@ -86,9 +97,9 @@ function sanitizedChatBody(body, env) {
   return {ok: true, body: forwarded};
 }
 
-function setCors(req, res, env) {
+function setCors(req, res, env, methods = 'POST, OPTIONS') {
   res.setHeader('Access-Control-Allow-Origin', cleanString(env.DEMO_ALLOWED_ORIGIN) ?? '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', methods);
   res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, x-demo-token');
   res.setHeader('Vary', 'Origin');
 }
@@ -159,9 +170,70 @@ async function handleOpenRouterProxy(req, res, env = process.env, fetchImpl = fe
   res.send(responseText);
 }
 
+function musixmatchMethod(req) {
+  return queryString(req.query?.method)
+    ?? cleanString(String(req.url ?? '').split('?')[0].split('/').pop());
+}
+
+function musixmatchProxyToken(req) {
+  return queryString(req.query?.apikey) ?? bearer(req);
+}
+
+function upstreamMusixmatchUrl(req, method, env) {
+  const base = cleanString(env.MUSIXMATCH_BASE_URL) ?? DEFAULT_MUSIXMATCH_URL;
+  const incoming = new URL(req.url ?? '/', 'https://demo.local');
+  const upstream = new URL(`${base.replace(/\/$/, '')}/${method}`);
+  incoming.searchParams.forEach((value, key) => {
+    if (key !== 'method' && key !== 'apikey') upstream.searchParams.append(key, value);
+  });
+  upstream.searchParams.set('apikey', cleanString(env.MUSIXMATCH_API_KEY) ?? '');
+  return upstream;
+}
+
+async function handleMusixmatchProxy(req, res, env = process.env, fetchImpl = fetch) {
+  setCors(req, res, env, 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'GET') {
+    json(res, 405, {error: {message: 'Method not allowed.'}});
+    return;
+  }
+  const acceptedToken = cleanString(env.DEMO_PROXY_TOKEN) ?? DEFAULT_PUBLIC_TOKEN;
+  if (musixmatchProxyToken(req) !== acceptedToken) {
+    json(res, 401, {error: {message: 'Invalid public demo token.'}});
+    return;
+  }
+  if (!cleanString(env.MUSIXMATCH_API_KEY)) {
+    json(res, 500, {error: {message: 'Demo proxy is missing MUSIXMATCH_API_KEY.'}});
+    return;
+  }
+  const method = musixmatchMethod(req);
+  if (!method || !ALLOWED_MUSIXMATCH_METHODS.has(method)) {
+    json(res, 400, {error: {message: 'Requested Musixmatch method is not allowed.'}});
+    return;
+  }
+  const perIp = numberEnv(env, 'DEMO_MAX_MUSIXMATCH_REQUESTS_PER_IP_PER_DAY', 80);
+  const total = numberEnv(env, 'DEMO_MAX_MUSIXMATCH_TOTAL_REQUESTS_PER_DAY', 800);
+  const day = new Date().toISOString().slice(0, 10);
+  if (!consumeBucket(`mxm-ip:${day}:${clientIp(req)}`, perIp) || !consumeBucket(`mxm-total:${day}`, total)) {
+    json(res, 429, {error: {message: 'Public demo Musixmatch rate limit reached.'}});
+    return;
+  }
+  const upstream = await fetchImpl(upstreamMusixmatchUrl(req, method, env));
+  const responseText = await upstream.text();
+  res.status(upstream.status);
+  res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/json');
+  res.send(responseText);
+}
+
 module.exports = {
   DEFAULT_ALLOWED_MODELS,
+  ALLOWED_MUSIXMATCH_METHODS,
   buckets,
   handleOpenRouterProxy,
+  handleMusixmatchProxy,
   sanitizedChatBody,
+  upstreamMusixmatchUrl,
 };
