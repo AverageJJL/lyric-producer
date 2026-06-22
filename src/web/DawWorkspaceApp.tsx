@@ -147,9 +147,9 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
   );
 
   const handleSelectBlock = useCallback(
-    (blockId: string | null, options?: {additive?: boolean}) => {
+    (blockId: string | null, options?: {additive?: boolean; openEditor?: boolean}) => {
       selectBlock(blockId, options);
-      if (blockId) {
+      if (blockId && options?.openEditor !== false) {
         workspacePanels.openEditor();
       }
     },
@@ -275,7 +275,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
         onFocusWorkspace: focusWorkspace, onSelectTrack: handleSelectTrack,
         onAddVirtualInstrument: (instrumentId, presetId) =>
           addTrackFromTemplate('virtual_instrument', {instrumentId, presetId}),
-        onAddVoiceAudio: addVoiceAudioTrack, onAddDrumMachine: addDrumMachineTrack,
+        onAddVoiceAudio: addVoiceAudioTrack, onAddDrumMachine: () => { addDrumMachineTrack(); workspacePanels.openEditor(); workspacePanels.closeMixer(); },
         onMoveTrack: moveTrack, onTrackArchiveChange: setTrackArchived,
         onTrackDisableChange: setTrackDisabled, onToggleMute: toggleTrackMute,
         onToggleSolo: toggleTrackSolo, onToggleRecordArm: toggleTrackRecordArm,

@@ -2,6 +2,7 @@ import type {ApcPatchTransaction} from './copilotAgentContract';
 import type {ApcAgentTree} from './copilotAgentTools';
 import {buildAudioArrangementShortcut} from './copilotBuildAudioArrangement';
 import {buildDeleteTracksShortcut} from './copilotBuildDeleteShortcut';
+import {buildTrackReplaceShortcut} from './copilotBuildTrackReplaceShortcut';
 import {buildTimelineMetadataShortcut} from './copilotTimelineShortcuts';
 
 type ClipFile = {
@@ -142,6 +143,10 @@ export function buildBlockStructureShortcut(
   const timelineMetadata = buildTimelineMetadataShortcut(message, tree, history);
   if (timelineMetadata) {
     return timelineMetadata;
+  }
+  const trackReplace = buildTrackReplaceShortcut(message, tree);
+  if (trackReplace) {
+    return trackReplace;
   }
   const deleteTracks = buildDeleteTracksShortcut(message, tree, history);
   if (deleteTracks) {

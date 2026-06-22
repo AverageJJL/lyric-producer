@@ -13,6 +13,7 @@ import {registerSampleLibraryIpc} from './sampleLibraryIpc';
 import {registerSampleProviderIpc} from './sampleProviderIpc';
 import {registerSongSeedIpc} from './songSeedIpc';
 import {registerStemExportIpc} from './stemExportIpc';
+import type {PublicDemoConfig} from './publicDemoConfig';
 
 type AssetRoots = {
   readRoot: string;
@@ -25,11 +26,17 @@ type MainIpcOptions = {
   appWideRoots: () => AssetRoots;
   recordActiveProjectFolder: (folderPath: string | null) => void;
   sendNativeCommand: (command: string, payloadJson: string) => string;
+  demoConfig?: () => PublicDemoConfig;
+  demoUsagePath?: () => string;
 };
 
 export function registerMainIpc(options: MainIpcOptions): void {
   registerProjectCloseGuardIpc();
-  registerCopilotIpc({sendNativeCommand: options.sendNativeCommand});
+  registerCopilotIpc({
+    sendNativeCommand: options.sendNativeCommand,
+    demoConfig: options.demoConfig,
+    demoUsagePath: options.demoUsagePath,
+  });
   registerFileIpc({
     getMainWindow: options.getMainWindow,
     assetRoots: options.assetRoots,
@@ -55,5 +62,8 @@ export function registerMainIpc(options: MainIpcOptions): void {
   registerSampleProviderIpc({assetRoots: options.appWideRoots});
   registerStemExportIpc({getMainWindow: options.getMainWindow});
   registerFxWindowIpc(options.getMainWindow);
-  registerSongSeedIpc({appWideRoots: options.appWideRoots});
+  registerSongSeedIpc({
+    appWideRoots: options.appWideRoots,
+    demoConfig: options.demoConfig,
+  });
 }

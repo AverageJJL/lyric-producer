@@ -60,17 +60,6 @@ function referenceAnalysis(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function referenceSource() {
-  return {
-    kind: 'youtube',
-    url: 'https://www.youtube.com/watch?v=halo',
-    videoId: 'halo',
-    title: 'Beyonce - Halo (Official Audio)',
-    channelTitle: 'Beyonce - Topic',
-    confidence: 0.94,
-  };
-}
-
 describe('SongOnboardingPage Cyanite reference analysis', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -116,7 +105,7 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     await act(async () => { fireEvent.click(option); });
     await screen.findByLabelText('Remember those walls');
 
-    expect(referenceMock).toHaveBeenCalledWith({track: expect.objectContaining({title: 'Halo', artist: 'Beyonce'})});
+    expect(referenceMock).toHaveBeenCalledWith({track: expect.objectContaining({title: 'Halo', artist: 'Beyonce'}), allowCreditSpend: true});
     expect(await screen.findByLabelText('Cyanite reference analysis')).toBeInTheDocument();
     expect(screen.getByText('A dark energetic reference with driving synth percussion.')).toBeInTheDocument();
     expect(screen.getByText('Beyonce - Halo (Official Audio)')).toBeInTheDocument();
@@ -135,30 +124,8 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     }));
   });
 
-  it('asks before spending a Cyanite credit and can continue when skipped', async () => {
-    referenceMock.mockResolvedValue({ok: false, code: 'confirmation_required', error: 'Spend 1 Cyanite analysis credit?', source: referenceSource()});
-    const openSongIdeaProject = jest.fn();
-    render(<SongOnboardingPage onOpenEmptyProject={jest.fn()} onOpenSongIdeaProject={openSongIdeaProject} />);
-
-    fireEvent.click(screen.getByText('I have an idea already'));
-    fireEvent.change(screen.getByLabelText('Search for a song'), {target: {value: 'Halo'}});
-    await act(async () => { jest.advanceTimersByTime(320); });
-    const option = await screen.findByRole('option', {name: /Halo/i});
-    await act(async () => { fireEvent.click(option); });
-
-    expect(await screen.findByText('Spend 1 Cyanite analysis credit for Beyonce - Halo (Official Audio)?')).toBeInTheDocument();
-    expect(screen.queryByRole('button', {name: /Open DAW with this structure/i})).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', {name: /Fast Forward/i})).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: /Skip Cyanite/i}));
-    expect(await screen.findByText('Cyanite reference skipped to save credits. Continuing with existing metadata.')).toBeInTheDocument();
-    for (let step = 0; step < 12; step += 1) await act(async () => { jest.advanceTimersByTime(2500); });
-    await waitFor(() => expect(openSongIdeaProject).toHaveBeenCalledWith(expect.not.objectContaining({reference: expect.anything()})));
-  });
-
-  it('sends explicit confirmation before Cyanite enqueue', async () => {
-    referenceMock
-      .mockResolvedValueOnce({ok: false, code: 'confirmation_required', error: 'Spend 1 Cyanite analysis credit?', source: referenceSource()})
-      .mockResolvedValueOnce({ok: true, cacheStatus: 'analyzed', analysis: referenceAnalysis()});
+  it('starts Cyanite analysis automatically without spend controls', async () => {
+    referenceMock.mockResolvedValue({ok: true, cacheStatus: 'analyzed', analysis: referenceAnalysis()});
     render(<SongOnboardingPage onOpenEmptyProject={jest.fn()} onOpenSongIdeaProject={jest.fn()} />);
 
     fireEvent.click(screen.getByText('I have an idea already'));
@@ -166,10 +133,30 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     await act(async () => { jest.advanceTimersByTime(320); });
     const option = await screen.findByRole('option', {name: /Halo/i});
     await act(async () => { fireEvent.click(option); });
-    fireEvent.click(await screen.findByRole('button', {name: /Use 1 Cyanite analysis/i}));
 
     await screen.findByText('A dark energetic reference with driving synth percussion.');
     expect(referenceMock).toHaveBeenLastCalledWith({track: expect.objectContaining({title: 'Halo'}), allowCreditSpend: true});
+    expect(screen.queryByRole('button', {name: /Use 1 Cyanite analysis/i})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Skip Cyanite/i})).not.toBeInTheDocument();
+  });
+
+  it('does not show Cyanite spend controls while automatic analysis is pending', async () => {
+    let resolveReference: (value: unknown) => void = () => undefined;
+    referenceMock.mockReturnValue(new Promise(resolve => { resolveReference = resolve; }));
+    render(<SongOnboardingPage onOpenEmptyProject={jest.fn()} onOpenSongIdeaProject={jest.fn()} />);
+
+    fireEvent.click(screen.getByText('I have an idea already'));
+    fireEvent.change(screen.getByLabelText('Search for a song'), {target: {value: 'Halo'}});
+    await act(async () => { jest.advanceTimersByTime(320); });
+    const option = await screen.findByRole('option', {name: /Halo/i});
+    await act(async () => { fireEvent.click(option); });
+    expect(screen.queryByRole('button', {name: /Use 1 Cyanite analysis/i})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: /Skip Cyanite/i})).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveReference({ok: true, cacheStatus: 'analyzed', analysis: referenceAnalysis()});
+    });
+    await screen.findByText('A dark energetic reference with driving synth percussion.');
   });
 
   it('shows the demo-video message when Cyanite credits are exhausted', async () => {
@@ -186,7 +173,7 @@ describe('SongOnboardingPage Cyanite reference analysis', () => {
     const option = await screen.findByRole('option', {name: /Halo/i});
     await act(async () => { fireEvent.click(option); });
 
-    expect(await screen.findByText("We ran out of Cyanite credits, oops. Please see the demo video for how it would've worked.")).toBeInTheDocument();
+    expect(await screen.findByText('Cyanite usage limits reached in the public demo. Please see the demo video for how this feature works.')).toBeInTheDocument();
     expect(screen.queryByText('Monthly credit limit exceeded.')).not.toBeInTheDocument();
   });
 

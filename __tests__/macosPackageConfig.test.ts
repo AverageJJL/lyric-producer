@@ -67,6 +67,8 @@ describe('macOS package configuration', () => {
     expect(build.extraResources).not.toEqual(
       expect.arrayContaining([expect.objectContaining({from: 'assets', to: 'assets'})]),
     );
+    expect(fs.existsSync(path.join(repoRoot, 'assets/song-seed/demo-config.json'))).toBe(true);
+    expect(fs.existsSync(path.join(repoRoot, 'assets/song-seed/demo-song-seeds.json'))).toBe(true);
   });
 
   it('keeps hardened-runtime entitlements available for Electron and the native addon', () => {

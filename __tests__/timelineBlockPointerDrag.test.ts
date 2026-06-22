@@ -345,6 +345,64 @@ describe('timeline snap during pointer drag', () => {
     expect(onSelectBlock).not.toHaveBeenCalled();
   });
 
+  it('selects on pointer down but activates the editor only after a click finishes', () => {
+    const onSelectBlock = jest.fn();
+    const handlers = createBlockPointerHandlers({
+      block,
+      blocks: [block],
+      trackCount: 1,
+      trackIds: ['t1'],
+      maxTimelineBeat: 64,
+      metrics: {left: {setValue: jest.fn()}, width: {setValue: jest.fn()}},
+      dragStartXRef: {current: 0},
+      dragStartBeatRef: {current: 0},
+      dragStartLengthRef: {current: 4},
+      dragStartTrackIndexRef: {current: 0},
+      isDraggingRef: {current: false},
+      sessionRef: {current: null},
+      onSelectBlock,
+      onDraggingChange: jest.fn(),
+      onMoveBlock: jest.fn(),
+      onResizeBlock: jest.fn(),
+    });
+
+    handlers.onMovePointerDown({button: 0, pointerId: 1, pageX: 0, pageY: 0} as PointerEvent);
+    expect(onSelectBlock).toHaveBeenCalledWith('clip-1', {additive: false, openEditor: false});
+
+    handlers.onPointerUp({pointerId: 1, pageX: 1, pageY: 1});
+    expect(onSelectBlock).toHaveBeenLastCalledWith('clip-1', {openEditor: true});
+  });
+
+  it('does not activate the editor when resizing a drum pattern loop', () => {
+    const drumBlock = createDefaultDrumPatternBlock('t1', 0, 0, 'pattern-1');
+    const onSelectBlock = jest.fn();
+    const handlers = createBlockPointerHandlers({
+      block: drumBlock,
+      blocks: [drumBlock],
+      trackCount: 1,
+      trackIds: ['t1'],
+      maxTimelineBeat: 64,
+      pixelsPerBeat: PIXELS_PER_BEAT,
+      metrics: {left: {setValue: jest.fn()}, width: {setValue: jest.fn()}},
+      dragStartXRef: {current: 0},
+      dragStartBeatRef: {current: 0},
+      dragStartLengthRef: {current: 4},
+      dragStartTrackIndexRef: {current: 0},
+      isDraggingRef: {current: false},
+      sessionRef: {current: null},
+      onSelectBlock,
+      onDraggingChange: jest.fn(),
+      onMoveBlock: jest.fn(),
+      onResizeBlock: jest.fn(),
+    });
+
+    handlers.onResizeRightPointerDown({button: 0, pointerId: 1, pageX: 4 * PIXELS_PER_BEAT, pageY: 0} as PointerEvent);
+    handlers.onPointerUp({pointerId: 1, pageX: 8 * PIXELS_PER_BEAT, pageY: 0});
+
+    expect(onSelectBlock).toHaveBeenCalledTimes(1);
+    expect(onSelectBlock).toHaveBeenCalledWith(drumBlock.id, {additive: false, openEditor: false});
+  });
+
   it('passes raw move targets through for grouped move commits', () => {
     const moved: Array<{startBeat: number; trackId: string}> = [];
     const handlers = createBlockPointerHandlers({

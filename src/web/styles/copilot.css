@@ -293,6 +293,15 @@
   opacity: 0.72;
 }
 
+.copilot-demo-usage {
+  grid-column: 1 / -1;
+  color: rgba(224, 224, 224, 0.48);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
 .copilot-send-icon {
   width: 18px;
   height: 18px;

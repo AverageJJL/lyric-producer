@@ -1,10 +1,12 @@
 import React from 'react';
 
+import type {CopilotDemoUsage} from '../../native/copilotApi';
 import {SendHorizontalIcon} from './icons/WorkspaceIcons';
 
 type CopilotInputFormProps = {
   draft: string;
   isPending: boolean;
+  demoUsage?: CopilotDemoUsage | null;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -13,6 +15,7 @@ type CopilotInputFormProps = {
 export function CopilotInputForm({
   draft,
   isPending,
+  demoUsage,
   textareaRef,
   onDraftChange,
   onSend,
@@ -48,6 +51,11 @@ export function CopilotInputForm({
         disabled={!canSend}>
         <SendHorizontalIcon className="copilot-send-icon" />
       </button>
+      {demoUsage?.enabled ? (
+        <small className="copilot-demo-usage">
+          Demo Copilot: {demoUsage.remaining}/{demoUsage.limit} live messages left
+        </small>
+      ) : null}
     </form>
   );
 }

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "track": {
+        "id": "demo-blank-space",
+        "title": "Blank Space",
+        "artist": "Taylor Swift",
+        "album": "1989",
+        "releaseYear": "2014",
+        "hasLyrics": true,
+        "hasTrackStructure": true,
+        "source": "musixmatch"
+      },
+      "bpm": 96,
+      "key": "F major",
+      "confidence": 0.96,
+      "note": "Bundled public-demo metadata. The private demo can fetch live provider metadata.",
+      "lyrics": "[Verse]\nA white room glows under city light\nNew names bloom on a paper line\nEvery promise sounds expensive now\nEvery silence makes a louder sound\n[Pre-Chorus]\nBuild the scene, pull the camera close\nLeave one spark where the chorus goes\n[Chorus]\nWrite the warning in a clean refrain\nMake the glamour feel a little dangerous\nWrite the warning in a clean refrain\nLet the drums smile while the bass turns anxious\n[Bridge]\nDrop the lights to a midnight frame\nBring the vocal forward, dry and strange\n[Outro]\nLet the echo close the door again",
+      "copyright": "Public demo fixture text, not the original lyric. Original lyrics remain available only through the licensed provider flow.",
+      "structure": {
+        "verse": [0, 1, 2, 3],
+        "pre-chorus": [4, 5],
+        "chorus": [6, 7, 8, 9],
+        "bridge": [10, 11],
+        "outro": [12]
+      }
+    },
+    {
+      "track": {
+        "id": "demo-baby",
+        "title": "Baby",
+        "artist": "Justin Bieber feat. Ludacris",
+        "album": "My World 2.0",
+        "releaseYear": "2010",
+        "hasLyrics": true,
+        "hasTrackStructure": true,
+        "source": "musixmatch"
+      },
+      "bpm": 65,
+      "key": "Eb major",
+      "confidence": 0.84,
+      "note": "Bundled public-demo metadata. The private demo can fetch live provider metadata.",
+      "lyrics": "[Intro]\nBright claps count in the first big smile\n[Verse]\nSchoolyard lights and a radio crush\nEvery heartbeat starts to rush\n[Pre-Chorus]\nStack the doubles, make it shine\nKeep the kick soft under every line\n[Chorus]\nTurn the hook into a playground chant\nLet the melody bounce where the drums land\nTurn the hook into a playground chant\nKeep the bass simple so the vocal can dance\n[Bridge]\nPull the beat back for a half-time grin\nThen let the final chorus rush back in\n[Outro]\nFade the chant with the handclaps high",
+      "copyright": "Public demo fixture text, not the original lyric. Original lyrics remain available only through the licensed provider flow.",
+      "structure": {
+        "intro": [0],
+        "verse": [1, 2],
+        "pre-chorus": [3, 4],
+        "chorus": [5, 6, 7, 8],
+        "bridge": [9, 10],
+        "outro": [11]
+      }
+    }
+  ]
+}

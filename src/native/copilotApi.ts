@@ -44,6 +44,13 @@ export type CopilotModelConfig = {
   compactionModel: string;
 };
 
+export type CopilotDemoUsage = {
+  enabled: boolean;
+  limit: number;
+  used: number;
+  remaining: number;
+};
+
 export type CopilotAgentAskRequest = {
   message: string;
   history?: CopilotChatMessage[];
@@ -84,6 +91,7 @@ export type CopilotBridge = {
   agentAsk: (request: CopilotAgentAskRequest) => Promise<CopilotAgentAskResponse>;
   compact?: (request: CopilotCompactRequest) => Promise<CopilotCompactResponse>;
   modelConfig?: () => Promise<CopilotModelConfig>;
+  demoUsage?: () => Promise<CopilotDemoUsage>;
 };
 
 declare global {

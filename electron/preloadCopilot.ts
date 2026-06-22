@@ -30,5 +30,9 @@ export function exposeCopilotBridge(): void {
     modelConfig() {
       return ipcRenderer.invoke('copilot:model-config');
     },
+
+    demoUsage() {
+      return ipcRenderer.invoke('copilot:demo-usage');
+    },
   });
 }

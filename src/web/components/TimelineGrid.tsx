@@ -75,7 +75,7 @@ type TimelineGridProps = {
   onRowHeightChange: (rowHeight: number) => void;
   onMoveBlock: (blockId: string, startBeat: number, trackId: string) => void;
   onResizeBlock: (blockId: string, startBeat: number, lengthBeats: number) => void;
-  onSelectBlock: (blockId: string | null, options?: {additive?: boolean}) => void;
+  onSelectBlock: (blockId: string | null, options?: {additive?: boolean; openEditor?: boolean}) => void;
   onUpdateBlock: (blockId: string, updates: Partial<Pick<DAWBlock, 'name'>>) => void;
   onDeleteBlock: (blockId: string) => void;
   importAudioFile: ReturnType<typeof useAudioImport>['importAudioFile'];
@@ -432,7 +432,7 @@ export function TimelineGrid({
   const handleTimelineBlockSelect = useCallback((
     block: DAWBlock,
     blockId: string | null,
-    options?: {additive?: boolean},
+    options?: {additive?: boolean; openEditor?: boolean},
   ) => {
     if (blockId === null) {
       onSelectBlock(null, options);

@@ -21,7 +21,7 @@ import {useCopilotDrumPatternController} from './useCopilotDrumPatternController
 import {useCopilotEditableArrangement} from './useCopilotEditableArrangement';
 import {useCopilotMidiOptionController} from './useCopilotMidiOptionController';
 import {useCopilotMemoryState} from './useCopilotMemoryState';
-import {getCopilotBridge, type CopilotMode, type CopilotUiState} from '../../native/copilotApi';
+import {getCopilotBridge, type CopilotDemoUsage, type CopilotMode, type CopilotUiState} from '../../native/copilotApi';
 import {clearStaleStagedProposal} from './CopilotPanelHelpers';
 
 type CopilotPanelProps = {
@@ -42,6 +42,7 @@ function activeSessionFrom(sessions: CopilotChatSession[], activeSessionId: stri
 export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<CopilotMode>('build');
+  const [demoUsage, setDemoUsage] = useState<CopilotDemoUsage | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const activeRequestRef = useRef(0);
@@ -61,6 +62,13 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
   const isPending = pendingSessionId !== null;
 
   const focusInput = useCallback(() => { textareaRef.current?.focus({preventScroll: true}); }, []);
+  const refreshDemoUsage = useCallback(() => {
+    if (!bridge?.demoUsage) {
+      setDemoUsage(null);
+      return;
+    }
+    void bridge.demoUsage().then(setDemoUsage).catch(() => setDemoUsage(null));
+  }, [bridge]);
 
   const scheduleFocusInput = useCallback(() => {
     if (window.requestAnimationFrame) {
@@ -72,6 +80,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
   }, [focusInput]);
 
   useEffect(() => scheduleFocusInput(), [scheduleFocusInput]);
+  useEffect(() => refreshDemoUsage(), [refreshDemoUsage]);
   const midiOptions = useCopilotMidiOptionController(scheduleFocusInput);
   const drumPatterns = useCopilotDrumPatternController(scheduleFocusInput);
   const prepareMemoryRequest = useCopilotMemoryState();
@@ -201,6 +210,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
         context,
         mode,
       });
+      refreshDemoUsage();
       if (activeRequestRef.current !== requestId) {
         return;
       }
@@ -211,6 +221,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
       }
       appendAgentResult(agentResult, context, requestId, sessionId);
     } catch {
+      refreshDemoUsage();
       if (activeRequestRef.current === requestId) {
         setRequestPending(null);
       }
@@ -256,6 +267,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
       </div>
       <CopilotInputForm
         draft={draft}
+        demoUsage={demoUsage}
         isPending={isPending}
         textareaRef={textareaRef}
         onDraftChange={setDraft}

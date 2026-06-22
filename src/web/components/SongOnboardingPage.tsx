@@ -24,7 +24,7 @@ function apcProjects(paths: string[]): string[] {
   return paths.filter(path => /\.apc$/i.test(path.trim())).slice(0, 5);
 }
 
-const CYANITE_CREDITS_DEMO_MESSAGE = "We ran out of Cyanite credits, oops. Please see the demo video for how it would've worked.";
+const CYANITE_CREDITS_DEMO_MESSAGE = 'Cyanite usage limits reached in the public demo. Please see the demo video for how this feature works.';
 
 function cyaniteStatus(response: SongSeedReferenceAnalyzeResponse | null | undefined): string {
   return response && !response.ok && response.code === 'limit_exceeded'
@@ -34,7 +34,7 @@ function cyaniteStatus(response: SongSeedReferenceAnalyzeResponse | null | undef
 
 export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSongIdeaProject}: SongOnboardingPageProps) {
   const [referenceAnalysis, setReferenceAnalysis] = React.useState<ReferenceMoodAnalysis | null>(null);
-  const [referenceState, setReferenceState] = React.useState<'idle' | 'loading' | 'confirming' | 'ready' | 'error'>('idle');
+  const [referenceState, setReferenceState] = React.useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [referenceStatus, setReferenceStatus] = React.useState<string | null>(null);
   const [referenceSource, setReferenceSource] = React.useState<ReferenceMoodSource | null>(null);
   const [referenceCacheStatus, setReferenceCacheStatus] = React.useState<SongSeedReferenceCacheStatus | null>(null);
@@ -52,20 +52,20 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
   const pageClassName = `onboarding-page ${hasStartedAnalysis ? 'analysis-active' : ''}`;
   const recentProjects = apcProjects(projectFiles?.recentProjects ?? []);
 
-  const runReferenceAnalysis = React.useCallback((allowCreditSpend: boolean) => {
+  const runReferenceAnalysis = React.useCallback(() => {
     const track = flow.selectedTrack;
     if (!track) return;
     const runId = referenceRunRef.current + 1;
     referenceRunRef.current = runId;
     setReferenceState('loading');
-    setReferenceStatus(allowCreditSpend ? 'Enqueuing YouTube reference' : 'Finding YouTube reference');
+    setReferenceStatus('Finding YouTube reference');
     const timers = [
       window.setTimeout(() => runId === referenceRunRef.current && setReferenceStatus('Checking local reference cache'), 800),
       window.setTimeout(() => runId === referenceRunRef.current && setReferenceStatus('Checking Cyanite library reuse'), 1700),
-      window.setTimeout(() => runId === referenceRunRef.current && setReferenceStatus(allowCreditSpend ? 'Waiting for Cyanite V7 classifiers' : 'Preparing credit-safe decision'), 3100),
-      window.setTimeout(() => runId === referenceRunRef.current && allowCreditSpend && setReferenceStatus('Parsing Cyanite mood and production curves'), 6200),
+      window.setTimeout(() => runId === referenceRunRef.current && setReferenceStatus('Waiting for Cyanite V7 classifiers'), 3100),
+      window.setTimeout(() => runId === referenceRunRef.current && setReferenceStatus('Parsing Cyanite mood and production curves'), 6200),
     ];
-    const referenceRequest = allowCreditSpend ? {track, allowCreditSpend: true} : {track};
+    const referenceRequest = {track, allowCreditSpend: true};
     void Promise.resolve(analyzeSongSeedReference(referenceRequest)).then(response => {
       if (runId !== referenceRunRef.current) return;
       timers.forEach(window.clearTimeout);
@@ -77,11 +77,6 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
         setReferenceCacheStatus(response.cacheStatus ?? response.analysis.cacheStatus ?? null);
         setReferenceState('ready');
         setReferenceStatus(source ? `Cyanite reference ready: ${source.title}` : 'Cyanite reference ready');
-      } else if (response?.code === 'confirmation_required' && response.source) {
-        setReferenceSource(response.source);
-        setReferenceCacheStatus(null);
-        setReferenceState('confirming');
-        setReferenceStatus(`Spend 1 Cyanite analysis credit for ${response.source.title}?`);
       } else {
         setReferenceState('error');
         setReferenceStatus(cyaniteStatus(response));
@@ -99,17 +94,9 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
       setReferenceStatus(null);
       return;
     }
-    runReferenceAnalysis(false);
+    runReferenceAnalysis();
   }, [flow.selectedTrack?.id, runReferenceAnalysis]);
 
-  const handleConfirmReferenceSpend = React.useCallback(() => runReferenceAnalysis(true), [runReferenceAnalysis]);
-  const handleSkipReference = React.useCallback(() => {
-    referenceRunRef.current += 1;
-    setReferenceAnalysis(null);
-    setReferenceCacheStatus(null);
-    setReferenceState('error');
-    setReferenceStatus('Cyanite reference skipped to save credits. Continuing with existing metadata.');
-  }, []);
   const resetReference = React.useCallback(() => {
     referenceRunRef.current += 1;
     setReferenceAnalysis(null); setReferenceSource(null); setReferenceCacheStatus(null);
@@ -225,8 +212,6 @@ export function SongOnboardingPage({projectFiles, onOpenEmptyProject, onOpenSong
                   canFastForward={flow.canFastForward}
                   onDraftChange={flow.handleDraftChange}
                   onOpenProject={flow.handleOpenProject}
-                  onConfirmReferenceSpend={handleConfirmReferenceSpend}
-                  onSkipReference={handleSkipReference}
                 />
                 <SongLyricWheel
                   analysis={flow.analysis}

@@ -191,6 +191,24 @@ provider API keys stay hidden. It returns normalized match-risk metadata only
 ids, and short user-authored overlap phrases). It is informational, not a legal
 copyright judgment, and full provider lyrics must not be persisted or displayed.
 
+### 3.8 Public demo distribution mode
+
+The Musicathon public demo build may ship as a macOS-first Electron download with no
+real provider API keys embedded. Packaged demo credentials are limited to non-secret
+client configuration; live model calls must route through a server-side proxy that
+holds the real OpenRouter key and enforces request caps.
+
+- Public demo song startup may use bundled, provider-shaped demo fixtures and the
+  existing `assets/song-seed` Cyanite reference seed cache.
+- Public demo builds must never enqueue new Cyanite analysis jobs. Cache hits remain
+  visible; uncached references return a user-facing limit message and point viewers
+  to the demo video.
+- Public demo Copilot access is intentionally metered. The desktop app enforces a
+  small local message limit, and the proxy enforces model/body/rate limits as a
+  second guardrail.
+- Full copyrighted lyrics must not be bundled into the public app. Any bundled lyric
+  text must be demo-safe fixture text or provider attribution/copyright metadata.
+
 ## 4. Arrangement & Command Contracts (For Agents)
 ### 4.1 `applyArrangementOperations` (existing)
 

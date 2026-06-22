@@ -10,6 +10,7 @@ import {
 import {startCrashReporting} from './crashReporting';
 import {appWideAssetRoots, projectMediaRoots} from './assetRoots';
 import {installPermissionPolicy} from './permissionPolicy';
+import {readPublicDemoConfig} from './publicDemoConfig';
 import {installRuntimeUpdater} from './runtimeUpdater';
 import {
   attachProjectCloseGuard,
@@ -126,6 +127,14 @@ function assetRoots() {
 // under userData and never move per-project.
 function appWideRoots() {
   return appWideAssetRoots(rootsEnv());
+}
+
+function publicDemoConfig() {
+  return readPublicDemoConfig(appWideRoots().readRoot, process.env);
+}
+
+function publicDemoUsagePath() {
+  return path.join(app.getPath('userData'), 'public-demo-usage.json');
 }
 
 function sendRendererEvent(eventName: string, payloadJson: string) {
@@ -268,6 +277,8 @@ registerMainIpc({
   recordActiveProjectFolder,
   sendNativeCommand: (command, payloadJson) =>
     resolveNativeAddon().sendCommand(command, payloadJson),
+  demoConfig: publicDemoConfig,
+  demoUsagePath: publicDemoUsagePath,
 });
 
 if (shouldRunApp) {

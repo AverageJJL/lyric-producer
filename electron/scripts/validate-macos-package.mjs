@@ -135,6 +135,16 @@ function assertMacPackaging() {
     'assets/song-seed/reference-cache.seed.json',
     'Song seed reference cache metadata missing',
   );
+  requirePath(
+    errors,
+    'assets/song-seed/demo-config.json',
+    'Public demo config missing',
+  );
+  requirePath(
+    errors,
+    'assets/song-seed/demo-song-seeds.json',
+    'Public demo song fixtures missing',
+  );
   requirePath(errors, 'assets/instruments', 'Bundled instrument assets missing');
 
   return errors;

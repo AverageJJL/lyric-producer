@@ -1,0 +1,11 @@
+{
+  "name": "ai-producer-core-demo-proxy",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "vercel dev"
+  }
+}

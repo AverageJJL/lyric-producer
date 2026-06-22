@@ -26,7 +26,6 @@ type ProviderErrorCode =
 type SongSeedReferenceErrorCode =
   | ProviderErrorCode
   | 'analysis_failed'
-  | 'confirmation_required'
   | 'invalid_file'
   | 'limit_exceeded'
   | 'rate_limited'

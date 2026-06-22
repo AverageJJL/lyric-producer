@@ -1,5 +1,6 @@
 import type {ApcPatchTransaction} from './copilotAgentContract';
 import type {ApcAgentTree} from './copilotAgentTools';
+import {barDisplayRangeToBeats, parseArrangementSectionMarkers} from './copilotSectionMarkerParser';
 
 type ChatMessage = {role?: unknown; content?: unknown};
 type ClipFile = {type?: unknown; startBeat?: unknown; lengthBeats?: unknown; audioFilePath?: unknown; absoluteAudioFilePath?: unknown};
@@ -89,9 +90,11 @@ function rangeFromText(text: string, barLength: number): BeatRange | null {
   const match = text.match(/\b(?:(bar|bars|measure|measures|beat|beats)\s*)?(\d+(?:\.\d+)?)\s*(?:to|-|through|until)\s*(?:(bar|bars|measure|measures|beat|beats)\s*)?(\d+(?:\.\d+)?)/i);
   if (!match) return null;
   const unit = (match[1] ?? match[3] ?? '').toLowerCase();
-  const scale = /bar|measure/.test(unit) ? barLength : 1;
-  const startBeat = Number(match[2]) * scale;
-  const endBeat = Number(match[4]) * scale;
+  if (/bar|measure/.test(unit)) {
+    return barDisplayRangeToBeats(Number(match[2]), Number(match[4]), barLength);
+  }
+  const startBeat = Number(match[2]);
+  const endBeat = Number(match[4]);
   return Number.isFinite(startBeat) && Number.isFinite(endBeat) && endBeat > startBeat
     ? {startBeat, endBeat}
     : null;
@@ -108,6 +111,34 @@ function markerName(text: string): string | null {
   return role ? role.replace(/-/g, ' ') : null;
 }
 
+function buildArrangementMarkers(
+  text: string,
+  tree: ApcAgentTree,
+  timeline: TimelineFile,
+  timelineHash: string,
+): CopilotTimelineShortcutResult | null {
+  const songEndBeat = audioExtent(tree)?.endBeat;
+  const parsed = parseArrangementSectionMarkers(text, barBeats(timeline), songEndBeat);
+  if (parsed.length < 2) return null;
+  const kept = validSections(timeline.sections);
+  const usedIds = new Set(kept.map(section => section.id));
+  const added = parsed.map(marker => {
+    const label = titleCase(marker.name);
+    return {
+      id: uniqueId(`ai-marker-${slug(label)}-${Math.round(marker.startBeat)}`, usedIds),
+      name: label,
+      startBeat: marker.startBeat,
+      lengthBeats: marker.endBeat - marker.startBeat,
+    };
+  });
+  return {
+    text: `Prepared ${added.length} arrangement section markers.`,
+    patch: {schemaVersion: 1, baseFingerprint: tree.fingerprint, summary: `Add ${added.length} arrangement section markers`, changes: [
+      {op: 'mergeFields', path: 'timeline.json', beforeHash: timelineHash, fields: {sections: [...kept, ...added].sort((a, b) => a.startBeat - b.startBeat)}},
+    ]},
+  };
+}
+
 function buildMarker(message: string, tree: ApcAgentTree, history?: unknown): CopilotTimelineShortcutResult | null {
   const timelineHash = hashOf(tree, 'timeline.json');
   const timeline = readJson<TimelineFile>(tree, 'timeline.json');
@@ -120,6 +151,8 @@ function buildMarker(message: string, tree: ApcAgentTree, history?: unknown): Co
     rangeFromText(combined, barBeats(timeline)) !== null;
   if (!direct && !confirmingPrevious && !answeringMarkerName) return null;
   const contextText = direct ? message : combined;
+  const arrangementMarkers = buildArrangementMarkers(contextText, tree, timeline, timelineHash);
+  if (arrangementMarkers) return arrangementMarkers;
   const range = rangeFromText(contextText, barBeats(timeline));
   const name = markerName(message) ?? markerName(contextText);
   if (!range || !name) return null;

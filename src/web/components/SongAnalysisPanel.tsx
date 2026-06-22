@@ -25,15 +25,13 @@ type SongAnalysisPanelProps = {
   draft: SongMetadataDraft | null;
   status: string | null;
   referenceAnalysis: ReferenceMoodAnalysis | null;
-  referenceState: 'idle' | 'loading' | 'confirming' | 'ready' | 'error';
+  referenceState: 'idle' | 'loading' | 'ready' | 'error';
   referenceStatus: string | null;
   referenceSource: ReferenceMoodSource | null;
   referenceCacheStatus: SongSeedReferenceCacheStatus | null;
   canFastForward: boolean;
   onDraftChange: (draft: SongMetadataDraft) => void;
   onOpenProject: () => void;
-  onConfirmReferenceSpend: () => void;
-  onSkipReference: () => void;
 };
 
 const PHASE_LABELS: Record<SongAnalysisPhase, string> = {
@@ -80,8 +78,6 @@ export function SongAnalysisPanel({
   canFastForward,
   onDraftChange,
   onOpenProject,
-  onConfirmReferenceSpend,
-  onSkipReference,
 }: SongAnalysisPanelProps) {
   const section = analysis?.sections[Math.min(activeSection, Math.max(0, analysis.sections.length - 1))];
   const isComplete = phase === 'complete';
@@ -89,7 +85,7 @@ export function SongAnalysisPanel({
   const ribbon = referenceAnalysis?.segments.slice(0, 20) ?? [];
   const source = referenceAnalysis?.source ?? referenceSource;
   const metadataSource = referenceAnalysis?.bpm || referenceAnalysis?.key ? 'BPM/key source: Cyanite reference' : analysis?.keySource;
-  const cacheLabel = referenceCacheStatus === 'cache' ? 'cache hit' : referenceCacheStatus === 'library' ? 'library reuse' : referenceCacheStatus === 'analyzed' ? 'credit used' : referenceState === 'confirming' ? 'credit needed' : 'checking reuse';
+  const cacheLabel = referenceCacheStatus === 'cache' ? 'cache hit' : referenceCacheStatus === 'library' ? 'library reuse' : referenceCacheStatus === 'analyzed' ? 'credit used' : referenceState === 'error' ? 'demo limit' : 'checking reuse';
   return (
     <aside className="song-analysis-panel" aria-label="Song analysis">
       <header className="song-analysis-header">
@@ -172,12 +168,6 @@ export function SongAnalysisPanel({
             {chips.length > 0 ? (
               <div className="song-reference-chips">
                 {chips.map(item => <span key={item}>{label(item)}</span>)}
-              </div>
-            ) : null}
-            {referenceState === 'confirming' ? (
-              <div className="song-reference-action">
-                <button type="button" className="onboarding-secondary" onClick={onConfirmReferenceSpend}>Use 1 Cyanite analysis</button>
-                <button type="button" className="onboarding-secondary" onClick={onSkipReference}>Skip Cyanite</button>
               </div>
             ) : null}
           </section>

@@ -104,7 +104,7 @@ describe('SongOnboardingPage metadata flow', () => {
     await waitFor(() => expect(screen.getByText(/Online BPM\/key unavailable: GetSongBPM returned 401.; OpenRouter analysis failed./)).toBeInTheDocument());
   });
 
-  it('keeps Fast Forward hidden after skipping Cyanite until online BPM/key resolves', async () => {
+  it('keeps Fast Forward hidden after Cyanite settles until online BPM/key resolves', async () => {
     let resolveMetadata: (value: unknown) => void = () => undefined;
     searchMock.mockResolvedValue({
       ok: true,
@@ -112,14 +112,7 @@ describe('SongOnboardingPage metadata flow', () => {
     });
     lyricsMock.mockResolvedValue({ok: true, trackId: 'mxm-umbrella', lyrics: 'Under my umbrella'});
     bpmMock.mockReturnValue(new Promise(resolve => { resolveMetadata = resolve; }));
-    referenceMock.mockResolvedValue({ok: false, code: 'confirmation_required', error: 'Spend 1 Cyanite analysis credit?', source: {
-      kind: 'youtube',
-      url: 'https://www.youtube.com/watch?v=umbrella',
-      videoId: 'umbrella',
-      title: 'Rihanna - Umbrella',
-      channelTitle: 'Rihanna',
-      confidence: 0.92,
-    }});
+    referenceMock.mockResolvedValue({ok: false, code: 'not_found', error: 'No reliable YouTube reference match was found.'});
     render(<SongOnboardingPage onOpenEmptyProject={jest.fn()} onOpenSongIdeaProject={jest.fn()} />);
 
     fireEvent.click(screen.getByText('I have an idea already'));
@@ -127,7 +120,6 @@ describe('SongOnboardingPage metadata flow', () => {
     await act(async () => { jest.advanceTimersByTime(320); });
     const option = await screen.findByRole('option', {name: /Umbrella/i});
     await act(async () => { fireEvent.click(option); });
-    fireEvent.click(await screen.findByRole('button', {name: /Skip Cyanite/i}));
 
     expect(screen.queryByRole('button', {name: /Fast Forward/i})).not.toBeInTheDocument();
     await act(async () => {

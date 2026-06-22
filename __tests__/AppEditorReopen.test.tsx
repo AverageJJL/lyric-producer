@@ -64,6 +64,11 @@ function addGrandPianoTrack() {
   fireEvent.click(screen.getByRole('button', {name: 'Grand Piano'}));
 }
 
+function addDrumMachineTrack() {
+  fireEvent.click(screen.getByText('+ Add track'));
+  fireEvent.click(screen.getByRole('button', {name: 'Drum Machine'}));
+}
+
 beforeEach(() => {
   resetStore();
   installAudioEngineMock();
@@ -129,8 +134,25 @@ test('clicking a MIDI block reopens the editor after closing it', async () => {
   const blockSurface = block.querySelector('.timeline-block-clip-surface') as HTMLDivElement;
   block.setPointerCapture = jest.fn();
   fireEvent.pointerDown(blockSurface, {pointerId: 1, clientX: 24, clientY: 120, pageX: 24, pageY: 120});
+  fireEvent.pointerUp(blockSurface, {pointerId: 1, clientX: 24, clientY: 120, pageX: 24, pageY: 120});
 
   await waitFor(() => {
     expect(screen.getByRole('heading', {name: 'Piano Roll'})).toBeInTheDocument();
   });
+});
+
+test('adding a drum machine reopens the editor after it was closed', async () => {
+  render(<App />);
+
+  addGrandPianoTrack();
+  fireEvent.click(screen.getByRole('button', {name: /Close Piano Roll/}));
+  expect(screen.queryByRole('heading', {name: 'Piano Roll'})).not.toBeInTheDocument();
+
+  addDrumMachineTrack();
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', {name: 'Drum Machine'})).toBeInTheDocument();
+  });
+  const drumEditor = screen.getAllByLabelText(/Drums ·/).find(element => element.tagName === 'SECTION');
+  expect(drumEditor).toHaveStyle({height: '380px'});
 });

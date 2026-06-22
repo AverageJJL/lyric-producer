@@ -38,7 +38,7 @@ type TimelineBlockProps = {
   beatsPerBar: number;
   onMoveBlock: (blockId: string, startBeat: number, trackId: string) => void;
   onResizeBlock: (blockId: string, startBeat: number, lengthBeats: number) => void;
-  onSelectBlock: (blockId: string, options?: {additive?: boolean}) => void;
+  onSelectBlock: (blockId: string, options?: {additive?: boolean; openEditor?: boolean}) => void;
   onUpdateBlock: (blockId: string, updates: Partial<Pick<DAWBlock, 'name'>>) => void;
   onDeleteBlock: (blockId: string) => void;
   onDraggingChange: (isDragging: boolean) => void;

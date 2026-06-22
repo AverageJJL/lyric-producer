@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "enabled": true,
+  "openRouterProxyBaseUrl": "https://ai-producer-core-demo.vercel.app/api/openrouter",
+  "openRouterPublicToken": "apc-public-demo",
+  "openRouterModel": "openai/gpt-4o-mini",
+  "openRouterFallbackModels": [
+    "openai/gpt-4.1-nano",
+    "openai/gpt-4.1-mini"
+  ],
+  "copilotMessageLimit": 5,
+  "disableLiveCyanite": true,
+  "disableLiveSongSeedProviders": true,
+  "cyaniteLimitMessage": "Cyanite usage limits reached in the public demo. Please see the demo video for how this feature works."
+}

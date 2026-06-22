@@ -3,6 +3,15 @@ import {askCopilotAgent} from './copilotAgentLoop';
 import {askOpenRouterCopilotCompaction} from './copilotCompaction';
 import {copilotModelConfig} from './copilotModels';
 import type {NativeCommandFn} from './askAudioTools';
+import {
+  copilotEnvForPublicDemo,
+  readPublicDemoConfig,
+  type PublicDemoConfig,
+} from './publicDemoConfig';
+import {
+  consumePublicDemoCopilotMessage,
+  publicDemoUsageStatus,
+} from './publicDemoUsage';
 
 type CopilotCompactIpcRequest = {
   history?: unknown;
@@ -15,6 +24,8 @@ type CopilotCompactIpcRequest = {
 type CopilotIpcDeps = {
   /** Synchronous native bridge used by read-only Ask measurement tools. */
   sendNativeCommand?: NativeCommandFn;
+  demoConfig?: () => PublicDemoConfig;
+  demoUsagePath?: () => string;
 };
 
 /**
@@ -27,11 +38,31 @@ type CopilotIpcDeps = {
  * conversation-memory summarization.
  */
 export function registerCopilotIpc(deps: CopilotIpcDeps = {}): void {
-  ipcMain.handle('copilot:agent-ask', async (_event, request?: Parameters<typeof askCopilotAgent>[0]) =>
-    askCopilotAgent(request ?? {}, {sendNativeCommand: deps.sendNativeCommand}),
+  const config = () => deps.demoConfig?.() ?? readPublicDemoConfig(undefined, process.env);
+  ipcMain.handle('copilot:agent-ask', async (_event, request?: Parameters<typeof askCopilotAgent>[0]) => {
+    const demo = config();
+    if (demo.enabled && !demo.openRouterProxyBaseUrl) {
+      return {ok: false as const, error: 'Public demo proxy is not configured.'};
+    }
+    const usage = consumePublicDemoCopilotMessage(demo, deps.demoUsagePath?.());
+    if (!usage.ok) {
+      return {ok: false as const, error: usage.error};
+    }
+    return askCopilotAgent(request ?? {}, {
+      env: copilotEnvForPublicDemo(process.env, demo),
+      sendNativeCommand: deps.sendNativeCommand,
+    });
+  });
+  ipcMain.handle('copilot:compact', async (_event, request?: CopilotCompactIpcRequest) => {
+    const demo = config();
+    return demo.enabled
+      ? {ok: false as const, error: 'Public demo skips hidden Copilot compaction calls.'}
+      : askOpenRouterCopilotCompaction(request ?? {});
+  });
+  ipcMain.handle('copilot:model-config', async () =>
+    copilotModelConfig(copilotEnvForPublicDemo(process.env, config())),
   );
-  ipcMain.handle('copilot:compact', async (_event, request?: CopilotCompactIpcRequest) =>
-    askOpenRouterCopilotCompaction(request ?? {}),
+  ipcMain.handle('copilot:demo-usage', async () =>
+    publicDemoUsageStatus(config(), deps.demoUsagePath?.()),
   );
-  ipcMain.handle('copilot:model-config', async () => copilotModelConfig());
 }

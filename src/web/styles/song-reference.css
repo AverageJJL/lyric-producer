@@ -11,10 +11,6 @@
   color: #f3d174;
 }
 
-.song-reference-readout.confirming .song-reference-heading span {
-  color: #f4b866;
-}
-
 .song-reference-readout.error .song-reference-heading span {
   color: #f27e7e;
 }

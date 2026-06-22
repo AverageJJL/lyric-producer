@@ -199,7 +199,7 @@ describe('credit-safe Cyanite reference flow', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('reuses a finished Cyanite library track before asking for a credit', async () => {
+  it('reuses a finished Cyanite library track before enqueueing a new analysis', async () => {
     const fetchMock = jest.fn()
       .mockImplementationOnce(youtubeFetches()[0])
       .mockImplementationOnce(youtubeFetches()[1])
@@ -212,19 +212,7 @@ describe('credit-safe Cyanite reference flow', () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('youTubeTrackEnqueue');
   });
 
-  it('requires confirmation before enqueueing a new Cyanite analysis', async () => {
-    const fetchMock = jest.fn()
-      .mockImplementationOnce(youtubeFetches()[0])
-      .mockImplementationOnce(youtubeFetches()[1])
-      .mockImplementationOnce(() => response({data: {libraryTracks: {edges: []}}}));
-
-    const result = await analyzeSongSeedReference({track}, {YOUTUBE_API_KEY: 'yt', CYANITE_ACCESS_TOKEN: 'token'}, fetchMock as typeof fetch, {cachePath});
-
-    expect(result).toMatchObject({ok: false, code: 'confirmation_required', source: {videoId: source.videoId}});
-    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('youTubeTrackEnqueue');
-  });
-
-  it('enqueues after confirmation and stores a cache entry', async () => {
+  it('enqueues a new Cyanite analysis without a confirmation round trip', async () => {
     const fetchMock = jest.fn()
       .mockImplementationOnce(youtubeFetches()[0])
       .mockImplementationOnce(youtubeFetches()[1])
@@ -236,7 +224,39 @@ describe('credit-safe Cyanite reference flow', () => {
       .mockImplementationOnce(() => response({data: {libraryTrack: finishedTrack('cyanite-new')}}))
       .mockImplementationOnce(() => response({data: {libraryTrackWaveform: {__typename: 'LibraryTrackWaveform', waveformUrl: 'https://waveform.example/h.json'}}}));
 
-    const result = await analyzeSongSeedReference({track, allowCreditSpend: true}, {YOUTUBE_API_KEY: 'yt', CYANITE_ACCESS_TOKEN: 'token'}, fetchMock as typeof fetch, {cachePath});
+    const result = await analyzeSongSeedReference({track}, {YOUTUBE_API_KEY: 'yt', CYANITE_ACCESS_TOKEN: 'token'}, fetchMock as typeof fetch, {cachePath});
+
+    expect(result).toMatchObject({ok: true, cacheStatus: 'analyzed', analysis: {libraryTrackId: 'cyanite-new'}});
+    expect(JSON.stringify(fetchMock.mock.calls)).toContain('youTubeTrackEnqueue');
+  });
+
+  it('blocks live provider lookup in public demo mode after cache misses', async () => {
+    const fetchMock = jest.fn();
+
+    const result = await analyzeSongSeedReference(
+      {track, allowCreditSpend: true},
+      {YOUTUBE_API_KEY: 'yt', CYANITE_ACCESS_TOKEN: 'token'},
+      fetchMock as typeof fetch,
+      {cachePath, seedCachePath, demoMode: true, demoLimitMessage: 'Demo Cyanite limit reached.'},
+    );
+
+    expect(result).toEqual({ok: false, code: 'limit_exceeded', error: 'Demo Cyanite limit reached.'});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stores a cache entry after automatic enqueue', async () => {
+    const fetchMock = jest.fn()
+      .mockImplementationOnce(youtubeFetches()[0])
+      .mockImplementationOnce(youtubeFetches()[1])
+      .mockImplementationOnce(() => response({data: {libraryTracks: {edges: []}}}))
+      .mockImplementationOnce(() => response({data: {youTubeTrackEnqueue: {
+        __typename: 'YouTubeTrackEnqueueSuccess',
+        enqueuedLibraryTrack: {__typename: 'LibraryTrack', id: 'cyanite-new', title: 'Halo', audioAnalysisV7: {__typename: 'AudioAnalysisV7Processing'}},
+      }}}))
+      .mockImplementationOnce(() => response({data: {libraryTrack: finishedTrack('cyanite-new')}}))
+      .mockImplementationOnce(() => response({data: {libraryTrackWaveform: {__typename: 'LibraryTrackWaveform', waveformUrl: 'https://waveform.example/h.json'}}}));
+
+    const result = await analyzeSongSeedReference({track}, {YOUTUBE_API_KEY: 'yt', CYANITE_ACCESS_TOKEN: 'token'}, fetchMock as typeof fetch, {cachePath});
     const cachedFetch = jest.fn()
       .mockImplementationOnce(youtubeFetches()[0])
       .mockImplementationOnce(youtubeFetches()[1]);

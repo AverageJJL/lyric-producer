@@ -20,6 +20,7 @@ export type PointerSession = {
   pointerId: number;
   originPageX: number;
   originPageY: number;
+  additive: boolean;
 };
 
 export type PointerLikeEvent = {
@@ -64,7 +65,7 @@ export type BlockPointerDragConfig = {
   isDraggingRef: {current: boolean};
   sessionRef: {current: PointerSession | null};
   preserveSelectionOnPointerDown?: boolean;
-  onSelectBlock: (blockId: string, options?: {additive?: boolean}) => void;
+  onSelectBlock: (blockId: string, options?: {additive?: boolean; openEditor?: boolean}) => void;
   onDraggingChange: (isDragging: boolean) => void;
   onMoveBlock: (blockId: string, startBeat: number, trackId: string) => void;
   onResizeBlock: (blockId: string, startBeat: number, lengthBeats: number) => void;
@@ -251,20 +252,21 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
       return;
     }
 
+    const additive = Boolean(pointer.ctrlKey || pointer.metaKey || pointer.shiftKey);
     config.sessionRef.current = {
       mode,
       pointerId: pointer.pointerId,
       originPageX: pointer.pageX,
       originPageY: pointer.pageY,
+      additive,
     };
     config.dragStartXRef.current = config.block.startBeat * pixelsPerBeat(config);
     config.dragStartBeatRef.current = config.block.startBeat;
     config.dragStartLengthRef.current = config.block.lengthBeats;
     config.dragStartTrackIndexRef.current = Math.max(0, config.trackIds.indexOf(config.block.trackId));
     config.isDraggingRef.current = true;
-    const additive = Boolean(pointer.ctrlKey || pointer.metaKey || pointer.shiftKey);
     if (!config.preserveSelectionOnPointerDown || additive) {
-      config.onSelectBlock(config.block.id, {additive});
+      config.onSelectBlock(config.block.id, {additive, openEditor: false});
     }
     config.onDraggingChange(true);
   };
@@ -316,6 +318,9 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
     const commitDx = pointer.pageX - session.originPageX;
     const commitDy = pointer.pageY - session.originPageY;
     commitDrag(config, session.mode, commitDx, commitDy);
+    if (session.mode === 'move' && !session.additive && Math.hypot(commitDx, commitDy) < 4) {
+      config.onSelectBlock(config.block.id, {openEditor: true});
+    }
     cleanupSession();
   };
 
