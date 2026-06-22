@@ -14,6 +14,7 @@ const ASYNC_REQUIRED_COMMANDS = new Set([
   'transport_stop',
   'transport_play',
   'upsert_audio_clip',
+  'upsert_audio_clips_batch',
 ]);
 
 declare global {

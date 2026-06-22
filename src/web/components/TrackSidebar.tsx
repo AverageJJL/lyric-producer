@@ -16,6 +16,7 @@ import {TrackSidebarRow} from './TrackSidebarRow';
 
 type TrackSidebarProps = {
   width: number;
+  rightOverlayInset?: number;
   onWidthChange: (width: number) => void;
   verticalScrollRef: React.RefObject<HTMLDivElement | null>;
   onSidebarWheel: (event: React.WheelEvent<HTMLDivElement>) => void;
@@ -66,6 +67,7 @@ type TrackSidebarProps = {
 
 export function TrackSidebar({
   width,
+  rightOverlayInset = 0,
   onWidthChange,
   verticalScrollRef,
   onSidebarWheel,
@@ -243,6 +245,7 @@ export function TrackSidebar({
           playheadBeat={detailPlayheadBeat}
           isPlaying={isPlaying}
           anchor={detailAnchor}
+          rightOverlayInset={rightOverlayInset}
           ignoreOutsideCloseRef={ignoreOutsideCloseRef}
           onClose={() => setDetailTrackId(null)}
           onMoveTrack={onMoveTrack}

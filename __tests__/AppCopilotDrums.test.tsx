@@ -97,8 +97,8 @@ test('renders drum pattern options, previews natively, and imports a step sequen
   });
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Make a drum beat'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 

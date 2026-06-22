@@ -100,10 +100,15 @@ function assertMacPackaging() {
   }
   const hasSampleMetadata = Array.isArray(build.extraResources)
     && build.extraResources.some(item => packageResourceMatches(item, 'assets/sample-library', 'assets/sample-library'));
+  const hasSongSeedMetadata = Array.isArray(build.extraResources)
+    && build.extraResources.some(item => packageResourceMatches(item, 'assets/song-seed', 'assets/song-seed'));
   const bundlesAllAssets = Array.isArray(build.extraResources)
     && build.extraResources.some(item => packageResourceMatches(item, 'assets', 'assets'));
   if (!hasSampleMetadata) {
     errors.push('macOS package must copy sample-library metadata as extra resources.');
+  }
+  if (!hasSongSeedMetadata) {
+    errors.push('macOS package must copy song-seed metadata as extra resources.');
   }
   if (bundlesAllAssets) {
     errors.push('macOS package must not copy the full assets folder because sample audio is downloadable.');
@@ -124,6 +129,11 @@ function assertMacPackaging() {
     errors,
     'assets/sample-library/cc0-core.catalog.json',
     'Sample library metadata missing',
+  );
+  requirePath(
+    errors,
+    'assets/song-seed/reference-cache.seed.json',
+    'Song seed reference cache metadata missing',
   );
   requirePath(errors, 'assets/instruments', 'Bundled instrument assets missing');
 

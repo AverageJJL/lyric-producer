@@ -83,6 +83,7 @@ describe('apc virtual tree + agent read tools', () => {
     window.audioEngine = undefined;
     const tree = buildApcVirtualTree(captureProjectSnapshot());
     expect(tree.fingerprint).toBe(snapshotFingerprint(captureProjectSnapshot()));
+    expect(tree.fingerprint).toHaveLength(20);
   });
 
   it('lists files and filters by glob', () => {
@@ -128,6 +129,7 @@ describe('apc virtual tree + agent read tools', () => {
 
     expect(tree.files['copilot.json']).toBeUndefined();
     expect(tree.index.some(entry => entry.path === 'copilot.json')).toBe(false);
+    expect(tree.fingerprint).not.toContain('Private old chat');
   });
 
   it('returns an error for an unknown path', () => {

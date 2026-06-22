@@ -68,6 +68,7 @@ export function dispatchToolCalls(toolCalls: ToolCall[], ctx: DispatchContext): 
   let terminalAnswer: CopilotAgentAnswer | null = null;
   let terminalText: string | null = null;
   let budgetHit = false;
+  let patchRejected = false;
 
   for (const call of toolCalls) {
     const name = call?.function?.name as string;
@@ -89,6 +90,10 @@ export function dispatchToolCalls(toolCalls: ToolCall[], ctx: DispatchContext): 
       if (problems.length === 0) {
         terminalPatch = patch;
       } else {
+        patchRejected = true;
+        terminalPatch = null;
+        terminalAnswer = null;
+        terminalText = null;
         ctx.messages.push({
           role: 'tool',
           tool_call_id: call.id,
@@ -101,6 +106,16 @@ export function dispatchToolCalls(toolCalls: ToolCall[], ctx: DispatchContext): 
     if (name === 'answer_copilot') {
       const parsed = rawAnswerFromArgs(args);
       if (parsed.ok) {
+        if (patchRejected) {
+          ctx.messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: JSON.stringify({
+              error: 'A co-emitted patch was rejected. Correct the patch or explain the failure; do not claim the edit is ready.',
+            }),
+          });
+          continue;
+        }
         terminalAnswer = parsed.answer;
         terminalText = parsed.text;
       } else {

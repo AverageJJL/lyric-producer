@@ -276,12 +276,31 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
       return;
     }
 
+    if (pointer.buttons !== undefined && (pointer.buttons & 1) === 0) {
+      cleanupSession({resetVisuals: true});
+      return;
+    }
+
     const dx = pointer.pageX - session.originPageX;
     const dy = pointer.pageY - session.originPageY;
     applyDragVisuals(config, session.mode, dx, dy);
   };
 
-  const cleanupSession = () => {
+  const resetVisuals = () => {
+    const ppb = pixelsPerBeat(config);
+    config.metrics.left.setValue(config.dragStartBeatRef.current * ppb);
+    config.metrics.width.setValue(
+      blockResizeVisualWidthPx(config.block, config.dragStartLengthRef.current, ppb),
+    );
+  };
+
+  const cleanupSession = (options?: {resetVisuals?: boolean}) => {
+    if (!config.sessionRef.current) {
+      return;
+    }
+    if (options?.resetVisuals) {
+      resetVisuals();
+    }
     config.sessionRef.current = null;
     config.isDraggingRef.current = false;
     config.onDraggingChange(false);
@@ -306,13 +325,14 @@ export function createBlockPointerHandlers(config: BlockPointerDragConfig) {
     if (!session || pointer.pointerId !== session.pointerId) {
       return;
     }
-    cleanupSession();
+    cleanupSession({resetVisuals: true});
   };
 
   return {
     onPointerMove,
     onPointerUp: finish,
     onPointerCancel: cancel,
+    cancelActiveSession: () => cleanupSession({resetVisuals: true}),
     onMovePointerDown: (event: PointerEvent) => beginSession('move', event),
     onResizeLeftPointerDown: (event: PointerEvent) =>
       beginSession(isMoveLeftEdgeBlock(config.block) ? 'move' : 'resize-left', event),

@@ -24,8 +24,8 @@ import {
   emptyCopilotChatProjectState,
   type CopilotChatProjectState,
 } from '../assistant/copilotChatHistory';
-import {canonicalJsonStringify} from './canonicalJson';
 import {mediaReferencesFromBlocks} from './mediaReferences';
+import {canonicalJsonFingerprint} from './stableHash';
 import {DEFAULT_SNAP_GRID, type SnapGrid} from '../ui/snapGrid';
 import {DEFAULT_CYCLE_END_BEAT, DEFAULT_CYCLE_START_BEAT} from '../transport/cycleRange';
 import {
@@ -248,7 +248,7 @@ export function captureProjectSnapshot(): ProjectSnapshot {
 }
 
 export function snapshotFingerprint(snapshot: ProjectSnapshot): string {
-  return canonicalJsonStringify(snapshot);
+  return canonicalJsonFingerprint(snapshot);
 }
 
 export function emptyProjectSnapshot(): ProjectSnapshot {

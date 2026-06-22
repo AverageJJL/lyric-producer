@@ -14,16 +14,16 @@ function response(body: unknown, ok = true, status = 200): Response {
 }
 
 describe('copilot compaction IPC helper', () => {
-  it('builds a no-tools Gemini summarization request', () => {
+  it('builds a no-tools summarization request', () => {
     const body = copilotCompactionRequestBody({
       conversationSummary: 'Existing durable memory.',
       history: [{role: 'user', content: 'Make a piano idea.'}],
       currentUserMessage: 'Continue this.',
       uiState: {rightPanel: 'copilot'},
       context: {project: {bpm: 120}},
-    }, 'google/gemini-3.1-pro-preview-customtools');
+    }, 'openai/gpt-4o-mini');
 
-    expect(body.model).toBe('google/gemini-3.1-pro-preview-customtools');
+    expect(body.model).toBe('openai/gpt-4o-mini');
     expect(body.max_tokens).toBe(COPILOT_SUMMARY_TARGET_TOKENS);
     expect(body.stream).toBe(false);
     expect(body).not.toHaveProperty('tools');
@@ -40,7 +40,7 @@ describe('copilot compaction IPC helper', () => {
     await expect(askOpenRouterCopilotCompaction({
       history: [{role: 'user', content: 'Create a piano track.'}],
     }, {
-      env: {OPENROUTER_API_KEY: 'sk-test', AI_PRODUCER_MODEL: 'google/gemini-3.1-pro-preview-customtools'},
+      env: {OPENROUTER_API_KEY: 'sk-test', AI_PRODUCER_MODEL: 'openai/gpt-4o-mini'},
       fetchImpl,
     })).resolves.toEqual({ok: true, summary: '## User Goals\nCreate MIDI sketches.'});
 

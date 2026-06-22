@@ -428,6 +428,11 @@ class AudioEngineController::Impl {
         return commandResultToJson(result);
       }
 
+      if (command == "upsert_audio_clips_batch") {
+        const auto result = handleUpsertAudioClipsBatch(*engine_, *edit_, projectState_, payloadJson);
+        return commandResultToJson(result);
+      }
+
       if (command == "set_drum_pattern_step") {
         const auto result = handleSetDrumPatternStep(*edit_, projectState_, payloadJson);
         return commandResultToJson(result);

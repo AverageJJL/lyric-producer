@@ -289,7 +289,7 @@ export function DawWorkspaceApp({projectFiles}: DawWorkspaceAppProps) {
         onDuplicateMediaSource: audioImport.duplicateAudioSource, onCompLooperLayer: compLooperLayer,
         onCompRecordingTake: compRecordingTake, onEditorActiveChange: handleEditorActiveChange,
         onCopilotActions: copilotGuidance.handleCopilotActions, onMasterVolumeChange: setMasterVolumeDb,
-        onMasterPanChange: setMasterPan, onOpenFx: openFxWindow, onClearGuide: copilotGuidance.clearGuide,
+        onMasterPanChange: setMasterPan, onOpenFx: openFxWindow,
         onOpenSettings: () => setIsSettingsOpen(true), onCloseSettings: () => setIsSettingsOpen(false),
         onToggleTakeFolder: handleToggleTakeFolder,
       }}

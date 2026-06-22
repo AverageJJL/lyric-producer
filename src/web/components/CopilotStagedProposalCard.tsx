@@ -1,62 +1,67 @@
 import {useCopilotStagingController} from './useCopilotStagingController';
+import {useNativeAudioSyncStatusStore} from '../../store/nativeAudioSyncStatus';
 
 /**
- * Cursor-style preview card for an AI-proposed edit set. Each option can be STAGED
- * directly into the live workspace (visible + audible under normal transport); the
- * user listens, swaps to another option, rejects (revert), or accepts (commit as one
- * undoable step). Renders nothing when no proposal is pending.
+ * Compact proposal card for an already-staged AI edit. Build proposals auto-stage as
+ * soon as they arrive, so this card only has to explain what changed and expose the
+ * decision. Multi-option proposals can still swap which edit is live.
  */
 export function CopilotStagedProposalCard() {
-  const {stagedProposal, activeStagedEditId, stagePending, stage, accept, reject} =
+  const {stagedProposal, activeStagedEditId, stage, accept, reject} =
     useCopilotStagingController();
+  const isPreparingAudioPreview = useNativeAudioSyncStatusStore(
+    state => state.preparingAudioPreviewCount > 0,
+  );
 
   if (!stagedProposal) {
     return null;
   }
 
+  const activeEdit =
+    stagedProposal.edits.find(edit => edit.id === activeStagedEditId) ??
+    stagedProposal.edits[0];
+  const hasMultipleEdits = stagedProposal.edits.length > 1;
+
   return (
-    <article className="copilot-message assistant copilot-staged-proposal">
-      <span className="copilot-message-role">Copilot</span>
+    <article className="copilot-message assistant copilot-staged-proposal" aria-label="Co-producer proposed edit">
+      <span className="copilot-message-role">Co-producer</span>
       <p className="copilot-staged-proposal__title">{stagedProposal.title}</p>
-      {stagePending ? (
-        <p className="copilot-staged-proposal__banner">
-          Staged into the workspace — play to listen, then Accept or Reject.
-        </p>
+      {isPreparingAudioPreview ? (
+        <p className="copilot-staged-proposal__status">Preparing audio preview...</p>
       ) : null}
-      <ul className="copilot-staged-proposal__options">
-        {stagedProposal.edits.map(edit => {
-          const isStaged = edit.id === activeStagedEditId;
-          return (
-            <li
-              key={edit.id}
-              className={`copilot-staged-proposal__option${isStaged ? ' is-staged' : ''}`}
-            >
-              <div className="copilot-staged-proposal__label">{edit.label}</div>
-              {edit.summary.length > 0 ? (
-                <ul className="copilot-staged-proposal__summary">
-                  {edit.summary.map((line, index) => (
-                    <li key={index}>{line}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {isStaged ? (
-                <div className="copilot-staged-proposal__actions">
-                  <button type="button" className="copilot-accept" onClick={accept}>
-                    Accept
-                  </button>
-                  <button type="button" className="copilot-reject" onClick={reject}>
-                    Reject
-                  </button>
-                </div>
-              ) : (
-                <button type="button" className="copilot-stage" onClick={() => stage(edit)}>
-                  {stagePending ? 'Swap to this' : 'Stage & listen'}
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {activeEdit?.summary.length ? (
+        <ul className="copilot-staged-proposal__summary">
+          {activeEdit.summary.map((line, index) => (
+            <li key={index}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
+      {hasMultipleEdits ? (
+        <div className="copilot-staged-proposal__option-controls" aria-label="Proposal options">
+          {stagedProposal.edits.map(edit => {
+            const isActive = edit.id === activeEdit?.id;
+            return (
+              <button
+                key={edit.id}
+                type="button"
+                className={`copilot-option${isActive ? ' is-active' : ''}`}
+                onClick={() => stage(edit)}
+                disabled={isActive}
+              >
+                Use {edit.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      <div className="copilot-staged-proposal__actions">
+        <button type="button" className="copilot-accept" onClick={accept}>
+          Accept
+        </button>
+        <button type="button" className="copilot-reject" onClick={reject}>
+          Reject
+        </button>
+      </div>
     </article>
   );
 }

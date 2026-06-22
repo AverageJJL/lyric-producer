@@ -101,29 +101,102 @@ function analysis(): SongSeedReferenceAnalysis {
   };
 }
 
+function seedAnalysis(libraryTrackId: string, referenceSource: SongSeedReferenceSource): SongSeedReferenceAnalysis {
+  return {...analysis(), libraryTrackId, source: referenceSource, title: referenceSource.title};
+}
+
+function writeSeedCache(
+  seedPath: string,
+  entries: Array<{key: string; analysisId: string; analysis: SongSeedReferenceAnalysis}>,
+): void {
+  const analyses: Record<string, SongSeedReferenceAnalysis> = {};
+  const keyedEntries: Record<string, {savedAt: string; analysisId: string}> = {};
+  for (const entry of entries) {
+    analyses[entry.analysisId] = entry.analysis;
+    keyedEntries[entry.key] = {savedAt: '2026-06-20T00:00:00.000Z', analysisId: entry.analysisId};
+  }
+  fs.mkdirSync(path.dirname(seedPath), {recursive: true});
+  fs.writeFileSync(seedPath, JSON.stringify({version: 1, analyses, entries: keyedEntries}), 'utf8');
+}
+
 describe('credit-safe Cyanite reference flow', () => {
   let root: string;
   let cachePath: string;
+  let seedCachePath: string;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'musicapp-reference-cache-'));
     cachePath = path.join(root, 'cache.json');
+    seedCachePath = path.join(root, 'seed.json');
   });
 
   afterEach(() => {
     fs.rmSync(root, {recursive: true, force: true});
   });
 
-  it('uses the local cache without calling Cyanite enqueue', async () => {
+  it('uses the local cache without calling providers', async () => {
     writeReferenceCache(cachePath, {track}, source, analysis());
-    const fetchMock = jest.fn()
-      .mockImplementationOnce(youtubeFetches()[0])
-      .mockImplementationOnce(youtubeFetches()[1]);
+    const fetchMock = jest.fn();
 
     const result = await analyzeSongSeedReference({track}, {YOUTUBE_API_KEY: 'yt'}, fetchMock as typeof fetch, {cachePath});
 
     expect(result).toMatchObject({ok: true, cacheStatus: 'cache'});
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('uses bundled Baby seed analysis before YouTube or Cyanite calls', async () => {
+    const babySource = {
+      kind: 'youtube' as const,
+      url: 'https://www.youtube.com/watch?v=kffacxfA7G4',
+      videoId: 'kffacxfA7G4',
+      title: 'Justin Bieber - Baby ft. Ludacris',
+      channelTitle: 'JustinBieberVEVO',
+      confidence: 0.72,
+    };
+    writeSeedCache(seedCachePath, [
+      {key: 'song:baby:justin bieber', analysisId: 'baby', analysis: seedAnalysis('seed-baby', babySource)},
+    ]);
+    const fetchMock = jest.fn();
+
+    const result = await analyzeSongSeedReference({title: 'Baby', artist: 'Justin Bieber'}, {}, fetchMock as typeof fetch, {cachePath, seedCachePath});
+
+    expect(result).toMatchObject({ok: true, cacheStatus: 'cache', analysis: {libraryTrackId: 'seed-baby', source: {videoId: 'kffacxfA7G4'}}});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('uses bundled Blank Space seed analysis before YouTube or Cyanite calls', async () => {
+    const blankSpaceSource = {
+      kind: 'youtube' as const,
+      url: 'https://www.youtube.com/watch?v=TOanjmNxKEI',
+      videoId: 'TOanjmNxKEI',
+      title: 'Taylor Swift - Blank Space (Official Video) | Espa\u00f1ol & English',
+      channelTitle: 'w i l d e s t d r e a m s',
+      confidence: 0.7,
+    };
+    writeSeedCache(seedCachePath, [
+      {key: 'song:blank space:taylor swift', analysisId: 'blank-space', analysis: seedAnalysis('seed-blank-space', blankSpaceSource)},
+    ]);
+    const fetchMock = jest.fn();
+
+    const result = await analyzeSongSeedReference({title: 'Blank Space', artist: 'Taylor Swift'}, {}, fetchMock as typeof fetch, {cachePath, seedCachePath});
+
+    expect(result).toMatchObject({ok: true, cacheStatus: 'cache', analysis: {libraryTrackId: 'seed-blank-space', source: {videoId: 'TOanjmNxKEI'}}});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('prefers writable cache entries over bundled seed entries', async () => {
+    const seedSource = {...source, videoId: 'seed-video'};
+    const writableSource = {...source, videoId: 'writable-video'};
+    writeSeedCache(seedCachePath, [
+      {key: 'song:halo:beyonce', analysisId: 'seed-halo', analysis: seedAnalysis('seed-halo', seedSource)},
+    ]);
+    writeReferenceCache(cachePath, {track}, writableSource, {...analysis(), libraryTrackId: 'writable-halo'});
+    const fetchMock = jest.fn();
+
+    const result = await analyzeSongSeedReference({track}, {}, fetchMock as typeof fetch, {cachePath, seedCachePath});
+
+    expect(result).toMatchObject({ok: true, cacheStatus: 'cache', analysis: {libraryTrackId: 'writable-halo', source: {videoId: 'writable-video'}}});
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reuses a finished Cyanite library track before asking for a credit', async () => {
@@ -171,6 +244,6 @@ describe('credit-safe Cyanite reference flow', () => {
 
     expect(result).toMatchObject({ok: true, cacheStatus: 'analyzed', analysis: {libraryTrackId: 'cyanite-new'}});
     expect(cached).toMatchObject({ok: true, cacheStatus: 'cache', analysis: {libraryTrackId: 'cyanite-new'}});
-    expect(cachedFetch).toHaveBeenCalledTimes(2);
+    expect(cachedFetch).not.toHaveBeenCalled();
   });
 });

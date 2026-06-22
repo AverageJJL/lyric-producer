@@ -12,11 +12,11 @@ import type {SnapGrid} from '../../ui/snapGrid';
 import {
   createBlockPointerHandlers,
   isMoveLeftEdgeBlock,
-  usesAudioTrimResize,
   usesOverlayClipShell,
   type BlockDragMode,
   type PointerSession,
 } from '../../ui/timelineBlockPointerDrag';
+import {previewAudioSourceOffsetBeats} from '../../ui/timelineClipPreview';
 import type {TimelineTrackLaneLayout} from '../../ui/timelineTrackLanes';
 import {ClipContent, type ClipPreviewState} from './ClipContent';
 import {clearImportedBlockPointerDragSuppression} from '../../ui/timelineImportDragSuppression';
@@ -165,7 +165,7 @@ export function TimelineBlock({
     setLeft(block.startBeat * pixelsPerBeat);
     setWidth(storeWidthPx);
     dragStartLength.current = displayLengthBeats;
-  }, [block.startBeat, displayLengthBeats, pixelsPerBeat, storeWidthPx]);
+  }, [block.startBeat, displayLengthBeats, isDragging, pixelsPerBeat, storeWidthPx]);
 
   useEffect(() => {
     if (!isSelected) {
@@ -238,6 +238,35 @@ export function TimelineBlock({
       trackIds,
     ],
   );
+
+  useEffect(() => {
+    if (!isDragging) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => pointerHandlers.onPointerMove(event);
+    const handlePointerUp = (event: PointerEvent) => pointerHandlers.onPointerUp(event);
+    const handlePointerCancel = (event: PointerEvent) => pointerHandlers.onPointerCancel(event);
+    const cancelDrag = () => pointerHandlers.cancelActiveSession();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') {
+        cancelDrag();
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerup', handlePointerUp, true);
+    window.addEventListener('pointercancel', handlePointerCancel, true);
+    window.addEventListener('blur', cancelDrag);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerup', handlePointerUp, true);
+      window.removeEventListener('pointercancel', handlePointerCancel, true);
+      window.removeEventListener('blur', cancelDrag);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isDragging, pointerHandlers]);
 
   const startPointer = (
     event: React.PointerEvent<HTMLElement>,
@@ -443,9 +472,11 @@ export function TimelineBlock({
     ? {
         lengthBeats: previewLengthBeats,
         startBeat: previewStartBeat,
-        sourceOffsetBeats: usesAudioTrimResize(block)
-          ? (block.sourceOffsetBeats ?? 0) + (previewStartBeat - block.startBeat)
-          : block.sourceOffsetBeats,
+        midiTrimStartBeat:
+          block.type === 'midi' && dragMode === 'resize-left'
+            ? previewStartBeat
+            : undefined,
+        sourceOffsetBeats: previewAudioSourceOffsetBeats(block, dragMode, previewStartBeat),
         drumDimFromBeat:
           isDrumPatternBlock(block) && dragMode === 'resize-right'
             ? dragStartLength.current
@@ -461,6 +492,7 @@ export function TimelineBlock({
         onPointerMove={pointerHandlers.onPointerMove}
         onPointerUp={pointerHandlers.onPointerUp}
         onPointerCancel={pointerHandlers.onPointerCancel}
+        onLostPointerCapture={pointerHandlers.onPointerCancel}
         onPointerEnter={clearImportDragSuppressionWhenIdle}
         style={{top, left, width: displayWidthPx, height: blockHeight}}>
         <div
@@ -524,6 +556,7 @@ export function TimelineBlock({
       onPointerMove={pointerHandlers.onPointerMove}
       onPointerUp={pointerHandlers.onPointerUp}
       onPointerCancel={pointerHandlers.onPointerCancel}
+      onLostPointerCapture={pointerHandlers.onPointerCancel}
       onPointerEnter={clearImportDragSuppressionWhenIdle}
       style={{top, left, width, height: blockHeight, backgroundColor: block.color}}>
       {!readOnly ? (

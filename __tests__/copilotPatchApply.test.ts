@@ -6,6 +6,7 @@ import {DEFAULT_TIME_SIGNATURE} from '../src/store/projectMetadata';
 import {DEFAULT_SNAP_GRID} from '../src/ui/snapGrid';
 import {buildApcVirtualTree} from '../src/assistant/apcSourceTree';
 import {applyApcPatch, type ApcPatchTransaction} from '../src/assistant/copilotPatchApply';
+import {MAX_CREATED_AUDIO_CLIP_WAVEFORM_PEAKS} from '../src/assistant/copilotPatchMediaFields';
 
 jest.mock('../src/native/refreshPlayback', () => ({
   refreshPlaybackAndInstruments: jest.fn(),
@@ -132,6 +133,50 @@ describe('applyApcPatch', () => {
       expect(clip?.name).toBe('Lead Vocal');
       // Stripped field survived because it was re-attached from the full source.
       expect(clip?.waveformPeaks).toEqual([0.1, 0.2, 0.3]);
+      expect(clip?.absoluteAudioFilePath).toBe('/Users/secret/vox.wav');
+    }
+  });
+
+  it('caps copied waveform peaks for created audio slice clips', () => {
+    const {trackId} = setupProject();
+    const largePeaks = Array.from(
+      {length: MAX_CREATED_AUDIO_CLIP_WAVEFORM_PEAKS * 3},
+      (_, index) => (index % 9) / 8,
+    );
+    useDAWStore.setState(state => ({
+      blocks: state.blocks.map(block =>
+        block.id === 'clip-audio' ? {...block, waveformPeaks: largePeaks} : block,
+      ),
+    }));
+    const tree = buildApcVirtualTree(captureProjectSnapshot());
+    const patch: ApcPatchTransaction = {
+      schemaVersion: 1,
+      baseFingerprint: tree.fingerprint,
+      summary: 'Create a visible slice',
+      changes: [{
+        op: 'createFile',
+        path: 'clips/clip-slice.json',
+        content: JSON.stringify({
+          id: 'clip-slice',
+          trackId,
+          name: 'Slice',
+          startBeat: 0,
+          lengthBeats: 2,
+          type: 'audio',
+          color: '#64a5ff',
+          audioFilePath: 'imports/vox.wav',
+          sourceLengthBeats: 4,
+          sourceOffsetBeats: 0,
+        }),
+      }],
+    };
+
+    const result = applyApcPatch(patch);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const clip = result.snapshot.blocks.find(block => block.id === 'clip-slice');
+      expect(clip?.waveformPeaks).toHaveLength(MAX_CREATED_AUDIO_CLIP_WAVEFORM_PEAKS);
       expect(clip?.absoluteAudioFilePath).toBe('/Users/secret/vox.wav');
     }
   });

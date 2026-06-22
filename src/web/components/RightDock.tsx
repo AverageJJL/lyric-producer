@@ -46,7 +46,7 @@ const PANEL_TITLES: Record<RightPanelId, string> = {
   browser: 'Browser',
   audio: 'Audio',
   lyrics: 'Lyrics',
-  copilot: 'Copilot',
+  copilot: 'Co-producer',
 };
 
 export function RightDock({
@@ -94,7 +94,7 @@ export function RightDock({
   };
 
   return (
-    <aside className="right-dock" style={{width}} aria-label={PANEL_TITLES[panel]}>
+    <aside className="right-dock" data-panel={panel} style={{width}} aria-label={PANEL_TITLES[panel]}>
       <div
         className="right-dock-resize"
         onPointerDown={startResize}

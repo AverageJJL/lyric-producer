@@ -5,12 +5,19 @@ import type {
 import {CyaniteError} from './songSeedCyanite';
 import {findReusableCyaniteLibraryReference, getCyaniteWaveformUrl} from './songSeedCyaniteLibrary';
 import {analyzeCyaniteYouTubeReference} from './songSeedCyaniteYoutube';
-import {readReferenceCache, writeReferenceCache} from './songSeedReferenceCache';
+import {
+  readReferenceCache,
+  readReferenceCacheBySong,
+  readReferenceSeedCache,
+  readReferenceSeedCacheBySong,
+  writeReferenceCache,
+} from './songSeedReferenceCache';
 import {findYouTubeReference} from './songSeedYouTube';
 import {type FetchLike} from './songSeedUtils';
 
 export type SongSeedReferenceOptions = {
   cachePath?: string;
+  seedCachePath?: string;
 };
 
 export async function analyzeSongSeedReference(
@@ -19,12 +26,19 @@ export async function analyzeSongSeedReference(
   fetchImpl: FetchLike = fetch,
   options: SongSeedReferenceOptions = {},
 ): Promise<SongSeedReferenceAnalyzeResponse> {
+  const cachedBySong = readReferenceCacheBySong(options.cachePath, request)
+    ?? readReferenceSeedCacheBySong(options.seedCachePath, request);
+  if (cachedBySong) return {ok: true, analysis: cachedBySong, cacheStatus: 'cache'};
+
   const source = await findYouTubeReference(request, env, fetchImpl);
   if (!source.ok) {
     return source;
   }
-  const cached = readReferenceCache(options.cachePath, request, source.source);
+
+  const cached = readReferenceCache(options.cachePath, request, source.source)
+    ?? readReferenceSeedCache(options.seedCachePath, request, source.source);
   if (cached) return {ok: true, analysis: cached, cacheStatus: 'cache'};
+
   try {
     const reusable = await findReusableCyaniteLibraryReference(request, source.source, env, fetchImpl);
     if (reusable) {

@@ -5,7 +5,9 @@ import {
   sendNativeAudioCommandAsync,
 } from '../native/NativeAudioEngine';
 import {audioPathIsPlaybackReady} from '../native/audioPlaybackPreparation';
+import {coalesceAudioBatchPayloads, type CoalescedAudioBatchPayload} from '../native/audioBatchCoalescing';
 import {
+  batchableFileAudioClipPayload,
   nativeBlockFingerprint,
   shouldSyncFileAudioClip,
   upsertBlockToEngineAsync,
@@ -22,11 +24,15 @@ import {buildNativeTempoMapPayload} from '../native/tempoMapPayload';
 import {syncTrackInstruments} from '../native/syncTrackInstruments';
 import {activeTracks, playableTrackIds, playableTracks} from '../music/trackOrganization';
 import {suppressNativeBridgeSync} from './dawRecording';
+import {setNativeAudioPreviewPreparing} from './nativeAudioSyncStatus';
 import type {DAWBlock, DAWTrack} from './useDAWStore';
 import {useDAWStore} from './useDAWStore';
 
 const BLOCK_UPSERT_DEBOUNCE_MS = 200;
 const TRACK_MAPPING_DEBOUNCE_MS = 40;
+const AUDIO_BATCH_UPSERT_MIN_CLIPS = 4;
+const AUDIO_BATCH_COMMAND_CHUNK_SIZE = 1;
+const AUDIO_BATCH_COMMAND_CHUNK_DELAY_MS = 16;
 // Opening a saved project can make many clips dirty at once. File-backed audio
 // upserts are async, but the native engine still serializes media work; yielding
 // between clips keeps playback prep cooperative instead of one large burst.
@@ -41,6 +47,16 @@ const blockFingerprints = new Map<string, string>();
 let pendingProjectRestoreBlockSyncDeferral = 0;
 const projectRestoreDeferredAudioBlockIds = new Set<string>();
 let transportStartRequestId = 0;
+let nativeSyncGeneration = 0;
+const pendingAudioBatchPromises = new Set<Promise<void>>();
+const coalescedPlaybackIdsByBlockId = new Map<string, Set<string>>();
+const coalescedPlaybackMemberIdsByClipId = new Map<string, Set<string>>();
+
+type AudioBatchItem = {
+  block: DAWBlock;
+  payload: Record<string, unknown>;
+  fingerprint: string;
+};
 
 function clearPendingUpserts(): void {
   if (!upsertTimer) {
@@ -202,11 +218,193 @@ function markBlockSynced(block: DAWBlock): void {
   projectRestoreDeferredAudioBlockIds.delete(block.id);
 }
 
+function rememberCoalescedPlayback(groups: CoalescedAudioBatchPayload[]): void {
+  groups.forEach(group => {
+    if (!group.coalesced) {
+      return;
+    }
+    const clipId = String(group.payload.clipId ?? '');
+    if (!clipId) {
+      return;
+    }
+    const members = new Set(group.memberBlockIds);
+    coalescedPlaybackMemberIdsByClipId.set(clipId, members);
+    members.forEach(blockId => {
+      const existing = coalescedPlaybackIdsByBlockId.get(blockId) ?? new Set<string>();
+      existing.add(clipId);
+      coalescedPlaybackIdsByBlockId.set(blockId, existing);
+    });
+  });
+}
+
+function clearCoalescedPlaybackForBlockIds(blockIds: Set<string>): Set<string> {
+  const affectedBlockIds = new Set<string>();
+  const clipIds = new Set<string>();
+  blockIds.forEach(blockId => {
+    coalescedPlaybackIdsByBlockId.get(blockId)?.forEach(clipId => clipIds.add(clipId));
+  });
+  clipIds.forEach(clipId => {
+    sendNativeAudioCommand('delete_clip', {clipId});
+    coalescedPlaybackMemberIdsByClipId.get(clipId)?.forEach(blockId => {
+      affectedBlockIds.add(blockId);
+      coalescedPlaybackIdsByBlockId.get(blockId)?.delete(clipId);
+      if (coalescedPlaybackIdsByBlockId.get(blockId)?.size === 0) {
+        coalescedPlaybackIdsByBlockId.delete(blockId);
+      }
+    });
+    coalescedPlaybackMemberIdsByClipId.delete(clipId);
+  });
+  return affectedBlockIds;
+}
+
+function nextNativeSyncGeneration(): number {
+  nativeSyncGeneration += 1;
+  return nativeSyncGeneration;
+}
+
+function batchableDirtyItems(dirtyIds: Set<string>, blocks: DAWBlock[]): AudioBatchItem[] {
+  const items: AudioBatchItem[] = [];
+  dirtyIds.forEach(blockId => {
+    const block = blocks.find(item => item.id === blockId);
+    if (!block) {
+      return;
+    }
+    const payload = batchableFileAudioClipPayload(block);
+    if (payload) {
+      items.push({block, payload, fingerprint: nativeBlockFingerprint(block)});
+    }
+  });
+  return items;
+}
+
+function batchPlaybackIdsByBlockId(groups: CoalescedAudioBatchPayload[]): Map<string, Set<string>> {
+  const byBlockId = new Map<string, Set<string>>();
+  groups.forEach(group => {
+    if (!group.coalesced) {
+      return;
+    }
+    const clipId = String(group.payload.clipId ?? '');
+    if (!clipId) {
+      return;
+    }
+    group.memberBlockIds.forEach(blockId => {
+      const existing = byBlockId.get(blockId) ?? new Set<string>();
+      existing.add(clipId);
+      byBlockId.set(blockId, existing);
+    });
+  });
+  return byBlockId;
+}
+
+function waitForNextAudioBatchChunk(): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, AUDIO_BATCH_COMMAND_CHUNK_DELAY_MS);
+  });
+}
+
+function healStaleAudioBatch(
+  items: AudioBatchItem[],
+  coalesced: CoalescedAudioBatchPayload[],
+): void {
+  const {blocks} = useDAWStore.getState();
+  const playbackIdsByBlockId = batchPlaybackIdsByBlockId(coalesced);
+  items.forEach(item => {
+    const current = blocks.find(block => block.id === item.block.id);
+    if (!current) {
+      playbackIdsByBlockId.get(item.block.id)?.forEach(clipId => {
+        sendNativeAudioCommand('delete_clip', {clipId});
+      });
+      sendNativeAudioCommand('delete_clip', {clipId: item.block.id});
+      blockFingerprints.delete(item.block.id);
+      return;
+    }
+    if (nativeBlockFingerprint(current) !== item.fingerprint) {
+      clearCoalescedPlaybackForBlockIds(new Set([current.id]));
+      upsertBlockToEngineAsync(current);
+      markBlockSynced(current);
+    }
+  });
+}
+
+async function sendCoalescedAudioBatchChunks(
+  coalesced: CoalescedAudioBatchPayload[],
+  items: AudioBatchItem[],
+  generation: number,
+): Promise<void> {
+  for (let index = 0; index < coalesced.length; index += AUDIO_BATCH_COMMAND_CHUNK_SIZE) {
+    if (generation !== nativeSyncGeneration) {
+      healStaleAudioBatch(items, coalesced);
+      return;
+    }
+
+    const chunk = coalesced.slice(index, index + AUDIO_BATCH_COMMAND_CHUNK_SIZE);
+    await sendNativeAudioCommandAsync('upsert_audio_clips_batch', {
+      clips: chunk.map(item => item.payload),
+    });
+
+    if (generation !== nativeSyncGeneration) {
+      healStaleAudioBatch(items, coalesced);
+      return;
+    }
+
+    if (index + AUDIO_BATCH_COMMAND_CHUNK_SIZE < coalesced.length) {
+      await waitForNextAudioBatchChunk();
+    }
+  }
+}
+
+function queueAudioBatchUpsert(items: AudioBatchItem[], generation: number): void {
+  if (items.length === 0) {
+    return;
+  }
+  clearCoalescedPlaybackForBlockIds(new Set(items.map(item => item.block.id)));
+  const coalesced = coalesceAudioBatchPayloads(items.map(item => ({
+    blockId: item.block.id,
+    payload: item.payload,
+  })));
+  rememberCoalescedPlayback(coalesced);
+  items.forEach(item => markBlockSynced(item.block));
+  setNativeAudioPreviewPreparing(true);
+  const promise = sendCoalescedAudioBatchChunks(coalesced, items, generation)
+    .finally(() => {
+      pendingAudioBatchPromises.delete(promise);
+      setNativeAudioPreviewPreparing(false);
+      syncLoopRange();
+    });
+  pendingAudioBatchPromises.add(promise);
+}
+
+function waitForPendingAudioBatches(): Promise<void> {
+  return Promise.all([...pendingAudioBatchPromises]).then(() => undefined);
+}
+
 function ensureArrangementSynced(blocks: DAWBlock[], state = useDAWStore.getState()): void {
   syncTempoMap(state);
+  const dirtyIds = new Set<string>();
   blocks.forEach(block => {
     const fingerprint = nativeBlockFingerprint(block);
     if (blockFingerprints.get(block.id) === fingerprint) {
+      return;
+    }
+    dirtyIds.add(block.id);
+  });
+  if (dirtyIds.size === 0) {
+    syncLoopRange(state);
+    return;
+  }
+
+  clearPendingUpserts();
+  const generation = nativeSyncGeneration;
+  const batchItems = batchableDirtyItems(dirtyIds, blocks);
+  if (batchItems.length >= AUDIO_BATCH_UPSERT_MIN_CLIPS) {
+    batchItems.forEach(item => dirtyIds.delete(item.block.id));
+    queueAudioBatchUpsert(batchItems, generation);
+  }
+
+  dirtyIds.forEach(blockId => {
+    const block = blocks.find(item => item.id === blockId);
+    if (!block) {
+      blockFingerprints.delete(blockId);
       return;
     }
     upsertBlockToEngineAsync(block);
@@ -216,12 +414,72 @@ function ensureArrangementSynced(blocks: DAWBlock[], state = useDAWStore.getStat
 }
 
 function deleteBlockImmediate(block: DAWBlock): void {
+  clearCoalescedPlaybackForBlockIds(new Set([block.id]));
   sendNativeAudioCommand('delete_clip', {clipId: block.id});
   blockFingerprints.delete(block.id);
 }
 
-function flushScheduledUpserts(dirtyIds: Set<string>): void {
+export function deleteNativePlaybackForBlockIdsNow(blockIds: Iterable<string>): void {
+  const ids = new Set(blockIds);
+  if (ids.size === 0) {
+    return;
+  }
+  ids.forEach(blockId => {
+    clearCoalescedPlaybackForBlockIds(new Set([blockId]));
+    sendNativeAudioCommand('delete_clip', {clipId: blockId});
+    blockFingerprints.delete(blockId);
+  });
+  syncLoopRange();
+}
+
+export function cancelPendingNativePlaybackForBlockIds(blockIds: Iterable<string>): void {
+  const ids = new Set(blockIds);
+  if (ids.size === 0) {
+    return;
+  }
+  clearPendingUpserts();
+  nextNativeSyncGeneration();
+  deleteNativePlaybackForBlockIdsNow(ids);
+}
+
+export function syncNativePlaybackForBlockIdsNow(blockIds: Iterable<string>): void {
+  const ids = new Set(blockIds);
+  if (ids.size === 0) {
+    return;
+  }
+  clearPendingUpserts();
+  const generation = nextNativeSyncGeneration();
   const {blocks} = useDAWStore.getState();
+  const batchItems = batchableDirtyItems(ids, blocks);
+  if (batchItems.length >= AUDIO_BATCH_UPSERT_MIN_CLIPS) {
+    batchItems.forEach(item => ids.delete(item.block.id));
+    queueAudioBatchUpsert(batchItems, generation);
+  }
+
+  ids.forEach(blockId => {
+    const block = blocks.find(item => item.id === blockId);
+    if (block) {
+      upsertBlockImmediate(block);
+      return;
+    }
+    sendNativeAudioCommand('delete_clip', {clipId: blockId});
+    blockFingerprints.delete(blockId);
+  });
+  syncLoopRange();
+}
+
+function flushScheduledUpserts(dirtyIds: Set<string>, generation: number): void {
+  if (generation !== nativeSyncGeneration) {
+    upsertTimer = null;
+    return;
+  }
+  const {blocks} = useDAWStore.getState();
+  const batchItems = batchableDirtyItems(dirtyIds, blocks);
+  if (batchItems.length >= AUDIO_BATCH_UPSERT_MIN_CLIPS) {
+    batchItems.forEach(item => dirtyIds.delete(item.block.id));
+    queueAudioBatchUpsert(batchItems, generation);
+  }
+
   let processed = 0;
   while (processed < BLOCK_UPSERT_CHUNK_SIZE && dirtyIds.size > 0) {
     const blockId = dirtyIds.values().next().value as string | undefined;
@@ -242,13 +500,19 @@ function flushScheduledUpserts(dirtyIds: Set<string>): void {
       continue;
     }
 
+    clearCoalescedPlaybackForBlockIds(new Set([blockId])).forEach(affectedId => {
+      if (affectedId !== blockId && blocks.some(item => item.id === affectedId)) {
+        blockFingerprints.delete(affectedId);
+        dirtyIds.add(affectedId);
+      }
+    });
     upsertBlockToEngineAsync(block);
     markBlockSynced(block);
   }
 
   if (dirtyIds.size > 0) {
     upsertTimer = setTimeout(
-      () => flushScheduledUpserts(dirtyIds),
+      () => flushScheduledUpserts(dirtyIds, generation),
       BLOCK_UPSERT_CHUNK_DELAY_MS,
     );
     return;
@@ -258,7 +522,7 @@ function flushScheduledUpserts(dirtyIds: Set<string>): void {
   syncLoopRange();
 }
 
-function scheduleUpserts(dirtyIds: Set<string>): void {
+function scheduleUpserts(dirtyIds: Set<string>, generation = nativeSyncGeneration): void {
   if (dirtyIds.size === 0) {
     return;
   }
@@ -268,7 +532,7 @@ function scheduleUpserts(dirtyIds: Set<string>): void {
   }
 
   upsertTimer = setTimeout(
-    () => flushScheduledUpserts(new Set(dirtyIds)),
+    () => flushScheduledUpserts(new Set(dirtyIds), generation),
     BLOCK_UPSERT_DEBOUNCE_MS,
   );
 }
@@ -289,6 +553,7 @@ function excludeRecordingBlockFromDirty(
 }
 
 function upsertBlockImmediate(block: DAWBlock): void {
+  clearCoalescedPlaybackForBlockIds(new Set([block.id]));
   upsertBlockToEngineAsync(block);
   markBlockSynced(block);
 }
@@ -314,6 +579,10 @@ async function sendTransportStartAsync(
   deferredPlayBlockIds: Set<string>,
 ): Promise<void> {
   const requestId = ++transportStartRequestId;
+  await waitForPendingAudioBatches();
+  if (requestId !== transportStartRequestId || !useDAWStore.getState().isPlaying) {
+    return;
+  }
   let response = await sendNativeAudioCommandAsync('transport_play', payload);
   if (requestId !== transportStartRequestId || !useDAWStore.getState().isPlaying) {
     return;
@@ -452,6 +721,7 @@ export function useDAWNativeBridge(): void {
         const prevPlayableIds = playableTrackIds(prevState.tracks);
         const nextPlayableIds = playableTrackIds(nextState.tracks);
         const playableOrderChanged = trackOrderIsDifferent(prevState.tracks, nextState.tracks);
+        const blocksChangedWithTracks = nextState.blocks !== prevState.blocks;
         const newlyDisabledIds = [...prevPlayableIds].filter(trackId => !nextPlayableIds.has(trackId));
         const newlyEnabledIds = [...nextPlayableIds].filter(trackId => !prevPlayableIds.has(trackId));
 
@@ -463,6 +733,9 @@ export function useDAWNativeBridge(): void {
             .filter(block => newlyDisabledIds.includes(block.trackId))
             .forEach(deleteBlockImmediate);
           scheduleTrackMapping(nextState.tracks, () => {
+            if (blocksChangedWithTracks) {
+              return;
+            }
             if (playableOrderChanged) {
               nextState.blocks
                 .filter(block => nextPlayableIds.has(block.trackId))
@@ -481,6 +754,7 @@ export function useDAWNativeBridge(): void {
           previousBlocksRef.current = nextState.blocks;
           return;
         }
+        const syncGeneration = nextNativeSyncGeneration();
 
         const removedBlocks = previousBlocksRef.current.filter(
           previousBlock => !nextState.blocks.some(block => block.id === previousBlock.id),
@@ -527,13 +801,13 @@ export function useDAWNativeBridge(): void {
             }
           });
           if (immediateDirtyIds.size > 0) {
-            scheduleUpserts(immediateDirtyIds);
+            scheduleUpserts(immediateDirtyIds, syncGeneration);
           }
           if (removedBlocks.length > 0) {
             syncLoopRange(nextState);
           }
         } else if (dirtyIds.size > 0) {
-          scheduleUpserts(dirtyIds);
+          scheduleUpserts(dirtyIds, syncGeneration);
         } else if (removedBlocks.length > 0 || recordingJustFinalized) {
           syncLoopRange(nextState);
         }

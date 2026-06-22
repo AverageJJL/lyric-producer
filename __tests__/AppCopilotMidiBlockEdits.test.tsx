@@ -1,5 +1,5 @@
 import React from 'react';
-import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 jest.mock('react-markdown', () => ({children}: {children: React.ReactNode}) => <>{children}</>);
 jest.mock('remark-gfm', () => () => null);
@@ -59,8 +59,8 @@ function agentAnswer(text: string, midiBlockEdits: unknown[]) {
 }
 
 function openCopilotAndSend(message: string): void {
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByRole('textbox', {name: 'Message Copilot'});
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByRole('textbox', {name: 'Message Co-producer'});
   fireEvent.change(input, {target: {value: message}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 }
@@ -110,17 +110,15 @@ test('stages a Copilot MIDI block create and commits it on Accept', async () => 
   openCopilotAndSend('add a 4 beat midi block');
 
   expect(await screen.findByText(/I prepared a MIDI block\./)).toBeInTheDocument();
-  // Nothing applied until the user stages the preview.
-  expect(useDAWStore.getState().blocks).toHaveLength(0);
+  expect(screen.queryByRole('button', {name: 'Stage & listen'})).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', {name: 'Accept'})).toBeInTheDocument();
   const request = agentAsk.mock.calls[0][0];
   expect(request.context.arrangement.softwareInstrumentTracks[0]).toMatchObject({id: trackId, isSelected: true});
 
-  // Stage the preview into the live workspace.
-  fireEvent.click(screen.getByRole('button', {name: 'Stage & listen'}));
   await waitFor(() => expect(useDAWStore.getState().blocks).toHaveLength(1));
   expect(useDAWStore.getState().blocks[0]).toMatchObject({id: 'clip-ai', trackId, name: 'AI Lead', type: 'midi'});
 
-  // Accept commits it (and the preview card collapses).
+  // Accept commits the already-live preview and collapses the card.
   fireEvent.click(screen.getByRole('button', {name: 'Accept'}));
   await waitFor(() => expect(screen.queryByRole('button', {name: 'Accept'})).not.toBeInTheDocument());
   expect(useDAWStore.getState().blocks).toHaveLength(1);
@@ -143,7 +141,8 @@ test('reverts a staged MIDI block create on Reject', async () => {
   render(<App />);
   openCopilotAndSend('add a midi block');
 
-  fireEvent.click(await screen.findByRole('button', {name: 'Stage & listen'}));
+  expect(await screen.findByRole('button', {name: 'Reject'})).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: 'Stage & listen'})).not.toBeInTheDocument();
   await waitFor(() => expect(useDAWStore.getState().blocks).toHaveLength(1));
   fireEvent.click(screen.getByRole('button', {name: 'Reject'}));
 
@@ -177,7 +176,8 @@ test('stages a replacement for an existing MIDI block', async () => {
 
   render(<App />);
   openCopilotAndSend('replace the selected midi block');
-  fireEvent.click(await screen.findByRole('button', {name: 'Stage & listen'}));
+  expect(await screen.findByRole('button', {name: 'Accept'})).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: 'Stage & listen'})).not.toBeInTheDocument();
 
   await waitFor(() => expect(useDAWStore.getState().blocks[0]).toMatchObject({
     id: block.id,

@@ -1,4 +1,5 @@
 .workspace-stage {
+  --interactive-right-inset: 0px;
   position: relative;
   display: flex;
   flex: 1;
@@ -24,6 +25,46 @@
   overflow: hidden;
 }
 
+.right-dock[data-panel='copilot'] {
+  z-index: 35;
+  background:
+    linear-gradient(115deg, rgba(192, 218, 255, 0.025), transparent 34%),
+    linear-gradient(245deg, rgba(78, 131, 212, 0.025), transparent 42%),
+    linear-gradient(180deg, rgba(6, 8, 13, 0.78), rgba(3, 5, 9, 0.86));
+  border-left-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 1px 0 rgba(255, 255, 255, 0.08),
+    -18px 0 44px rgba(3, 8, 18, 0.34);
+  backdrop-filter: blur(24px) saturate(82%) brightness(58%) contrast(100%);
+  -webkit-backdrop-filter: blur(24px) saturate(82%) brightness(58%) contrast(100%);
+}
+
+.right-dock[data-panel='copilot']::before,
+.right-dock[data-panel='copilot']::after {
+  position: absolute;
+  pointer-events: none;
+  content: "";
+}
+
+.right-dock[data-panel='copilot']::before {
+  inset: -18%;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(231, 243, 255, 0.035), transparent 32%),
+    radial-gradient(ellipse at 78% 22%, rgba(126, 174, 255, 0.03), transparent 36%),
+    radial-gradient(ellipse at 52% 94%, rgba(70, 96, 148, 0.04), transparent 42%);
+  filter: blur(16px);
+  opacity: 0.22;
+}
+
+.right-dock[data-panel='copilot']::after {
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 20%, transparent 84%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 24%, rgba(0, 0, 0, 0.36));
+  mix-blend-mode: screen;
+  opacity: 0.16;
+}
+
 .right-dock-resize {
   position: absolute;
   left: 0;
@@ -32,6 +73,13 @@
   width: 6px;
   cursor: col-resize;
   z-index: 2;
+}
+
+.right-dock[data-panel='copilot'] .right-dock-resize,
+.right-dock[data-panel='copilot'] .right-dock-header,
+.right-dock[data-panel='copilot'] .right-dock-body {
+  position: relative;
+  z-index: 1;
 }
 
 .right-dock-header {
@@ -44,6 +92,12 @@
   border-bottom: 1px solid var(--line-soft);
 }
 
+.right-dock[data-panel='copilot'] .right-dock-header {
+  color: rgba(238, 243, 251, 0.82);
+  background: transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
 .right-dock-body {
   flex: 1;
   overflow: auto;
@@ -51,4 +105,24 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.right-dock[data-panel='copilot'] .right-dock-body {
+  background: transparent;
+}
+
+.workspace-stage[data-right-panel='copilot'] .timeline-toolbar {
+  padding-right: calc(12px + var(--interactive-right-inset, 0px));
+}
+
+.workspace-stage[data-right-panel='copilot'] .editor-panel-header {
+  padding-right: calc(12px + var(--interactive-right-inset, 0px));
+}
+
+.workspace-stage[data-right-panel='copilot'] .editor-panel-body {
+  padding-right: calc(12px + var(--interactive-right-inset, 0px));
+}
+
+.workspace-stage[data-right-panel='copilot'] .editor-panel-body.piano-roll-editor-body {
+  padding-right: var(--interactive-right-inset, 0px);
 }

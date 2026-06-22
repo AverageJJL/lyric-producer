@@ -16,7 +16,13 @@ export type StagedEditBase = {
 };
 
 export type StagedEdit =
-  | (StagedEditBase & {kind: 'snapshot'; snapshot: ProjectSnapshot; previewSkipsNativeSync?: boolean})
+  | (StagedEditBase & {
+      kind: 'snapshot';
+      snapshot: ProjectSnapshot;
+      acceptSnapshot?: ProjectSnapshot;
+      skipPlaybackRefresh?: boolean;
+      previewSkipsNativeSync?: boolean;
+    })
   | (StagedEditBase & {kind: 'operations'; operations: ArrangementOperation[]});
 
 /** A group of swappable options the user chooses between (only one staged at a time). */
@@ -29,9 +35,20 @@ export type StagedProposal = {
 export function stagedEditFromSnapshot(
   base: StagedEditBase,
   snapshot: ProjectSnapshot,
-  options?: {previewSkipsNativeSync?: boolean},
+  options?: {
+    acceptSnapshot?: ProjectSnapshot;
+    skipPlaybackRefresh?: boolean;
+    previewSkipsNativeSync?: boolean;
+  },
 ): StagedEdit {
-  return {...base, kind: 'snapshot', snapshot, previewSkipsNativeSync: options?.previewSkipsNativeSync};
+  return {
+    ...base,
+    kind: 'snapshot',
+    snapshot,
+    acceptSnapshot: options?.acceptSnapshot,
+    skipPlaybackRefresh: options?.skipPlaybackRefresh,
+    previewSkipsNativeSync: options?.previewSkipsNativeSync,
+  };
 }
 
 export function stagedEditFromOperations(

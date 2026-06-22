@@ -19,6 +19,7 @@ type TrackDetailsPopupProps = {
   playheadBeat: number;
   isPlaying: boolean;
   anchor: {x: number; y: number};
+  rightOverlayInset?: number;
   ignoreOutsideCloseRef: React.RefObject<boolean>;
   onClose: () => void;
   onMoveTrack: (trackId: string, direction: TrackMoveDirection) => void;
@@ -65,6 +66,7 @@ export function TrackDetailsPopup({
   playheadBeat,
   isPlaying,
   anchor,
+  rightOverlayInset = 0,
   ignoreOutsideCloseRef,
   onClose,
   onMoveTrack,
@@ -87,8 +89,14 @@ export function TrackDetailsPopup({
       return;
     }
     const rect = panelRef.current.getBoundingClientRect();
-    setPosition(anchoredPopupPosition(anchor.x, anchor.y, rect.width || PANEL_WIDTH, rect.height || PANEL_MAX_HEIGHT));
-  }, [anchor.x, anchor.y, track.id]);
+    setPosition(anchoredPopupPosition(
+      anchor.x,
+      anchor.y,
+      rect.width || PANEL_WIDTH,
+      rect.height || PANEL_MAX_HEIGHT,
+      {rightInset: rightOverlayInset},
+    ));
+  }, [anchor.x, anchor.y, rightOverlayInset, track.id]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {

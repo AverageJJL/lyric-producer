@@ -82,6 +82,18 @@
     #242528;
 }
 
+.timeline-display-row.pending-removal {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 122, 122, 0.16) 0,
+      rgba(255, 122, 122, 0.16) 8px,
+      rgba(40, 41, 43, 0.66) 8px,
+      rgba(40, 41, 43, 0.66) 16px
+    ),
+    #303235;
+}
+
 .timeline-section-bands {
   position: absolute;
   right: 0;

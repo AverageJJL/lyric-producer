@@ -85,6 +85,7 @@ add_library(MusicAppEngine STATIC
   AudioEngine.cpp
   AudioEngineController.cpp
   AmpSimCommands.cpp
+  ArrangementAudioBatchCommands.cpp
   ArrangementAudioCommands.cpp
   ArrangementCommandHelpers.cpp
   ArrangementCommands.cpp

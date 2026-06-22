@@ -2,9 +2,9 @@ import {isDrumPatternBlock} from '../music/clipFactories';
 import type {DAWBlock} from '../store/useDAWStore';
 import {PIXELS_PER_BEAT} from './timelineLayout';
 
-/** MIDI + drum blocks: left edge drags the clip; recorded audio keeps left-trim. */
+/** Drum patterns still keep left-edge move until pattern source-offset semantics exist. */
 export function isMoveLeftEdgeBlock(block: DAWBlock): boolean {
-  return block.type === 'midi' || isDrumPatternBlock(block);
+  return isDrumPatternBlock(block);
 }
 
 export function usesAudioTrimResize(block: DAWBlock): boolean {

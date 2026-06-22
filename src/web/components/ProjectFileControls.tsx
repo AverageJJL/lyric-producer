@@ -3,12 +3,10 @@ import React from 'react';
 import type {MidiExportMode} from '../../arrangement/projectExportActions';
 import {registerCopilotRevealHandler} from '../../assistant/copilotRevealRegistry';
 import type {ProjectFileLifecycle} from '../../hooks/useProjectFileLifecycle';
-import {RefreshGuideIcon} from './icons/WorkspaceIcons';
 
 type ProjectFileControlsProps = {
   projectFiles: ProjectFileLifecycle;
   onOpenSettings?: () => void;
-  onClearGuide: () => void;
 };
 
 function useCloseOnOutsideClick(
@@ -42,7 +40,6 @@ function useCloseOnOutsideClick(
 export function ProjectFileControls({
   projectFiles,
   onOpenSettings,
-  onClearGuide,
 }: ProjectFileControlsProps) {
   const [midiMode, setMidiMode] = React.useState<MidiExportMode>('all');
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -87,16 +84,6 @@ export function ProjectFileControls({
           <span />
           <span />
         </span>
-      </button>
-      <button
-        type="button"
-        className="project-menu-trigger"
-        aria-label="Refresh guide highlight"
-        title="Refresh guide highlight"
-        data-copilot-id="clear-guide-highlight"
-        data-copilot-purpose="Clear the current Copilot guide highlight."
-        onClick={onClearGuide}>
-        <RefreshGuideIcon className="workspace-nav-icon" />
       </button>
       {isMenuOpen ? (
         <div

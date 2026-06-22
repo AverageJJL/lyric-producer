@@ -79,13 +79,13 @@ export function roundBeat(value: number): number {
 
 export function wantsAudioArrangement(message: string): boolean {
   const text = message.toLowerCase();
-  const arrangement = /\b(arrange|arrangement|structure|section|split|slice|chop|blocks?|demo|a\/b|dropout|breakdown|vocal[- ]space)\b/.test(text);
-  const sourceBound = /\b(audio|clip|block|stem|existing|current|without generating|no new music|using only)\b/.test(text);
+  const arrangement = /\b(arrange|arrangement|structure|section|split|slice|chop|blocks?|demo|a\/b|dropout|breakdown|vocal[- ]space|hook|chorus|bigger|contrast|space)\b/.test(text);
+  const sourceBound = /\b(audio|clip|block|stem|existing|current|without generating|without adding new music|no new music|using only)\b/.test(text);
   return arrangement && sourceBound;
 }
 
 export function wantsDropout(message: string): boolean {
-  return /\b(dropout|vocal[- ]space|thin out|mute|strip|remove)\b/i.test(message);
+  return /\b(dropout|vocal[- ]space|thin out|mutes?|muting|strip|remove|gain changes?)\b/i.test(message);
 }
 
 export function treeHash(tree: ApcAgentTree, path: string): string | null {

@@ -27,6 +27,12 @@ CommandResult handleUpsertAudioClip(
     ProjectState& projectState,
     const std::string& payloadJson);
 
+CommandResult handleUpsertAudioClipsBatch(
+    tracktion::engine::Engine& engine,
+    tracktion::engine::Edit& edit,
+    ProjectState& projectState,
+    const std::string& payloadJson);
+
 CommandResult handleSetDrumPatternStep(
     tracktion::engine::Edit& edit,
     ProjectState& projectState,

@@ -38,6 +38,12 @@ export type CopilotCompactResponse =
   | {ok: true; summary: string}
   | {ok: false; error: string};
 
+export type CopilotModelConfig = {
+  agentModel: string;
+  fallbackModel: string;
+  compactionModel: string;
+};
+
 export type CopilotAgentAskRequest = {
   message: string;
   history?: CopilotChatMessage[];
@@ -77,6 +83,7 @@ export type CopilotAgentAskResponse =
 export type CopilotBridge = {
   agentAsk: (request: CopilotAgentAskRequest) => Promise<CopilotAgentAskResponse>;
   compact?: (request: CopilotCompactRequest) => Promise<CopilotCompactResponse>;
+  modelConfig?: () => Promise<CopilotModelConfig>;
 };
 
 declare global {

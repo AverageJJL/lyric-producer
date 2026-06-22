@@ -1,5 +1,6 @@
 import {isDrumPatternBlock} from '../music/clipFactories';
 import {normalizeDrumPattern, type DrumPattern} from '../music/drumPatterns';
+import {trimNotesToAbsoluteRange} from '../music/midiClipTrim';
 import {resolvePasteOverlaps} from '../music/timelineCollision';
 import {blockEndBeat} from '../music/timelineCollision';
 import {
@@ -40,32 +41,6 @@ function clonePattern(pattern: DrumPattern, id: string): DrumPattern {
 
 function recordHistory(): void {
   recordArrangementHistory(captureArrangementHistorySnapshot(useDAWStore.getState()));
-}
-
-function trimNotesToAbsoluteRange(
-  block: DAWBlock,
-  rangeStartBeat: number,
-  rangeEndBeat: number,
-): DAWNote[] | undefined {
-  if (!block.notes) {
-    return undefined;
-  }
-
-  return block.notes.flatMap(note => {
-    const noteStart = block.startBeat + note.startBeat;
-    const noteEnd = noteStart + note.lengthBeats;
-    const trimmedStart = Math.max(noteStart, rangeStartBeat);
-    const trimmedEnd = Math.min(noteEnd, rangeEndBeat);
-    if (trimmedStart >= trimmedEnd) {
-      return [];
-    }
-
-    return [{
-      ...note,
-      startBeat: trimmedStart - rangeStartBeat,
-      lengthBeats: trimmedEnd - trimmedStart,
-    }];
-  });
 }
 
 function commitSingleBlockEdit(blockId: string, nextBlock: DAWBlock): boolean {

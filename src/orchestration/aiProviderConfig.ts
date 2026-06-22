@@ -7,7 +7,7 @@ export const AI_PROVIDER_ENV = {
   baseUrl: 'AI_PRODUCER_API_BASE_URL',
 } as const;
 
-export const DEFAULT_AI_MODEL = 'google/gemini-3.1-pro-preview-customtools';
+export const DEFAULT_AI_MODEL = 'openai/gpt-4o-mini-search-preview';
 
 export type AiRuntimeEnvironment = 'development' | 'test' | 'production';
 

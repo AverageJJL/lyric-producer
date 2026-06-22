@@ -224,7 +224,11 @@ export function validatePatchAgainstTree(tree: ApcAgentTree, patch: ApcPatchTran
       problems.push(`unsafe path: ${change.path}`);
       continue;
     }
-    if (change.op !== 'createFile') {
+    if (change.op === 'createFile') {
+      if (hashByPath.has(change.path)) {
+        problems.push(`file already exists: ${change.path}; use mergeFields for existing top-level files or replaceFile with beforeHash.`);
+      }
+    } else {
       const expected = hashByPath.get(change.path);
       if (expected === undefined) {
         problems.push(`unknown file: ${change.path}`);

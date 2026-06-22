@@ -84,6 +84,52 @@ function shouldRemoveNativeAudioClip(block: DAWBlock): boolean {
     && Boolean(block.isMissingMedia);
 }
 
+function nativeAudioClipPayload(block: DAWBlock): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    clipId: block.id,
+    trackId: block.trackId,
+    startBeat: block.startBeat,
+    lengthBeats: block.lengthBeats,
+    name: block.name,
+    sourceOffsetBeats: block.sourceOffsetBeats ?? 0,
+    sourceLengthBeats: block.sourceLengthBeats ?? block.lengthBeats,
+    clipGainDb: block.clipGainDb ?? 0,
+    fadeInBeats: block.fadeInBeats ?? 0,
+    fadeOutBeats: block.fadeOutBeats ?? 0,
+    isReversed: block.isReversed ?? false,
+  };
+
+  if (isDrumPatternBlock(block) && block.patternId) {
+    const pattern = useDAWStore.getState().patterns[block.patternId];
+    if (pattern) {
+      payload.lanes = patternStepsPayload(pattern);
+    }
+  }
+
+  if (shouldSyncFileAudioClip(block)) {
+    payload.audioFilePath = block.audioFilePath;
+    if (block.absoluteAudioFilePath) {
+      payload.absoluteAudioFilePath = block.absoluteAudioFilePath;
+    }
+  }
+
+  return payload;
+}
+
+export function batchableFileAudioClipPayload(block: DAWBlock): Record<string, unknown> | null {
+  const tracks = useDAWStore.getState().tracks;
+  if (
+    !trackIsPlayable(tracks, block.trackId) ||
+    blockIsMutedForPlayback(block) ||
+    shouldRemoveNativeAudioClip(block) ||
+    !shouldSyncFileAudioClip(block) ||
+    !fileAudioIsPreparedForNativePlayback(block)
+  ) {
+    return null;
+  }
+  return nativeAudioClipPayload(block);
+}
+
 export function upsertBlockToEngine(block: DAWBlock): void {
   upsertBlockToEngineWithOptions(block, {asyncFileAudio: false});
 }
@@ -124,39 +170,13 @@ function upsertBlockToEngineWithOptions(
     return;
   }
 
-  const payload: Record<string, unknown> = {
-    clipId: block.id,
-    trackId: block.trackId,
-    startBeat: block.startBeat,
-    lengthBeats: block.lengthBeats,
-    name: block.name,
-    sourceOffsetBeats: block.sourceOffsetBeats ?? 0,
-    sourceLengthBeats: block.sourceLengthBeats ?? block.lengthBeats,
-    clipGainDb: block.clipGainDb ?? 0,
-    fadeInBeats: block.fadeInBeats ?? 0,
-    fadeOutBeats: block.fadeOutBeats ?? 0,
-    isReversed: block.isReversed ?? false,
-  };
-
-  if (isDrumPatternBlock(block) && block.patternId) {
-    const pattern = useDAWStore.getState().patterns[block.patternId];
-    if (pattern) {
-      payload.lanes = patternStepsPayload(pattern);
-    }
-  }
-
   const shouldSyncFileAudio = shouldSyncFileAudioClip(block);
   if (shouldSyncFileAudio && !fileAudioIsPreparedForNativePlayback(block)) {
     sendNativeAudioCommand('delete_clip', {clipId: block.id});
     return;
   }
 
-  if (shouldSyncFileAudio) {
-    payload.audioFilePath = block.audioFilePath;
-    if (block.absoluteAudioFilePath) {
-      payload.absoluteAudioFilePath = block.absoluteAudioFilePath;
-    }
-  }
+  const payload = nativeAudioClipPayload(block);
 
   if (options.asyncFileAudio && shouldSyncFileAudio) {
     sendFileAudioUpsertAsync(payload);

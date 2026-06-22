@@ -9,7 +9,7 @@
  */
 export {copilotToolSchema} from './copilotContract';
 
-export const DEFAULT_MODEL = 'google/gemini-3.1-pro-preview-customtools';
+export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 export const MIMO_CONTEXT_WINDOW_TOKENS = 1_048_576;
 export const COPILOT_COMPACTION_TRIGGER_TOKENS = 100_000;
 export const COPILOT_RESPONSE_TOKEN_BUDGET = 4096;

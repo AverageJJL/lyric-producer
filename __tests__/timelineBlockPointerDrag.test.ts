@@ -9,6 +9,7 @@ import {
   usesAudioTrimResize,
   usesOverlayClipShell,
 } from '../src/ui/timelineBlockPointerDrag';
+import {previewAudioSourceOffsetBeats} from '../src/ui/timelineClipPreview';
 import {PIXELS_PER_BEAT, RESIZE_HANDLE_WIDTH} from '../src/ui/timelineLayout';
 
 describe('resolveBlockDragMode', () => {
@@ -61,8 +62,8 @@ describe('block resize routing', () => {
     expect(isDrumPatternBlock(drumBlock)).toBe(true);
   });
 
-  it('routes MIDI and drum left edge to move', () => {
-    expect(isMoveLeftEdgeBlock(midiBlock)).toBe(true);
+  it('routes only drum left edge to move', () => {
+    expect(isMoveLeftEdgeBlock(midiBlock)).toBe(false);
     expect(isMoveLeftEdgeBlock(drumBlock)).toBe(true);
     expect(isMoveLeftEdgeBlock(voiceBlock)).toBe(false);
   });
@@ -71,6 +72,14 @@ describe('block resize routing', () => {
     expect(usesAudioTrimResize(voiceBlock)).toBe(true);
     expect(usesAudioTrimResize(drumBlock)).toBe(false);
     expect(usesAudioTrimResize(midiBlock)).toBe(false);
+  });
+
+  it('keeps waveform source offset stable while moving audio clips', () => {
+    const trimmedVoice = {...voiceBlock, startBeat: 2, sourceOffsetBeats: 1.5};
+
+    expect(previewAudioSourceOffsetBeats(trimmedVoice, 'move', 6)).toBe(1.5);
+    expect(previewAudioSourceOffsetBeats(trimmedVoice, 'resize-right', 2)).toBe(1.5);
+    expect(previewAudioSourceOffsetBeats(trimmedVoice, 'resize-left', 4)).toBe(3.5);
   });
 
   it('drum blocks start at one bar but are not capped to source trim on resize', () => {
@@ -204,6 +213,79 @@ describe('timeline snap during pointer drag', () => {
     handlers.onPointerUp({pointerId: 1, pageX: 2 * 96, pageY: 0});
 
     expect(moved).toEqual([{startBeat: 2, trackId: 't1'}]);
+  });
+
+  it('commits MIDI left-edge drags as resize-left, not move', () => {
+    const moved: Array<{startBeat: number; trackId: string}> = [];
+    const resized: Array<{startBeat: number; lengthBeats: number}> = [];
+    const handlers = createBlockPointerHandlers({
+      block,
+      blocks: [block],
+      trackCount: 1,
+      trackIds: ['t1'],
+      maxTimelineBeat: 64,
+      pixelsPerBeat: PIXELS_PER_BEAT,
+      snapGrid: 'off',
+      metrics: {
+        left: {setValue: jest.fn()},
+        width: {setValue: jest.fn()},
+      },
+      dragStartXRef: {current: 0},
+      dragStartBeatRef: {current: 0},
+      dragStartLengthRef: {current: 4},
+      dragStartTrackIndexRef: {current: 0},
+      isDraggingRef: {current: false},
+      sessionRef: {current: null},
+      onSelectBlock: jest.fn(),
+      onDraggingChange: jest.fn(),
+      onMoveBlock: (_blockId, startBeat, trackId) => moved.push({startBeat, trackId}),
+      onResizeBlock: (_blockId, startBeat, lengthBeats) => resized.push({startBeat, lengthBeats}),
+    });
+
+    handlers.onResizeLeftPointerDown({button: 0, pointerId: 1, pageX: 0, pageY: 0} as PointerEvent);
+    handlers.onPointerUp({pointerId: 1, pageX: PIXELS_PER_BEAT, pageY: 0});
+
+    expect(moved).toEqual([]);
+    expect(resized).toEqual([{startBeat: 1, lengthBeats: 3}]);
+  });
+
+  it('cancels and resets when a drag move arrives after the primary button was lost', () => {
+    const leftSet = jest.fn();
+    const widthSet = jest.fn();
+    const dragging = jest.fn();
+    const resized: Array<{startBeat: number; lengthBeats: number}> = [];
+    const handlers = createBlockPointerHandlers({
+      block: {...block, startBeat: 2, lengthBeats: 4},
+      blocks: [{...block, startBeat: 2, lengthBeats: 4}],
+      trackCount: 1,
+      trackIds: ['t1'],
+      maxTimelineBeat: 64,
+      pixelsPerBeat: PIXELS_PER_BEAT,
+      snapGrid: 'off',
+      metrics: {
+        left: {setValue: leftSet},
+        width: {setValue: widthSet},
+      },
+      dragStartXRef: {current: 0},
+      dragStartBeatRef: {current: 0},
+      dragStartLengthRef: {current: 4},
+      dragStartTrackIndexRef: {current: 0},
+      isDraggingRef: {current: false},
+      sessionRef: {current: null},
+      onSelectBlock: jest.fn(),
+      onDraggingChange: dragging,
+      onMoveBlock: jest.fn(),
+      onResizeBlock: (_blockId, startBeat, lengthBeats) => resized.push({startBeat, lengthBeats}),
+    });
+
+    handlers.onResizeRightPointerDown({button: 0, pointerId: 3, pageX: 2 * PIXELS_PER_BEAT, pageY: 0} as PointerEvent);
+    handlers.onPointerMove({pointerId: 3, pageX: 6 * PIXELS_PER_BEAT, pageY: 0, buttons: 0});
+    handlers.onPointerUp({pointerId: 3, pageX: 6 * PIXELS_PER_BEAT, pageY: 0});
+
+    expect(resized).toEqual([]);
+    expect(leftSet).toHaveBeenLastCalledWith(2 * PIXELS_PER_BEAT);
+    expect(widthSet).toHaveBeenLastCalledWith(4 * PIXELS_PER_BEAT);
+    expect(dragging).toHaveBeenLastCalledWith(false);
   });
 
   it('uses the active row height for vertical track moves', () => {

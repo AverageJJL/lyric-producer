@@ -62,6 +62,7 @@ describe('macOS package configuration', () => {
       expect.objectContaining({from: 'assets/instruments', to: 'assets/instruments'}),
       expect.objectContaining({from: 'assets/drums/icons', to: 'assets/drums/icons'}),
       expect.objectContaining({from: 'assets/sample-library', to: 'assets/sample-library'}),
+      expect.objectContaining({from: 'assets/song-seed', to: 'assets/song-seed'}),
     ]));
     expect(build.extraResources).not.toEqual(
       expect.arrayContaining([expect.objectContaining({from: 'assets', to: 'assets'})]),

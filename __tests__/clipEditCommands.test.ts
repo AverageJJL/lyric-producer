@@ -169,6 +169,31 @@ describe('clip edit commands', () => {
     expect(block?.notes).toEqual([{note: 60, velocity: 90, startBeat: 1, lengthBeats: 2}]);
   });
 
+  it('resizes a MIDI clip from the left without sliding notes in time', () => {
+    resetStore([
+      midiBlock({
+        lengthBeats: 6,
+        notes: [
+          {note: 48, velocity: 70, startBeat: 0.25, lengthBeats: 0.5},
+          {note: 60, velocity: 90, startBeat: 1, lengthBeats: 2},
+          {note: 64, velocity: 80, startBeat: 4, lengthBeats: 1},
+        ],
+      }),
+    ]);
+
+    useDAWStore.getState().resizeBlock('clip-1', 2, 4);
+
+    const [block] = useDAWStore.getState().blocks;
+    expect(block).toMatchObject({startBeat: 2, lengthBeats: 4});
+    expect(block?.notes).toEqual([
+      {note: 60, velocity: 90, startBeat: 0, lengthBeats: 1},
+      {note: 64, velocity: 80, startBeat: 2, lengthBeats: 1},
+    ]);
+
+    useDAWStore.getState().undo();
+    expect(useDAWStore.getState().blocks[0]).toMatchObject({startBeat: 0, lengthBeats: 6});
+  });
+
   it('trims the selected audio clip start to the playhead with source offset', () => {
     resetStore([
       midiBlock({

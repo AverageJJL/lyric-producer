@@ -29,8 +29,8 @@ export function CopilotInputForm({
       <textarea
         id="copilot-message"
         ref={textareaRef}
-        aria-label="Message Copilot"
-        placeholder="Message Copilot"
+        aria-label="Message Co-producer"
+        placeholder="Message Co-producer"
         rows={2}
         value={draft}
         onChange={event => onDraftChange(event.currentTarget.value)}

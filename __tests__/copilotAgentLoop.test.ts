@@ -90,7 +90,7 @@ describe('askCopilotAgent', () => {
   it('falls back to the secondary model on a first-turn HTTP failure', async () => {
     const t = tree();
     const projectHash = t.index.find(e => e.path === 'project.json')!.contentHash;
-    const fallbackModel = 'google/gemini-3.1-flash-lite';
+    const fallbackModel = 'openai/gpt-4.1-mini';
     const {impl, bodies} = mockFetch([
       {ok: false, status: 404, json: async () => ({})},
       chat({content: null, tool_calls: [toolCall('submit_project_patch', {
@@ -213,6 +213,37 @@ describe('askCopilotAgent', () => {
       expect(result.text).toContain('Set the tempo'); // answer text wins over patch summary
       expect(result.turns).toBe(1);
     }
+  });
+
+  it('repairs createFile over an existing timeline file before surfacing an answer', async () => {
+    const t = tree();
+    const timelineHash = t.index.find(e => e.path === 'timeline.json')!.contentHash;
+    const section = {id: 'intro', name: 'Intro', startBeat: 0, lengthBeats: 24};
+    const {impl, bodies} = mockFetch([
+      chat({content: null, tool_calls: [
+        toolCall('submit_project_patch', {
+          summary: 'bad marker',
+          baseFingerprint: t.fingerprint,
+          changes: [{op: 'createFile', path: 'timeline.json', content: JSON.stringify({sections: [section]})}],
+        }),
+        toolCall('answer_copilot', {text: 'I added the marker.', actions: []}),
+      ]}),
+      chat({content: null, tool_calls: [toolCall('submit_project_patch', {
+        summary: 'Add Intro marker',
+        baseFingerprint: t.fingerprint,
+        changes: [{op: 'mergeFields', path: 'timeline.json', beforeHash: timelineHash, fields: {sections: [section]}}],
+      })]}),
+    ]);
+
+    const result = await askCopilotAgent({message: 'make the timeline change', tree: t}, {env: ENV, fetchImpl: impl});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.text).toBe('Add Intro marker');
+      expect(result.patch?.changes[0]).toMatchObject({op: 'mergeFields', path: 'timeline.json'});
+      expect(result.turns).toBe(2);
+    }
+    expect(JSON.stringify(bodies[1].messages)).toContain('file already exists: timeline.json');
   });
 
   it('repairs an empty answer_copilot by feeding the problem back and continuing', async () => {

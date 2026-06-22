@@ -59,17 +59,20 @@ export function TrackSidebarRow({
 }: TrackSidebarRowProps) {
   const mix = normalizeTrackMix(track);
   const frozen = track.isFrozen === true;
+  const pendingDeletion = track.pendingDeletion === true;
   const className = [
     'track-row',
     'compact',
     isSelected ? 'selected' : '',
     track.isDisabled ? 'disabled' : '',
+    pendingDeletion ? 'pending-removal' : '',
   ].filter(Boolean).join(' ');
 
   return (
     <div
       className={className}
       style={{height: timelineTrackHeight(track, rowHeight)}}
+      title={pendingDeletion ? 'Will be removed if you accept this Co-producer edit.' : undefined}
       data-copilot-group={`Track row ${track.name}`}>
       <div
         className="track-row-header"
@@ -102,7 +105,7 @@ export function TrackSidebarRow({
             data-copilot-id={`track:${track.id}:record-arm`}
             data-copilot-purpose="Arm this track for recording."
             data-guide-target={GUIDE_TARGET_IDS['track-record-arm']}
-            disabled={frozen}
+            disabled={frozen || pendingDeletion}
             onClick={event => {
               event.stopPropagation();
               onToggleRecordArm(track.id);
@@ -117,6 +120,7 @@ export function TrackSidebarRow({
             data-copilot-id={`track:${track.id}:mute`}
             data-copilot-purpose="Mute this track during playback."
             data-guide-target={GUIDE_TARGET_IDS['track-mute']}
+            disabled={pendingDeletion}
             onClick={event => {
               event.stopPropagation();
               onToggleMute(track.id);
@@ -130,6 +134,7 @@ export function TrackSidebarRow({
             data-copilot-id={`track:${track.id}:solo`}
             data-copilot-purpose="Solo this track during playback."
             data-guide-target={GUIDE_TARGET_IDS['track-solo']}
+            disabled={pendingDeletion}
             onClick={event => {
               event.stopPropagation();
               onToggleSolo(track.id);
@@ -143,7 +148,7 @@ export function TrackSidebarRow({
               title={`Input monitor ${track.name}`}
               data-copilot-id={`track:${track.id}:input-monitor`}
               data-copilot-purpose="Monitor this audio input through the native engine."
-              disabled={frozen}
+              disabled={frozen || pendingDeletion}
               onClick={event => {
                 event.stopPropagation();
                 onTrackInputMonitoringChange(track.id, track.isInputMonitoringEnabled !== true);

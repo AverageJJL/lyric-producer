@@ -1,4 +1,3 @@
-import {canonicalJsonStringify} from '../arrangement/canonicalJson';
 import {
   APC_DIR,
   APC_PATHS,
@@ -10,7 +9,14 @@ import {
 } from '../arrangement/apc';
 import {createArrangementLockLookup} from '../arrangement/operationLocks';
 import {captureProjectSnapshot, type ProjectSnapshot} from '../arrangement/projectSnapshot';
-import {buildApcVirtualTree, hashApcContent, STRIPPED_CLIP_FIELDS} from './apcSourceTree';
+import {canonicalJsonStringify} from '../arrangement/canonicalJson';
+import {buildApcVirtualTree, hashApcContent} from './apcSourceTree';
+import {
+  mergeCreatedAudioClipFields,
+  mergeStrippedClipFields,
+  restoreLiveClipStrippedFields,
+  sourceClipByAudioPath,
+} from './copilotPatchMediaFields';
 
 /** Patch transaction (renderer mirror of electron/copilotAgentContract.ts). */
 export type ApcPatchChange =
@@ -41,35 +47,6 @@ function pathIsSafe(relativePath: string): boolean {
   return !relativePath
     .split('/')
     .some(seg => seg === '..' || seg === '.' || seg.length === 0 || seg.includes('\\'));
-}
-
-/** When the model replaces a clip file, re-attach the fields stripped from its view. */
-function mergeStrippedFields(path: string, original: string | undefined, next: string): string {
-  if (!path.startsWith('clips/') || original === undefined) {
-    return next;
-  }
-  try {
-    const originalJson = JSON.parse(original) as Record<string, unknown>;
-    const nextJson = JSON.parse(next) as Record<string, unknown>;
-    for (const field of STRIPPED_CLIP_FIELDS) {
-      if (field in originalJson && !(field in nextJson)) {
-        nextJson[field] = originalJson[field];
-      }
-    }
-    return canonicalJsonStringify(nextJson);
-  } catch {
-    return next;
-  }
-}
-
-function restoreLiveClipStrippedFields(files: Map<string, string>, snapshot: ProjectSnapshot): void {
-  snapshot.blocks.forEach(block => {
-    const path = APC_PATHS.clip(block.id);
-    const current = files.get(path);
-    if (current) {
-      files.set(path, mergeStrippedFields(path, canonicalJsonStringify(block), current));
-    }
-  });
 }
 
 /**
@@ -149,12 +126,12 @@ function lockConflicts(snapshot: ProjectSnapshot, changes: ApcPatchChange[]): Ap
 /** Rebuild manifest ordering arrays from the files actually present after the patch. */
 function reconcileManifest(files: Map<string, string>): void {
   const prev = JSON.parse(files.get('manifest.json') ?? '{}') as Record<string, unknown>;
-  const presentIds = (dir: string, idOf: (value: any) => string): string[] => {
+  const presentIds = (dir: string, idOf: (value: Record<string, unknown>) => unknown): string[] => {
     const ids: string[] = [];
     for (const [filePath, content] of files) {
       if (filePath.startsWith(`${dir}/`) && filePath.endsWith('.json')) {
         try {
-          const id = idOf(JSON.parse(content));
+          const id = idOf(JSON.parse(content) as Record<string, unknown>);
           if (typeof id === 'string' && id.length > 0) {
             ids.push(id);
           }
@@ -212,6 +189,7 @@ export function applyApcPatch(patch: ApcPatchTransaction): ApcPatchApplyResult {
     serializeApcSource(decomposeSnapshotToApcSource(snapshot, TS)).map(f => [f.relativePath, f.content]),
   );
   restoreLiveClipStrippedFields(files, snapshot);
+  const sourceByAudioPath = sourceClipByAudioPath(files);
 
   for (const change of patch.changes) {
     if (!pathIsSafe(change.path)) {
@@ -253,7 +231,10 @@ export function applyApcPatch(patch: ApcPatchTransaction): ApcPatchApplyResult {
       files.set(change.path, canonicalJsonStringify({...base, ...change.fields}));
     } else {
       // replaceFile / createFile
-      const merged = mergeStrippedFields(change.path, files.get(change.path), change.content);
+      const source = files.get(change.path);
+      const merged = source === undefined && change.op === 'createFile'
+        ? mergeCreatedAudioClipFields(sourceByAudioPath, change.path, change.content)
+        : mergeStrippedClipFields(change.path, source, change.content);
       files.set(change.path, merged);
     }
   }

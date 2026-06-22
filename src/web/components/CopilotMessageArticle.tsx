@@ -48,7 +48,7 @@ export function CopilotMessageArticle({
   return (
     <article className={`copilot-message ${message.role === 'user' ? 'user' : 'assistant'} ${message.error ? 'error' : ''}`}>
       <span className="copilot-message-role">
-        {message.role === 'user' ? 'You' : 'Copilot'}
+        {message.role === 'user' ? 'You' : 'Co-producer'}
         {assistant && message.model ? <span className="copilot-message-model">{message.model}</span> : null}
       </span>
       {assistant ? (

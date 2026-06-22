@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 
 import {isDrumPatternBlock} from '../../music/clipFactories';
 import {drumPatternDotsLayout} from '../../music/drumPatternPreviewLayout';
+import {trimNotesToAbsoluteRange} from '../../music/midiClipTrim';
 import {notesToPreviewLayout} from '../../music/midiClipPreviewLayout';
 import type {DAWBlock} from '../../store/useDAWStore';
 import {useDAWStore} from '../../store/useDAWStore';
@@ -11,6 +12,7 @@ import {clipDisplayPixelsPerBeat} from '../../ui/clipDisplayScale';
 export type ClipPreviewState = {
   lengthBeats: number;
   startBeat?: number;
+  midiTrimStartBeat?: number;
   sourceOffsetBeats?: number;
   /** Drum loop extension preview — dim hits from this beat while dragging. */
   drumDimFromBeat?: number;
@@ -35,6 +37,7 @@ export function ClipContent({block, widthPx, heightPx, pixelsPerBeat, preview, i
         widthPx={widthPx}
         heightPx={heightPx}
         pixelsPerBeat={pixelsPerBeat}
+        trimStartBeat={preview?.midiTrimStartBeat}
       />
     );
   }
@@ -68,16 +71,24 @@ function MidiPreview({
   widthPx,
   heightPx,
   pixelsPerBeat,
+  trimStartBeat,
 }: {
   block: DAWBlock;
   lengthBeats: number;
   widthPx: number;
   heightPx: number;
   pixelsPerBeat?: number;
+  trimStartBeat?: number;
 }) {
+  const notes = useMemo(
+    () => trimStartBeat === undefined
+      ? block.notes ?? []
+      : trimNotesToAbsoluteRange(block, trimStartBeat, trimStartBeat + lengthBeats) ?? [],
+    [block, lengthBeats, trimStartBeat],
+  );
   const layout = useMemo(
-    () => notesToPreviewLayout(block.notes ?? [], lengthBeats, widthPx, heightPx, pixelsPerBeat),
-    [block.notes, heightPx, lengthBeats, pixelsPerBeat, widthPx],
+    () => notesToPreviewLayout(notes, lengthBeats, widthPx, heightPx, pixelsPerBeat),
+    [heightPx, lengthBeats, notes, pixelsPerBeat, widthPx],
   );
 
   return (

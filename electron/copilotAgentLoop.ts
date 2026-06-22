@@ -18,12 +18,10 @@ import type {NativeCommandFn} from './askAudioTools';
 import type {AskReport} from './askReportTypes';
 import {buildAskShortcut} from './copilotAskShortcuts';
 import {buildBlockStructureShortcut} from './copilotBuildShortcuts';
+import {agentModel, fallbackAgentModels} from './copilotModels';
 
 export type {CopilotAgentRequest, CopilotAgentAnswer} from './copilotAgentTurn';
-
-/** Primary agentic model; env can override fallback for providers that need one. */
-export const DEFAULT_AGENT_MODEL = 'google/gemini-3.1-pro-preview-customtools';
-export const FALLBACK_AGENT_MODEL = 'google/gemini-3.1-pro-preview-customtools';
+export {DEFAULT_AGENT_MODEL} from './copilotModels';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
 const DEFAULT_TIMEOUT_MS = 45_000;
@@ -99,11 +97,18 @@ async function runLoop(
   ctx: LoopContext,
 ): Promise<LoopOutcome> {
   const ask = ctx.mode === 'ask';
+  const packedContext = contextMessage(request, message, tree);
   const messages: Array<Record<string, unknown>> = [
     {role: 'system', content: ask ? ASK_SYSTEM_PROMPT : COPILOT_AGENT_SYSTEM_PROMPT},
     // Heavy context + tree index sent ONCE; we append to `messages` each turn, never rebuild it.
-    {role: 'user', content: contextMessage(request, message, tree)},
+    {role: 'user', content: packedContext},
   ];
+  if (ctx.debug) {
+    const recentCount = Array.isArray(request.history) ? request.history.length : 0;
+    const summaryChars = typeof request.conversationSummary === 'string' ? request.conversationSummary.length : 0;
+    // eslint-disable-next-line no-console
+    console.error(`[copilot-agent:${ctx.mode}] context=${packedContext.length} chars, files=${tree.index.length}, history=${recentCount}, summary=${summaryChars} chars`);
+  }
   const seenToolCalls = new Set<string>();
   const counters = {toolCallCount: 0, sawReadProgress: false};
   // Read-only Ask analysis tools each contribute a card; collected across turns and
@@ -215,7 +220,7 @@ export async function askCopilotAgent(
     }
   }
   if (mode === 'build') {
-    const shortcut = buildBlockStructureShortcut(message, tree);
+    const shortcut = buildBlockStructureShortcut(message, tree, request.history);
     if (shortcut) {
       return {ok: true, text: shortcut.text, patch: shortcut.patch, reports: [], model: 'local-block-structure', turns: 0};
     }
@@ -236,17 +241,20 @@ export async function askCopilotAgent(
     mode,
     sendNativeCommand: options.sendNativeCommand,
   };
-  const primary = cleanString(env.AI_PRODUCER_AGENT_MODEL) ?? DEFAULT_AGENT_MODEL;
-  const fallback = cleanString(env.AI_PRODUCER_FALLBACK_MODEL) ?? FALLBACK_AGENT_MODEL;
+  const primary = agentModel(env);
+  const fallbacks = fallbackAgentModels(env, primary);
   const startedAt = Date.now();
 
   try {
     let outcome = await runLoop(primary, request, message, tree, ctx);
     let model = primary;
-    if (!outcome.ok && outcome.fallback && primary !== fallback) {
+    for (const fallback of fallbacks) {
+      if (outcome.ok || !outcome.fallback) {
+        break;
+      }
       if (debug) {
         // eslint-disable-next-line no-console
-        console.error(`[copilot-agent] primary ${primary} failed (${outcome.error}); falling back to ${fallback}`);
+        console.error(`[copilot-agent] ${model} failed (${outcome.error}); falling back to ${fallback}`);
       }
       model = fallback;
       outcome = await runLoop(fallback, request, message, tree, ctx);

@@ -9,8 +9,8 @@ import {CopilotMessageArticle} from './CopilotMessageArticle';
 import {CopilotHeaderBar} from './CopilotHeaderBar';
 import {CopilotStagedProposalCard} from './CopilotStagedProposalCard';
 import {runCopilotAgent, type RunCopilotAgentResult} from '../../assistant/runCopilotAgent';
-import {revertStagedEdit} from '../../assistant/copilotStaging';
-import {isCopilotStagePending, useCopilotStagingStore} from '../../assistant/copilotStagingStore';
+import {stageCopilotEdit} from '../../assistant/copilotStaging';
+import {useCopilotStagingStore} from '../../assistant/copilotStagingStore';
 import {
   useCopilotChatHistoryStore,
   type CopilotChatSession,
@@ -22,6 +22,7 @@ import {useCopilotEditableArrangement} from './useCopilotEditableArrangement';
 import {useCopilotMidiOptionController} from './useCopilotMidiOptionController';
 import {useCopilotMemoryState} from './useCopilotMemoryState';
 import {getCopilotBridge, type CopilotMode, type CopilotUiState} from '../../native/copilotApi';
+import {clearStaleStagedProposal} from './CopilotPanelHelpers';
 
 type CopilotPanelProps = {
   uiState: CopilotUiState;
@@ -97,6 +98,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
   }, []);
 
   const startNewChat = useCallback(() => {
+    clearStaleStagedProposal();
     newChat();
     setDraft('');
     closeMenus();
@@ -104,6 +106,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
   }, [closeMenus, newChat, scheduleFocusInput]);
 
   const selectHistorySession = useCallback((sessionId: string) => {
+    clearStaleStagedProposal();
     selectSession(sessionId);
     setDraft('');
     closeMenus();
@@ -123,11 +126,9 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
     if (activeRequestRef.current !== requestId) {
       return;
     }
-    const note = result.proposal
-      ? `${result.text}\n\nProposed an edit below — click “Stage & listen” to apply it in the workspace, then Accept or Reject.`
-      : result.proposalError
-        ? `${result.text}\n\n${result.proposalError}`
-        : result.text;
+    const note = result.proposalError
+      ? `${result.text}\n\n${result.proposalError}`
+      : result.text;
     appendMessage(sessionId, {
       id: messageId('assistant'),
       role: 'assistant',
@@ -141,10 +142,12 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
     if (result.proposal) {
       // Never orphan a still-undecided preview: revert any live-but-unaccepted stage
       // back to its base before the new proposal replaces the card.
-      if (isCopilotStagePending()) {
-        revertStagedEdit();
-      }
+      clearStaleStagedProposal();
       useCopilotStagingStore.getState().setStagedProposal(result.proposal);
+      const [firstEdit] = result.proposal.edits;
+      if (firstEdit) {
+        stageCopilotEdit(firstEdit);
+      }
     }
   };
 
@@ -160,6 +163,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
     const sessionId = activeSession.id;
     const message = (overrideMessage ?? draft).trim();
     if (!message || isPending) return;
+    clearStaleStagedProposal();
     setDraft('');
     setRequestPending(sessionId);
     const requestId = activeRequestRef.current + 1;
@@ -170,7 +174,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
     const context = buildCopilotContextPayload(uiState, editableArrangement, projectContext);
 
     if (!bridge) {
-      appendError('Copilot is not available in this renderer.', requestId, sessionId);
+      appendError('Co-producer is not available in this renderer.', requestId, sessionId);
       setRequestPending(null);
       return;
     }
@@ -210,14 +214,14 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
       if (activeRequestRef.current === requestId) {
         setRequestPending(null);
       }
-      appendError('Copilot request failed before a response was returned.', requestId, sessionId);
+      appendError('Co-producer request failed before a response was returned.', requestId, sessionId);
     }
   };
 
   return (
     <section
       className="copilot-panel"
-      aria-label="Copilot chat"
+      aria-label="Co-producer chat"
       data-copilot-mode={mode}>
       <CopilotHeaderBar
         mode={mode}
@@ -244,7 +248,7 @@ export function CopilotPanel({uiState, onActions}: CopilotPanelProps) {
         ))}
         {isPending ? (
           <article className="copilot-message assistant pending">
-            <span className="copilot-message-role">Copilot</span>
+            <span className="copilot-message-role">Co-producer</span>
             <p className="copilot-message-plain">Thinking...</p>
           </article>
         ) : null}

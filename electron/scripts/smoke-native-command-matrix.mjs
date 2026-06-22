@@ -68,6 +68,27 @@ function assertClose(actual, expected) {
   assert.ok(Math.abs(actual - expected) < 0.001, actual + ' != ' + expected);
 }
 
+function writeSilentWav(filePath) {
+  const sampleRate = 44100;
+  const sampleCount = Math.floor(sampleRate / 4);
+  const dataSize = sampleCount * 2;
+  const buffer = Buffer.alloc(44 + dataSize);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+  fs.writeFileSync(filePath, buffer);
+}
+
 const tracks = [
   {
     id: 'track-1',
@@ -170,6 +191,66 @@ try {
     startBeat: 0,
     lengthBeats: 4,
   }));
+  const batchAudioPath = path.join(writableRoot, 'batch-source.wav');
+  writeSilentWav(batchAudioPath);
+  const batchAudio = expectOk(send('upsert_audio_clips_batch', {
+    clips: [
+      {
+        clipId: 'clip-batch-a',
+        trackId: 'track-2',
+        startBeat: 0,
+        lengthBeats: 1,
+        sourceOffsetBeats: 0.25,
+        sourceLengthBeats: 4,
+        clipGainDb: -3,
+        fadeInBeats: 0.1,
+        fadeOutBeats: 0.2,
+        audioFilePath: 'batch-source.wav',
+        absoluteAudioFilePath: batchAudioPath,
+      },
+      {
+        clipId: 'clip-batch-b',
+        trackId: 'track-2',
+        startBeat: 1,
+        lengthBeats: 1,
+        sourceOffsetBeats: 1,
+        sourceLengthBeats: 4,
+        clipGainDb: 1,
+        fadeInBeats: 0.05,
+        fadeOutBeats: 0.05,
+        audioFilePath: 'batch-source.wav',
+        absoluteAudioFilePath: batchAudioPath,
+      },
+    ],
+  }));
+  assert.equal(batchAudio.clipCount, 2);
+  assert.equal(batchAudio.failedClipCount, 0);
+  assert.equal(batchAudio.checkedFileCount, 1);
+  const partialBatch = expectOk(send('upsert_audio_clips_batch', {
+    clips: [
+      {
+        clipId: 'clip-batch-a',
+        trackId: 'track-2',
+        startBeat: 2,
+        lengthBeats: 1,
+        sourceOffsetBeats: 0,
+        sourceLengthBeats: 4,
+        audioFilePath: 'batch-source.wav',
+        absoluteAudioFilePath: batchAudioPath,
+      },
+      {
+        clipId: 'clip-batch-missing',
+        trackId: 'track-2',
+        startBeat: 3,
+        lengthBeats: 1,
+        audioFilePath: 'missing.wav',
+        absoluteAudioFilePath: path.join(writableRoot, 'missing.wav'),
+      },
+    ],
+  }));
+  assert.equal(partialBatch.clipCount, 1);
+  assert.equal(partialBatch.failedClipCount, 1);
+  assert.equal(partialBatch.clips[1].errorCode, 'file_not_found');
   expectOk(send('delete_clip', {clipId: 'clip-midi'}));
 
   expectOk(send('set_master_mix', {volumeDb: -9, pan: -0.25}));
@@ -274,7 +355,7 @@ try {
     'set_click_track', 'start_count_in_click', 'stop_count_in_click', 'set_tempo_map', 'get_tempo_map', 'set_transport_position',
     'transport_stop', 'return_to_zero', 'returnToZero', 'set_loop_range', 'setTracks',
     'set_tracks', 'set_record_arm', 'assign_track_instrument', 'list_instrument_presets',
-    'set_track_preset', 'set_track_instrument_param', 'upsert_midi_clip', 'upsert_audio_clip',
+    'set_track_preset', 'set_track_instrument_param', 'upsert_midi_clip', 'upsert_audio_clip', 'upsert_audio_clips_batch',
     'delete_clip', 'set_master_mix', 'get_track_mix', 'get_routing_graph', 'capture_track_automation', 'set_track_fx', 'get_track_fx',
     'list_fx_plugins', 'scan_fx_plugins', 'validate_fx_plugin_insert', 'probe_fx_plugin', 'set_amp_sim', 'get_amp_sim', 'start_recording', 'stop_recording',
     'start_audio_recording', 'stop_audio_recording', 'list_audio_devices',

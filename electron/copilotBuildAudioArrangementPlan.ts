@@ -5,9 +5,7 @@ import {
   readJson,
   roundBeat,
   slug,
-  sortedJson,
   wantsDropout,
-  type ClipFile,
   type Section,
   type SectionSpec,
   type SourceClip,
@@ -47,12 +45,36 @@ export function requestedEndBeat(message: string, clips: SourceClip[], specs: Se
     return explicitEnd;
   }
   const clipEnd = Math.max(...clips.map(clip => clip.startBeat + clip.lengthBeats));
-  return Math.min(52, Math.max(16, clipEnd));
+  return roundBeat(Math.max(0, clipEnd));
+}
+
+function snapBeat(value: number, grid = 4): number {
+  return roundBeat(Math.max(0, Math.round(value / grid) * grid));
+}
+
+function scaledSongSections(endBeat: number): SectionSpec[] {
+  const labels = ['Intro', 'Groove 1', 'Groove vocal space', 'Hook lift', 'Outro'];
+  const fractions = [0, 0.16, 0.4, 0.58, 0.86, 1];
+  const cuts = fractions.map((fraction, index) => {
+    if (index === 0) {
+      return 0;
+    }
+    return index === fractions.length - 1 ? roundBeat(endBeat) : snapBeat(endBeat * fraction);
+  });
+  return labels.map((name, index) => ({
+    key: slug(name),
+    name,
+    startBeat: cuts[index],
+    endBeat: cuts[index + 1],
+  })).filter(section => section.endBeat > section.startBeat);
 }
 
 export function defaultSections(endBeat: number): SectionSpec[] {
-  if (endBeat >= 52) {
+  if (Math.abs(endBeat - 52) < 0.001) {
     return DEMO_SECTIONS.map(section => ({...section, key: slug(section.name)}));
+  }
+  if (endBeat >= 64) {
+    return scaledSongSections(endBeat);
   }
   const labels = ['Intro', 'Main A', 'Main B', 'Outro'];
   const cuts = [0, 0.25, 0.55, 0.8, 1].map(fraction => roundBeat(endBeat * fraction));
@@ -76,6 +98,9 @@ export function dropoutWindow(message: string, endBeat: number): {startBeat: num
       return {startBeat, endBeat: Math.min(endBeat, stopBeat)};
     }
   }
+  if (endBeat >= 64) {
+    return {startBeat: snapBeat(endBeat * 0.4), endBeat: snapBeat(endBeat * 0.58)};
+  }
   return endBeat > 32 ? {startBeat: 16, endBeat: 32} : {startBeat: endBeat * 0.4, endBeat: endBeat * 0.65};
 }
 
@@ -87,7 +112,8 @@ export function splitForDropout(sections: SectionSpec[], window: {startBeat: num
   sections.forEach(section => {
     const cuts = [section.startBeat, section.endBeat, window.startBeat, window.endBeat]
       .filter(beat => beat >= section.startBeat && beat <= section.endBeat)
-      .sort((a, b) => a - b);
+      .sort((a, b) => a - b)
+      .filter((beat, index, beats) => index === 0 || Math.abs(beat - beats[index - 1]) > 0.000001);
     for (let index = 0; index < cuts.length - 1; index += 1) {
       const startBeat = cuts[index];
       const endBeat = cuts[index + 1];
@@ -95,7 +121,8 @@ export function splitForDropout(sections: SectionSpec[], window: {startBeat: num
         continue;
       }
       const inWindow = startBeat >= window.startBeat && endBeat <= window.endBeat;
-      const suffix = inWindow ? ' vocal space' : cuts.length > 2 ? ` ${index + 1}` : '';
+      const didSplit = cuts.length > 2;
+      const suffix = didSplit && inWindow ? ' vocal space' : didSplit ? ` ${index + 1}` : '';
       split.push({
         key: slug(`${section.name}${suffix}`),
         name: `${section.name}${suffix}`,
@@ -120,22 +147,6 @@ function validSections(value: unknown): Section[] {
     : [];
 }
 
-function shouldThinClip(clip: SourceClip): boolean {
-  const label = `${clip.name} ${clip.trackName}`.toLowerCase();
-  return !/\b(drum|kick|snare|hat|perc|bass|808|sub|low)\b/.test(label);
-}
-
-function uniqueClipId(base: string, used: Set<string>): string {
-  let id = base.slice(0, 78);
-  let suffix = 2;
-  while (used.has(id)) {
-    id = `${base.slice(0, 72)}-${suffix}`;
-    suffix += 1;
-  }
-  used.add(id);
-  return id;
-}
-
 export function sectionMarkers(tree: ApcAgentTree, specs: SectionSpec[], prefix: string): Section[] {
   const timeline = readJson<TimelineFile>(tree, 'timeline.json') ?? {};
   const kept = validSections(timeline.sections).filter(section => !section.id.startsWith(prefix));
@@ -148,40 +159,4 @@ export function sectionMarkers(tree: ApcAgentTree, specs: SectionSpec[], prefix:
       lengthBeats: roundBeat(section.endBeat - section.startBeat),
     })),
   ];
-}
-
-export function clipForSection(
-  source: SourceClip,
-  section: SectionSpec,
-  usedIds: Set<string>,
-  targetTrackId: string,
-  dropout: {startBeat: number; endBeat: number} | null,
-  muteDropout: boolean,
-): {id: string; content: string} | null {
-  const sourceEnd = source.startBeat + source.lengthBeats;
-  const startBeat = Math.max(source.startBeat, section.startBeat);
-  const endBeat = Math.min(sourceEnd, section.endBeat);
-  const sourceDelta = startBeat - source.startBeat;
-  const available = source.sourceLengthBeats - source.sourceOffsetBeats - sourceDelta;
-  const lengthBeats = roundBeat(Math.min(endBeat - startBeat, available));
-  if (lengthBeats <= 0) {
-    return null;
-  }
-  const id = uniqueClipId(`build-${section.key}-${slug(source.id)}`, usedIds);
-  const inDropout = Boolean(dropout && startBeat >= dropout.startBeat && endBeat <= dropout.endBeat);
-  const clip: ClipFile = {
-    ...source.clip,
-    id,
-    name: `${section.name} - ${source.name}`,
-    trackId: targetTrackId,
-    startBeat: roundBeat(startBeat),
-    lengthBeats,
-    sourceOffsetBeats: roundBeat(source.sourceOffsetBeats + sourceDelta),
-    sourceLengthBeats: source.sourceLengthBeats,
-    isMuted: true,
-  };
-  if (inDropout && shouldThinClip(source)) {
-    clip.clipGainDb = muteDropout ? -60 : Math.max(-60, (finiteNumber(source.clip.clipGainDb) ?? 0) - 10);
-  }
-  return {id, content: sortedJson(clip)};
 }

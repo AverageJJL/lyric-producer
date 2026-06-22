@@ -15,6 +15,7 @@ import {
 } from './songSeedProviders';
 
 type AssetRoots = {
+  readRoot: string;
   writableRoot: string;
 };
 
@@ -25,6 +26,11 @@ type SongSeedIpcOptions = {
 function referenceCachePath(options: SongSeedIpcOptions): string | undefined {
   const root = options.appWideRoots?.().writableRoot;
   return root ? path.join(root, 'song-seed-reference-cache.json') : undefined;
+}
+
+function referenceSeedCachePath(options: SongSeedIpcOptions): string | undefined {
+  const root = options.appWideRoots?.().readRoot;
+  return root ? path.join(root, 'song-seed', 'reference-cache.seed.json') : undefined;
 }
 
 export function registerSongSeedIpc(options: SongSeedIpcOptions = {}): void {
@@ -45,7 +51,10 @@ export function registerSongSeedIpc(options: SongSeedIpcOptions = {}): void {
   );
   ipcMain.handle('song-seed:analyze-reference', async (_event, request: SongSeedReferenceAnalyzeRequest) => {
     try {
-      return analyzeSongSeedReference(request ?? {}, process.env, fetch, {cachePath: referenceCachePath(options)});
+      return analyzeSongSeedReference(request ?? {}, process.env, fetch, {
+        cachePath: referenceCachePath(options),
+        seedCachePath: referenceSeedCachePath(options),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not analyze the YouTube reference.';
       return {ok: false, code: 'network_error', error: message};

@@ -15,6 +15,7 @@ import {App} from '../src/web/App';
 
 const sendCommand = jest.fn();
 const agentAsk = jest.fn();
+const modelConfig = jest.fn();
 
 function resetStore(): void {
   useDAWStore.setState({
@@ -61,7 +62,12 @@ beforeEach(() => {
     return JSON.stringify({ok: true, data: {}});
   });
   window.audioEngine = {sendCommand, onEvent: () => () => undefined};
-  window.copilot = {agentAsk};
+  modelConfig.mockResolvedValue({
+    agentModel: 'openai/gpt-4o-mini-search-preview',
+    fallbackModel: 'openai/gpt-4o-mini | openai/gpt-4.1-mini | openai/gpt-4.1-nano',
+    compactionModel: 'openai/gpt-4o-mini',
+  });
+  window.copilot = {agentAsk, modelConfig};
   HTMLElement.prototype.scrollIntoView = jest.fn();
   HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
     const target = this.getAttribute('data-guide-target');
@@ -80,19 +86,21 @@ afterEach(() => {
   resetCopilotChatHistoryForTests();
   sendCommand.mockReset();
   agentAsk.mockReset();
+  modelConfig.mockReset();
   delete window.audioEngine;
   delete window.copilot;
 });
 
-test('moves Mixer into the side-panel group and opens Copilot from the standalone button', async () => {
+test('moves Mixer into the side-panel group and opens Co-producer from the standalone button', async () => {
   render(<App />);
   const sidePanelGroup = screen.getByRole('group', {name: 'Side panels'});
   expect(within(sidePanelGroup).getByRole('button', {name: 'Mixer'})).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  expect(screen.getByRole('complementary', {name: 'Copilot'})).toBeInTheDocument();
-  expect(screen.queryByText('Copilot ready.')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  expect(screen.getByRole('complementary', {name: 'Co-producer'})).toBeInTheDocument();
+  expect(screen.queryByText('Co-producer ready.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/agent openai\/gpt-4o-mini-search-preview/)).not.toBeInTheDocument();
   await waitFor(() => {
-    expect(screen.getByLabelText('Message Copilot')).toHaveFocus();
+    expect(screen.getByLabelText('Message Co-producer')).toHaveFocus();
   });
 });
 
@@ -109,8 +117,8 @@ test('shows a Copilot answer and highlights the add-track target', async () => {
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'How do I add a track?'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -118,12 +126,11 @@ test('shows a Copilot answer and highlights the add-track target', async () => {
   const request = agentAsk.mock.calls[0][0];
   expect(request.context.visibleTargets.some((target: {id: string}) => target.id === 'add-track-button')).toBe(true);
   expect(request.context.project).toMatchObject({bpm: 120, trackCount: 0, isPlaying: false});
-  expect(screen.getByLabelText('Message Copilot')).toHaveFocus();
+  expect(screen.getByLabelText('Message Co-producer')).toHaveFocus();
   await waitFor(() => {
     expect(screen.getByLabelText('Guided target: + Add track')).toBeInTheDocument();
   });
-  fireEvent.click(screen.getByRole('button', {name: 'Refresh guide highlight'}));
-  expect(screen.queryByLabelText('Guided target: + Add track')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: 'Refresh guide highlight'})).not.toBeInTheDocument();
 });
 
 test('sends visible Track Details popup controls in Copilot context', async () => {
@@ -139,8 +146,8 @@ test('sends visible Track Details popup controls in Copilot context', async () =
   render(<App />);
   fireEvent.click(screen.getByRole('button', {name: /Show track details for/}));
   await waitFor(() => expect(screen.getByRole('dialog', {name: /Track details for/})).toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'What controls are in this popup?'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -164,8 +171,8 @@ test('can reveal selected track details from a Copilot navigation action', async
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Show me track details'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -188,8 +195,8 @@ test('can reveal the selected track volume control from a hidden workflow action
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Show me the piano volume'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -213,8 +220,8 @@ test('can reveal the Add Track menu without creating a track', async () => {
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Show me add track options'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -246,8 +253,8 @@ test('renders MIDI option cards, previews natively, and imports a bass track', a
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Give me a bassline'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 
@@ -277,8 +284,8 @@ test('can open an existing right panel from a Copilot action', async () => {
     turns: 1,
   });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
-  const input = screen.getByLabelText('Message Copilot');
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
+  const input = screen.getByLabelText('Message Co-producer');
   fireEvent.change(input, {target: {value: 'Open audio settings'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
 

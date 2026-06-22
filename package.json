@@ -114,6 +114,10 @@
       {
         "from": "assets/sample-library",
         "to": "assets/sample-library"
+      },
+      {
+        "from": "assets/song-seed",
+        "to": "assets/song-seed"
       }
     ],
     "asarUnpack": [

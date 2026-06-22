@@ -1,6 +1,7 @@
 import {ipcMain} from 'electron';
 import {askCopilotAgent} from './copilotAgentLoop';
 import {askOpenRouterCopilotCompaction} from './copilotCompaction';
+import {copilotModelConfig} from './copilotModels';
 import type {NativeCommandFn} from './askAudioTools';
 
 type CopilotCompactIpcRequest = {
@@ -32,4 +33,5 @@ export function registerCopilotIpc(deps: CopilotIpcDeps = {}): void {
   ipcMain.handle('copilot:compact', async (_event, request?: CopilotCompactIpcRequest) =>
     askOpenRouterCopilotCompaction(request ?? {}),
   );
+  ipcMain.handle('copilot:model-config', async () => copilotModelConfig());
 }

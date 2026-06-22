@@ -67,6 +67,7 @@ import {
   clampResizeFromRight,
   recordingClipLengthBeats,
 } from '../music/timelineCollision';
+import {trimNotesToAbsoluteRange} from '../music/midiClipTrim';
 import {buildNativeTransportPayload} from '../native/transportPayload';
 import {computeVisibleTimelineBeats} from '../ui/timelineExtent';
 import {BLOCK_COLORS, RECORDING_MIN_VISIBLE_BEATS} from '../ui/timelineLayout';
@@ -216,6 +217,8 @@ export type DAWTrack = {
   isDisabled?: boolean;
   /** Frozen tracks remain playable but reject AI/scripted edits and cannot be record-monitored. */
   isFrozen?: boolean;
+  /** Transient Copilot staging marker; Accept removes the track, Reject clears it. */
+  pendingDeletion?: boolean;
   /** Metadata-only folder/group labels for DAW organization and future native grouping. */
   trackFolderName?: string;
   trackGroupName?: string;
@@ -264,6 +267,8 @@ export type DAWBlock = {
   color: string;
   /** When true, AI/LLM operations must not mutate or delete this clip. */
   isLocked?: boolean;
+  /** Transient Copilot staging marker; Accept removes the clip, Reject clears it. */
+  pendingDeletion?: boolean;
   /** Looper overdubs stay as normal clips; this metadata groups wrap segments for future comping. */
   looperLayerId?: string;
   looperLayerIndex?: number;
@@ -796,7 +801,14 @@ function resizedBlockForState(
   const currentEnd = block.startBeat + block.lengthBeats;
   if (startBeat !== block.startBeat) {
     const clamped = clampResizeFromLeft(state.blocks, block.id, block.trackId, startBeat, currentEnd);
-    return {...block, startBeat: clamped.startBeat, lengthBeats: clamped.lengthBeats};
+    return {
+      ...block,
+      startBeat: clamped.startBeat,
+      lengthBeats: clamped.lengthBeats,
+      notes: block.type === 'midi'
+        ? trimNotesToAbsoluteRange(block, clamped.startBeat, currentEnd)
+        : block.notes,
+    };
   }
 
   const clampedLength = clampResizeFromRight(

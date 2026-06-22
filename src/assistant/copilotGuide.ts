@@ -70,9 +70,9 @@ export const GUIDE_TARGETS: GuideTarget[] = [
   },
   {
     id: 'copilot-button',
-    label: 'Copilot',
+    label: 'Co-producer',
     location: 'top-right toolbar',
-    purpose: 'Open this AI copilot sidebar.',
+    purpose: 'Open the AI co-producer sidebar.',
   },
   {
     id: 'play-button',

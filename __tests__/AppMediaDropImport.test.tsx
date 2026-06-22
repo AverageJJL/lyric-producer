@@ -330,6 +330,8 @@ test('plays an imported timeline audio clip without staying in native-start load
 
   fireEvent.click(screen.getByRole('button', {name: 'Play'}));
 
+  await waitFor(() => expect(sendCommandAsync.mock.calls.some(([command]) => command === 'transport_play'))
+    .toBe(true));
   const commandNames = sendCommand.mock.calls.map(([command]) => command);
   const asyncCommandNames = sendCommandAsync.mock.calls.map(([command]) => command);
   const setTracksIndex = commandNames.indexOf('setTracks');

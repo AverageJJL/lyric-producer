@@ -1,6 +1,8 @@
 import type {ApcPatchTransaction} from './copilotAgentContract';
 import type {ApcAgentTree} from './copilotAgentTools';
 import {buildAudioArrangementShortcut} from './copilotBuildAudioArrangement';
+import {buildDeleteTracksShortcut} from './copilotBuildDeleteShortcut';
+import {buildTimelineMetadataShortcut} from './copilotTimelineShortcuts';
 
 type ClipFile = {
   id?: unknown;
@@ -132,7 +134,19 @@ function buildSections(tree: ApcAgentTree, prefix: string, usedIds: Set<string>)
   }));
 }
 
-export function buildBlockStructureShortcut(message: string, tree: ApcAgentTree): CopilotBuildShortcutResult | null {
+export function buildBlockStructureShortcut(
+  message: string,
+  tree: ApcAgentTree,
+  history?: unknown,
+): CopilotBuildShortcutResult | null {
+  const timelineMetadata = buildTimelineMetadataShortcut(message, tree, history);
+  if (timelineMetadata) {
+    return timelineMetadata;
+  }
+  const deleteTracks = buildDeleteTracksShortcut(message, tree, history);
+  if (deleteTracks) {
+    return deleteTracks;
+  }
   const audioArrangement = buildAudioArrangementShortcut(message, tree);
   if (audioArrangement) {
     return audioArrangement;

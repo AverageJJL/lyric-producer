@@ -19,10 +19,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+}
+
+.copilot-header-left {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
 }
 
 .copilot-header-actions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
 }

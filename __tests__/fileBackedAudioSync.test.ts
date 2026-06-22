@@ -2,8 +2,9 @@ import {
   sendNativeAudioCommand,
   sendNativeAudioCommandAsync,
 } from '../src/native/NativeAudioEngine';
+import {batchableFileAudioClipPayload} from '../src/native/blockSync';
 import {upsertBlockForEngine} from '../src/native/refreshPlayback';
-import {useDAWStore, type DAWBlock} from '../src/store/useDAWStore';
+import {useDAWStore, type DAWBlock, type DAWTrack} from '../src/store/useDAWStore';
 
 jest.mock('../src/native/NativeAudioEngine', () => ({
   sendNativeAudioCommand: jest.fn(() => '{"ok":true}'),
@@ -14,6 +15,20 @@ const mockedSend = sendNativeAudioCommand as jest.MockedFunction<typeof sendNati
 const mockedSendAsync = sendNativeAudioCommandAsync as jest.MockedFunction<
   typeof sendNativeAudioCommandAsync
 >;
+
+function audioTrack(id = 'track-audio'): DAWTrack {
+  return {
+    id,
+    name: 'Audio',
+    isMuted: false,
+    isSolo: false,
+    type: 'voice_audio',
+    instrumentId: 'voice_audio',
+    presetId: 'voice_audio',
+    isRecordArmed: false,
+    isLocked: false,
+  };
+}
 
 describe('file-backed audio sync', () => {
   beforeEach(() => {
@@ -139,6 +154,47 @@ describe('file-backed audio sync', () => {
     expect(mockedSend).toHaveBeenCalledWith('delete_clip', {clipId: 'clip-compressed'});
     expect(mockedSend).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
     expect(mockedSendAsync).not.toHaveBeenCalledWith('upsert_audio_clip', expect.anything());
+  });
+
+  it('builds a batchable payload only for prepared audible file-backed audio', () => {
+    useDAWStore.setState({tracks: [audioTrack()]});
+    const block: DAWBlock = {
+      id: 'clip-batchable',
+      trackId: 'track-audio',
+      name: 'Batchable Loop',
+      startBeat: 8,
+      lengthBeats: 4,
+      type: 'audio',
+      color: '#4a7fd4',
+      sourceLengthBeats: 16,
+      sourceOffsetBeats: 2,
+      clipGainDb: -4,
+      fadeInBeats: 0.25,
+      fadeOutBeats: 0.5,
+      audioFilePath: 'imports/batchable.wav',
+      absoluteAudioFilePath: '/tmp/imports/batchable.wav',
+    };
+
+    expect(batchableFileAudioClipPayload(block)).toEqual(expect.objectContaining({
+      clipId: 'clip-batchable',
+      trackId: 'track-audio',
+      sourceLengthBeats: 16,
+      sourceOffsetBeats: 2,
+      clipGainDb: -4,
+      fadeInBeats: 0.25,
+      fadeOutBeats: 0.5,
+      audioFilePath: 'imports/batchable.wav',
+      absoluteAudioFilePath: '/tmp/imports/batchable.wav',
+    }));
+    expect(batchableFileAudioClipPayload({...block, isMuted: true})).toBeNull();
+    expect(batchableFileAudioClipPayload({
+      ...block,
+      audioFilePath: 'imports/batchable.mp3',
+      absoluteAudioFilePath: '/tmp/imports/batchable.mp3',
+    })).toBeNull();
+
+    useDAWStore.setState({tracks: [{...audioTrack(), isDisabled: true}]});
+    expect(batchableFileAudioClipPayload(block)).toBeNull();
   });
 
   it('removes clips on disabled tracks from native playback', () => {

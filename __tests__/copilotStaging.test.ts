@@ -145,4 +145,126 @@ describe('copilot staging engine', () => {
     expect(useDAWStore.getState().bpm).toBe(120);
     expect(refreshPlaybackAndInstruments).not.toHaveBeenCalled();
   });
+
+  it('removes pending audio preview clips from native playback on stage and reject', () => {
+    const sendCommand = jest.fn(() => '{"ok":true}');
+    const sendCommandAsync = jest.fn(() => Promise.resolve('{"ok":true}'));
+    window.audioEngine = {sendCommand, sendCommandAsync};
+    useDAWStore.setState({
+      tracks: [{
+        id: 'source-track',
+        name: 'Source',
+        isMuted: false,
+        isSolo: false,
+        type: 'voice_audio',
+        instrumentId: 'voice_audio',
+        presetId: 'voice_audio',
+        isRecordArmed: false,
+        isLocked: false,
+      }],
+      blocks: [{
+        id: 'source-clip',
+        trackId: 'source-track',
+        name: 'Source clip',
+        startBeat: 0,
+        lengthBeats: 64,
+        type: 'audio',
+        color: '#4a7fd4',
+        audioFilePath: 'imports/source.wav',
+        absoluteAudioFilePath: '/tmp/source.wav',
+        sourceLengthBeats: 64,
+        sourceOffsetBeats: 0,
+      }],
+    });
+    const base = captureProjectSnapshot();
+    const preview = stagedEditFromSnapshot(
+      {id: 'audio-preview', proposalId: 'A', label: 'audio guide', summary: []},
+      {
+        ...base,
+        tracks: [
+          {...base.tracks[0]!, isMuted: true, isDisabled: true, pendingDeletion: true},
+          {
+            ...base.tracks[0]!,
+            id: 'build-track',
+            name: 'Build slices - Source',
+            isMuted: false,
+            isDisabled: false,
+            pendingDeletion: undefined,
+          },
+        ],
+        blocks: [
+          {
+            ...base.blocks[0]!,
+            id: 'build-clip',
+            trackId: 'build-track',
+            name: 'Intro - Source',
+            lengthBeats: 8,
+            sourceLengthBeats: 64,
+          },
+          {...base.blocks[0]!, isMuted: true, pendingDeletion: true},
+        ],
+      },
+      {skipPlaybackRefresh: true, acceptSnapshot: {...base, tracks: [], blocks: []}},
+    );
+
+    stageCopilotEdit(preview);
+    expect(sendCommand).toHaveBeenCalledWith('delete_clip', JSON.stringify({clipId: 'source-clip'}));
+
+    revertStagedEdit();
+    expect(sendCommand).toHaveBeenCalledWith('delete_clip', JSON.stringify({clipId: 'build-clip'}));
+    expect(sendCommandAsync).toHaveBeenCalledWith(
+      'upsert_audio_clip',
+      expect.stringContaining('"clipId":"source-clip"'),
+    );
+  });
+
+  it('cancels in-place audio preview edits on reject', () => {
+    const sendCommand = jest.fn(() => '{"ok":true}');
+    const sendCommandAsync = jest.fn(() => Promise.resolve('{"ok":true}'));
+    window.audioEngine = {sendCommand, sendCommandAsync};
+    useDAWStore.setState({
+      tracks: [{
+        id: 'source-track',
+        name: 'Source',
+        isMuted: false,
+        isSolo: false,
+        type: 'voice_audio',
+        instrumentId: 'voice_audio',
+        presetId: 'voice_audio',
+        isRecordArmed: false,
+        isLocked: false,
+      }],
+      blocks: [{
+        id: 'source-clip',
+        trackId: 'source-track',
+        name: 'Source clip',
+        startBeat: 0,
+        lengthBeats: 64,
+        type: 'audio',
+        color: '#4a7fd4',
+        audioFilePath: 'imports/source.wav',
+        absoluteAudioFilePath: '/tmp/source.wav',
+        sourceLengthBeats: 64,
+        sourceOffsetBeats: 0,
+      }],
+    });
+    const base = captureProjectSnapshot();
+    const preview = stagedEditFromSnapshot(
+      {id: 'trim-preview', proposalId: 'B', label: 'trim', summary: []},
+      {
+        ...base,
+        blocks: [{...base.blocks[0]!, lengthBeats: 8}],
+      },
+      {skipPlaybackRefresh: true},
+    );
+
+    stageCopilotEdit(preview);
+    revertStagedEdit();
+
+    expect(sendCommand).toHaveBeenCalledWith('delete_clip', JSON.stringify({clipId: 'source-clip'}));
+    expect(sendCommandAsync).toHaveBeenCalledWith(
+      'upsert_audio_clip',
+      expect.stringContaining('"lengthBeats":64'),
+    );
+  });
 });

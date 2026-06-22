@@ -245,6 +245,7 @@
 .copilot-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid var(--line-soft);
@@ -271,7 +272,7 @@
 
 .copilot-input-row button {
   display: grid;
-  align-self: end;
+  align-self: center;
   width: 38px;
   height: 38px;
   place-items: center;

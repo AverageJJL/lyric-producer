@@ -101,7 +101,6 @@ type WorkspaceHandlers = {
   onCompRecordingTake: (takeId: string) => void;
   onEditorActiveChange: (active: boolean) => void;
   onCopilotActions: (actions: CopilotUiAction[], context: CopilotContextPayload) => void;
-  onClearGuide: () => void;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
   onToggleTakeFolder: (groupId: string) => void;
@@ -141,6 +140,11 @@ export function AppWorkspaceView({
   data,
   handlers,
 }: AppWorkspaceViewProps) {
+  const isCopilotPanel = workspacePanels.rightPanel === 'copilot';
+  const reservedRightDockWidth = workspacePanels.rightPanel && !isCopilotPanel ? `${workspacePanels.rightPanelWidth}px` : '0px';
+  const interactiveRightInset = isCopilotPanel ? `${workspacePanels.rightPanelWidth}px` : '0px';
+  const rightOverlayInset = isCopilotPanel ? workspacePanels.rightPanelWidth : 0;
+
   return (
     <main className={`app-shell ${mediaDrop.isDraggingMedia ? 'media-drop-active' : ''}`} aria-label="Media drop target" {...mediaDrop.dropImportProps}>
       {mediaDrop.isDraggingMedia ? <div className="media-drop-overlay" role="status">Drop audio or MIDI to import</div> : null}
@@ -150,7 +154,6 @@ export function AppWorkspaceView({
           <ProjectFileControls
             projectFiles={projectFiles}
             onOpenSettings={handlers.onOpenSettings}
-            onClearGuide={handlers.onClearGuide}
           />
         }
         workspaceNav={<WorkspaceNavButtons rightPanel={workspacePanels.rightPanel} isMixerOpen={workspacePanels.isMixerOpen} onToggleRightPanel={workspacePanels.toggleRightPanel} onToggleMixer={workspacePanels.toggleMixer} />}
@@ -171,10 +174,11 @@ export function AppWorkspaceView({
         onRecordPress={handlers.onRecordPress}
       />
       <GuidanceOverlay targetId={state.guideTargetId} targets={state.copilotTargets} />
-      <div className="workspace-stage" style={{'--right-dock-width': workspacePanels.rightPanel ? `${workspacePanels.rightPanelWidth}px` : '0px'} as React.CSSProperties}>
+      <div className="workspace-stage" data-right-panel={workspacePanels.rightPanel ?? undefined} style={{'--right-dock-width': reservedRightDockWidth, '--interactive-right-inset': interactiveRightInset} as React.CSSProperties}>
         <section className="workspace" data-shortcut-scope="arrangement" tabIndex={0} aria-label="Workspace" onPointerDown={handlers.onFocusWorkspace}>
           <TrackSidebar
             width={state.sidebarWidth}
+            rightOverlayInset={rightOverlayInset}
             onWidthChange={handlers.onSidebarWidthChange}
             verticalScrollRef={scrollRefs.sidebarScrollRef}
             onSidebarWheel={scrollRefs.onSidebarWheel}

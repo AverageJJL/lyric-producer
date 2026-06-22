@@ -66,6 +66,23 @@
   border-left: 3px solid var(--accent-green);
 }
 
+.track-row.pending-removal {
+  background: #3b3d40;
+  border-left: 3px solid #d36f6f;
+}
+
+.track-row.pending-removal .track-main,
+.track-row.pending-removal .track-controls {
+  opacity: 0.52;
+}
+
+.track-row.pending-removal .track-name::after {
+  content: ' REMOVE';
+  color: #ff9a9a;
+  font-size: 9px;
+  font-weight: 900;
+}
+
 .track-sidebar-take-row {
   width: 100%;
   background:

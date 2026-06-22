@@ -81,6 +81,81 @@ function audioBlock(id: string, trackId: string): DAWBlock {
   };
 }
 
+function preparedAudioBlock(id: string, trackId: string, index: number): DAWBlock {
+  const stem = Math.floor(index / 5);
+  const slice = index % 5;
+  const sections = [
+    {startBeat: 0, lengthBeats: 8},
+    {startBeat: 8, lengthBeats: 16},
+    {startBeat: 24, lengthBeats: 8},
+    {startBeat: 32, lengthBeats: 12},
+    {startBeat: 44, lengthBeats: 8},
+  ];
+  const section = sections[slice]!;
+  return {
+    id,
+    trackId,
+    name: `Build Slice ${index + 1}`,
+    startBeat: section.startBeat,
+    lengthBeats: section.lengthBeats,
+    type: 'audio',
+    color: '#5a8cff',
+    audioFilePath: `imports/stem-${stem}.wav`,
+    absoluteAudioFilePath: `/tmp/stem-${stem}.wav`,
+    sourceLengthBeats: 52,
+    sourceOffsetBeats: section.startBeat,
+    clipGainDb: slice === 3 ? 1.5 : 0,
+    fadeInBeats: slice === 0 ? 0.1 : 0,
+    fadeOutBeats: slice === 4 ? 0.25 : 0,
+  };
+}
+
+function copilotPreviewTracksAndBlocks(): {tracks: DAWTrack[]; blocks: DAWBlock[]} {
+  const tracks = Array.from({length: 6}, (_, index) =>
+    audioTrack(`build-track-${index + 1}`, `Build slices - Voice ${index + 1}`),
+  );
+  return {
+    tracks,
+    blocks: tracks.flatMap((item, trackIndex) =>
+      Array.from({length: 5}, (_, sliceIndex) =>
+        preparedAudioBlock(
+          `build-${trackIndex + 1}-${sliceIndex + 1}`,
+          item.id,
+          trackIndex * 5 + sliceIndex,
+        ),
+      ),
+    ),
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => {
+    resolve = next;
+  });
+  return {promise, resolve};
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 8; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+async function flushAudioBatchChunks(): Promise<void> {
+  for (let index = 0; index < 24; index += 1) {
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    act(() => {
+      jest.advanceTimersByTime(16);
+    });
+  }
+  await act(async () => {
+    await flushMicrotasks();
+  });
+}
+
 function NativeBridgeHarness(): null {
   useDAWNativeBridge();
   return null;
@@ -132,6 +207,8 @@ function resetStore(): void {
 describe('native bridge track ordering', () => {
   beforeEach(() => {
     resetStore();
+    mockedSend.mockImplementation(() => '{"ok":true}');
+    mockedSendAsync.mockImplementation(() => Promise.resolve('{"ok":true}'));
     mockedSend.mockClear();
     mockedSendAsync.mockClear();
   });
@@ -184,7 +261,7 @@ describe('native bridge track ordering', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(40);
+        jest.advanceTimersByTime(200);
       });
 
       const upsertCalls = mockedSend.mock.calls
@@ -238,6 +315,190 @@ describe('native bridge track ordering', () => {
         jest.advanceTimersByTime(1);
       });
       expect(upsertCount()).toBe(2);
+    } finally {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    }
+  });
+
+  it('chunks a Copilot-style slice preview into bounded native audio sync commands', async () => {
+    jest.useFakeTimers();
+    try {
+      const preview = copilotPreviewTracksAndBlocks();
+      render(<NativeBridgeHarness />);
+      mockedSend.mockClear();
+      mockedSendAsync.mockClear();
+
+      act(() => {
+        useDAWStore.setState({
+          tracks: preview.tracks,
+          blocks: preview.blocks,
+          syncSource: 'ui',
+        });
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+      await flushAudioBatchChunks();
+
+      const batchCalls = mockedSendAsync.mock.calls.filter(
+        ([command]) => command === 'upsert_audio_clips_batch',
+      );
+      expect(preview.blocks).toHaveLength(30);
+      expect(batchCalls.length).toBeGreaterThan(1);
+      expect(batchCalls.every(([, payload]) =>
+        ((payload as {clips?: unknown[]}).clips?.length ?? 0) <= 4,
+      )).toBe(true);
+      expect(batchCalls.flatMap(([, payload]) => (payload as {clips?: unknown[]}).clips ?? []))
+        .toHaveLength(18);
+      expect(mockedSendAsync.mock.calls.filter(([command]) => command === 'upsert_audio_clip'))
+        .toHaveLength(0);
+    } finally {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    }
+  });
+
+  it('waits for preview audio preparation before starting transport', async () => {
+    jest.useFakeTimers();
+    const batch = deferred<string>();
+    try {
+      const preview = copilotPreviewTracksAndBlocks();
+      mockedSendAsync.mockImplementation(command =>
+        command === 'upsert_audio_clips_batch'
+          ? batch.promise
+          : Promise.resolve('{"ok":true}'),
+      );
+      render(<NativeBridgeHarness />);
+      mockedSend.mockClear();
+      mockedSendAsync.mockClear();
+
+      act(() => {
+        useDAWStore.setState({
+          tracks: preview.tracks,
+          blocks: preview.blocks,
+          syncSource: 'ui',
+        });
+      });
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .toContain('upsert_audio_clips_batch');
+
+      await act(async () => {
+        useDAWStore.setState({isPlaying: true, playheadBeat: 0, playheadSeconds: 0});
+        await flushMicrotasks();
+      });
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .not.toContain('transport_play');
+
+      await act(async () => {
+        batch.resolve('{"ok":true}');
+        await flushMicrotasks();
+      });
+      await flushAudioBatchChunks();
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .toContain('transport_play');
+    } finally {
+      batch.resolve('{"ok":true}');
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancels stale scheduled audio sync when a preview is rejected before flushing', () => {
+    jest.useFakeTimers();
+    try {
+      const preview = copilotPreviewTracksAndBlocks();
+      render(<NativeBridgeHarness />);
+      mockedSend.mockClear();
+      mockedSendAsync.mockClear();
+
+      act(() => {
+        useDAWStore.setState({
+          tracks: preview.tracks,
+          blocks: preview.blocks,
+          syncSource: 'ui',
+        });
+      });
+      act(() => {
+        useDAWStore.setState({
+          tracks: [],
+          blocks: [],
+          syncSource: 'ui',
+        });
+      });
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .not.toContain('upsert_audio_clips_batch');
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .not.toContain('upsert_audio_clip');
+      expect(mockedSend.mock.calls.filter(([command]) => command === 'delete_clip').length)
+        .toBeGreaterThanOrEqual(30);
+    } finally {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not re-upsert prepared Build clips when accepting removes source clips', async () => {
+    jest.useFakeTimers();
+    try {
+      const preview = copilotPreviewTracksAndBlocks();
+      const sourceTracks = Array.from({length: 6}, (_, index) =>
+        ({...audioTrack(`source-track-${index + 1}`, `Voice ${index + 1}`), isDisabled: true}),
+      );
+      const sourceBlocks = sourceTracks.map((item, index) => ({
+        ...preparedAudioBlock(`source-${index + 1}`, item.id, index),
+        isMuted: true,
+        pendingDeletion: true,
+      }));
+      render(<NativeBridgeHarness />);
+      mockedSend.mockClear();
+      mockedSendAsync.mockClear();
+
+      act(() => {
+        useDAWStore.setState({
+          tracks: [...sourceTracks, ...preview.tracks],
+          blocks: [...preview.blocks, ...sourceBlocks],
+          syncSource: 'ui',
+        });
+      });
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+      await act(async () => {
+        await flushMicrotasks();
+      });
+      expect(mockedSendAsync.mock.calls.filter(([command]) => command === 'upsert_audio_clips_batch'))
+        .toHaveLength(1);
+
+      mockedSend.mockClear();
+      mockedSendAsync.mockClear();
+      act(() => {
+        useDAWStore.setState({
+          tracks: preview.tracks,
+          blocks: preview.blocks,
+          syncSource: 'ui',
+        });
+      });
+      act(() => {
+        jest.advanceTimersByTime(240);
+      });
+      await act(async () => {
+        await flushMicrotasks();
+      });
+
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .not.toContain('upsert_audio_clips_batch');
+      expect(mockedSendAsync.mock.calls.map(([command]) => command))
+        .not.toContain('upsert_audio_clip');
+      expect(mockedSend.mock.calls.filter(([command]) => command === 'delete_clip')).toHaveLength(6);
     } finally {
       jest.runOnlyPendingTimers();
       jest.useRealTimers();

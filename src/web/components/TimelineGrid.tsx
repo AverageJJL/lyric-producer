@@ -573,15 +573,21 @@ export function TimelineGrid({
             <TimelineRulerLayer visibleTimelineBeats={visibleTimelineBeats} pixelsPerBeat={pixelsPerBeat} playheadBeat={playheadBeat} snapGrid={snapGrid} timeSignature={timeSignature} meterMap={meterMap} tempoMap={tempoMap} sections={sections} authoredLyrics={lyrics} showAuthoredLyricsLane={showAuthoredLyricsLane} scale={scale} chord={chord} onRulerPointerDown={handleRulerPointerDown} onSectionsChange={setSections} onJumpToBeat={beat => useDAWStore.getState().setPlayheadBeat(beat, {pauseIfPlaying: true})} />
             <div className="timeline-display-rows" aria-hidden="true">
               {displayLaneLayout.lanes.map(lane => (
-                <span
-                  key={lane.key}
-                  className={`timeline-display-row ${lane.kind}`}
-                  style={{
-                    top: timelineHeaderHeight + lane.offsetTop,
-                    width: timelineWidth,
-                    height: lane.height,
-                  }}
-                />
+                (() => {
+                  const track = 'trackId' in lane ? tracks.find(item => item.id === lane.trackId) : undefined;
+                  return (
+                    <span
+                      key={lane.key}
+                      className={`timeline-display-row ${lane.kind} ${track?.pendingDeletion ? 'pending-removal' : ''}`}
+                      title={track?.pendingDeletion ? 'Will be removed if you accept this Co-producer edit.' : undefined}
+                      style={{
+                        top: timelineHeaderHeight + lane.offsetTop,
+                        width: timelineWidth,
+                        height: lane.height,
+                      }}
+                    />
+                  );
+                })()
               ))}
             </div>
             {!areColoredSectionsHidden ? (
@@ -624,7 +630,9 @@ export function TimelineGrid({
                   return null;
                 }
                 const renderedRowHeight = displayLane.height;
-                const isTrackMuted = tracks.find(track => track.id === block.trackId)?.isMuted === true;
+                const track = tracks.find(item => item.id === block.trackId);
+                const pendingDeletion = block.pendingDeletion === true || track?.pendingDeletion === true;
+                const isTrackMuted = track?.isMuted === true || pendingDeletion;
                 const groupId = block.recordingCompGroupId ?? block.recordingTakeGroupId;
                 const versionState = block.recordingCompGroupId
                   ? compVersionState(blocks, block.recordingCompGroupId)
@@ -660,14 +668,14 @@ export function TimelineGrid({
                     isGroupSelected={selectedBlockIds.length > 1 && selectedBlockIds.includes(block.id)}
                     snapGrid={snapGrid} isRelativeSnapEnabled={isRelativeSnapEnabled}
                     beatsPerBar={beatsPerBar}
-                    onMoveBlock={isGhost || isTakeLane || isCompFolderDisplay ? () => undefined : onMoveBlock}
-                    onResizeBlock={isGhost || isTakeLane || isCompFolderDisplay ? () => undefined : onResizeBlock}
-                    onSelectBlock={isGhost ? () => undefined : (blockId, options) =>
+                    onMoveBlock={isGhost || isTakeLane || isCompFolderDisplay || pendingDeletion ? () => undefined : onMoveBlock}
+                    onResizeBlock={isGhost || isTakeLane || isCompFolderDisplay || pendingDeletion ? () => undefined : onResizeBlock}
+                    onSelectBlock={isGhost || pendingDeletion ? () => undefined : (blockId, options) =>
                       handleTimelineBlockSelect(block, blockId, options)}
-                    onUpdateBlock={isGhost ? () => undefined : onUpdateBlock}
-                    onDeleteBlock={isGhost || isTakeLane || isCompFolderDisplay ? () => undefined : onDeleteBlock}
-                    onDraggingChange={isGhost ? () => undefined : setIsDraggingBlock}
-                    readOnly={isGhost || isTakeLane || isCompFolderDisplay}
+                    onUpdateBlock={isGhost || pendingDeletion ? () => undefined : onUpdateBlock}
+                    onDeleteBlock={isGhost || isTakeLane || isCompFolderDisplay || pendingDeletion ? () => undefined : onDeleteBlock}
+                    onDraggingChange={isGhost || pendingDeletion ? () => undefined : setIsDraggingBlock}
+                    readOnly={isGhost || isTakeLane || isCompFolderDisplay || pendingDeletion}
                     isTakeFolderExpanded={
                       block.recordingCompGroupId
                         ? expandedTakeGroups.includes(block.recordingCompGroupId)

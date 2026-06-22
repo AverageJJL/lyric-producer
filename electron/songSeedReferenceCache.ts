@@ -18,6 +18,17 @@ type CacheFile = {
   entries: Record<string, CacheEntry>;
 };
 
+type SeedCacheEntry = CacheEntry | {
+  savedAt: string;
+  analysisId: string;
+};
+
+type SeedCacheFile = {
+  version: 1;
+  entries: Record<string, SeedCacheEntry>;
+  analyses?: Record<string, SongSeedReferenceAnalysis>;
+};
+
 type CacheRequest = {
   track?: SongSeedTrack;
   title?: string;
@@ -26,6 +37,10 @@ type CacheRequest = {
 
 function emptyCache(): CacheFile {
   return {version: 1, entries: {}};
+}
+
+function emptySeedCache(): SeedCacheFile {
+  return {version: 1, entries: {}, analyses: {}};
 }
 
 function isAnalysis(value: unknown): value is SongSeedReferenceAnalysis {
@@ -43,6 +58,17 @@ function readCache(cachePath?: string): CacheFile {
     return parsed.version === 1 && parsed.entries ? {version: 1, entries: parsed.entries} : emptyCache();
   } catch {
     return emptyCache();
+  }
+}
+
+function readSeedCache(cachePath?: string): SeedCacheFile {
+  if (!cachePath || !fs.existsSync(cachePath)) return emptySeedCache();
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cachePath, 'utf8')) as Partial<SeedCacheFile>;
+    if (parsed.version !== 1 || !parsed.entries) return emptySeedCache();
+    return {version: 1, entries: parsed.entries, analyses: parsed.analyses ?? {}};
+  } catch {
+    return emptySeedCache();
   }
 }
 
@@ -73,17 +99,78 @@ export function referenceCacheKeys(request: CacheRequest, source: SongSeedRefere
   ].filter((item): item is string => Boolean(item));
 }
 
+function analysisFromSeedEntry(cache: SeedCacheFile, entry: SeedCacheEntry | undefined): SongSeedReferenceAnalysis | null {
+  if (!entry) return null;
+  if ('analysis' in entry && isAnalysis(entry.analysis)) return entry.analysis;
+  if ('analysisId' in entry) {
+    const analysis = cache.analyses?.[entry.analysisId];
+    if (isAnalysis(analysis)) return analysis;
+  }
+  return null;
+}
+
+function cachedAnalysis(analysis: SongSeedReferenceAnalysis, source?: SongSeedReferenceSource): SongSeedReferenceAnalysis {
+  return {
+    ...analysis,
+    ...(source ? {source} : {}),
+    cacheStatus: 'cache',
+  };
+}
+
+function readCacheKeys(
+  cache: CacheFile,
+  keys: string[],
+  source?: SongSeedReferenceSource,
+): SongSeedReferenceAnalysis | null {
+  for (const key of keys) {
+    const analysis = cache.entries[key]?.analysis;
+    if (isAnalysis(analysis)) return cachedAnalysis(analysis, source);
+  }
+  return null;
+}
+
+function readSeedCacheKeys(
+  cache: SeedCacheFile,
+  keys: string[],
+  source?: SongSeedReferenceSource,
+): SongSeedReferenceAnalysis | null {
+  for (const key of keys) {
+    const analysis = analysisFromSeedEntry(cache, cache.entries[key]);
+    if (analysis) return cachedAnalysis(analysis, source);
+  }
+  return null;
+}
+
+export function readReferenceCacheBySong(
+  cachePath: string | undefined,
+  request: CacheRequest,
+): SongSeedReferenceAnalysis | null {
+  const key = referenceSongCacheKey(request);
+  return key ? readCacheKeys(readCache(cachePath), [key]) : null;
+}
+
+export function readReferenceSeedCacheBySong(
+  cachePath: string | undefined,
+  request: CacheRequest,
+): SongSeedReferenceAnalysis | null {
+  const key = referenceSongCacheKey(request);
+  return key ? readSeedCacheKeys(readSeedCache(cachePath), [key]) : null;
+}
+
 export function readReferenceCache(
   cachePath: string | undefined,
   request: CacheRequest,
   source: SongSeedReferenceSource,
 ): SongSeedReferenceAnalysis | null {
-  const cache = readCache(cachePath);
-  for (const key of referenceCacheKeys(request, source)) {
-    const analysis = cache.entries[key]?.analysis;
-    if (isAnalysis(analysis)) return {...analysis, source, cacheStatus: 'cache'};
-  }
-  return null;
+  return readCacheKeys(readCache(cachePath), referenceCacheKeys(request, source), source);
+}
+
+export function readReferenceSeedCache(
+  cachePath: string | undefined,
+  request: CacheRequest,
+  source: SongSeedReferenceSource,
+): SongSeedReferenceAnalysis | null {
+  return readSeedCacheKeys(readSeedCache(cachePath), referenceCacheKeys(request, source), source);
 }
 
 export function writeReferenceCache(

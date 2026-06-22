@@ -64,7 +64,7 @@ export function WorkspaceNavButtons({
           <MixerSlidersIcon className="workspace-nav-icon" />
         </button>
       </div>
-      <div className="workspace-nav-group" role="group" aria-label="Copilot">
+      <div className="workspace-nav-group" role="group" aria-label="Co-producer">
         <button
           type="button"
           className={`workspace-nav-button ${rightPanel === 'lyrics' ? 'active' : ''}`}
@@ -76,7 +76,7 @@ export function WorkspaceNavButtons({
         <button
           type="button"
           className={`workspace-nav-button ${rightPanel === 'copilot' ? 'active' : ''}`}
-          aria-label="Copilot"
+          aria-label="Co-producer"
           aria-pressed={rightPanel === 'copilot'}
           data-guide-target={GUIDE_TARGET_IDS['copilot-button']}
           onClick={() => onToggleRightPanel('copilot')}>

@@ -74,7 +74,7 @@ afterEach(() => {
 });
 
 async function sendCopilotMessage(text: string, expectedAnswer: string): Promise<void> {
-  const input = screen.getByRole('textbox', {name: 'Message Copilot'});
+  const input = screen.getByRole('textbox', {name: 'Message Co-producer'});
   fireEvent.change(input, {target: {value: text}});
   fireEvent.click(screen.getByRole('button', {name: 'Send message'}));
   await screen.findByText(expectedAnswer);
@@ -88,7 +88,7 @@ test('sends more than six previous Copilot messages before compaction', async ()
   });
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
   for (let index = 1; index <= 5; index += 1) {
     await sendCopilotMessage(`Question ${index}`, `ok-${index}`);
   }
@@ -106,7 +106,7 @@ test('auto-compacts older Copilot chat and sends summary plus recent tail', asyn
   compact.mockResolvedValue({ok: true, summary: 'Compacted durable memory.'});
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
   const longPrompt = 'compose '.repeat(4700);
   for (let index = 1; index <= 9; index += 1) {
     await sendCopilotMessage(`${longPrompt}${index}`, `long-ok-${index}`);
@@ -133,13 +133,13 @@ test('keeps Copilot chats across sidebar close, new chat, and history selection'
   });
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
   await sendCopilotMessage('First question', 'answer-1');
 
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
   expect(screen.queryByText('answer-1')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', {name: 'Copilot'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Co-producer'}));
   expect(screen.getByText('First question')).toBeInTheDocument();
   expect(screen.getByText('answer-1')).toBeInTheDocument();
 
